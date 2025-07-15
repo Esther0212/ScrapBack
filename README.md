@@ -3,6 +3,8 @@
 
 ---
 
+---
+
 ## ✅ 1. File Naming Convention
 
 Use **camelCase** for all filenames (especially in the `/app` and `/components` folders) to keep consistency and avoid confusion.
