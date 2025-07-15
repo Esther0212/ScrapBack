@@ -1,11 +1,5 @@
-Here’s a clean, professional, and developer-friendly `README.md` version of your instructions — including best practices, examples, and references:
-
----
-
 ````markdown
-# 📱 ScrapBack React Native (Expo Router) Project Guidelines
-
-Welcome to the ScrapBack codebase! This guide helps keep our project organized and consistent. Please follow the conventions below when developing.
+# PLEASE
 
 ---
 
