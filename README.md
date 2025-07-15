@@ -1,51 +1,50 @@
-````markdown
-# PLEASE FOLLOW:
 
 ---
 
+```markdown
+# 📱 ScrapBack React Native Guidelines
+
+Welcome to the ScrapBack project! Please follow these coding practices to keep our codebase clean, consistent, and easy to maintain.
+
 ---
 
-## ✅ 1. File Naming Convention
+## ✅ File Naming
 
-Use **camelCase** for all filenames (especially in the `/app` and `/components` folders) to keep consistency and avoid confusion.
+Use **camelCase** for all file and folder names.
 
-✅ Good:
-```sh
-loginScreen.js
-customTabBar.js
-````
-
-❌ Bad:
-
-```sh
-LoginScreen.js
-custom_tab_bar.js
-CustomTabBar.js
+✅ Example:
 ```
 
+loginScreen.js
+customTabBar.js
+
+```
+
+❌ Avoid:
+```
+
+LoginScreen.js
+custom\_tab\_bar.js
+
+````
+
 ---
 
-## ✅ 2. Always Use `SafeAreaView`
+## ✅ SafeAreaView: Always Use It!
 
-To prevent layout issues (e.g., overlapping with the status bar on devices like iPhone X), **wrap all page content** inside a `SafeAreaView` (and `SafeAreaProvider` if needed):
-
-### Installation:
+To make sure your screen content doesn't overlap with the status bar (especially on devices like iPhone X), always use:
 
 ```js
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-```
 
-### Usage:
-
-```js
 <SafeAreaProvider>
   <SafeAreaView style={styles.SafeAreaView}>
-    {/* Your screen content here */}
+    {/* Page content here */}
   </SafeAreaView>
 </SafeAreaProvider>
-```
+````
 
-### Style Example:
+And your styles should include:
 
 ```js
 const styles = StyleSheet.create({
@@ -55,44 +54,37 @@ const styles = StyleSheet.create({
 });
 ```
 
-📖 Reference:
-[React Native and iPhone X SafeAreaView (bram.us)](https://www.bram.us/2018/02/20/react-native-and-iphone-x-safeareaview/)
+📎 Reference: [React Native and iPhone X SafeAreaView](https://www.bram.us/2018/02/20/react-native-and-iphone-x-safeareaview/)
 
 ---
 
-## ✅ 3. Component Export Format
+## ✅ Export Default Format
 
-Always use the following pattern when creating functional components:
+Always define your components before exporting them. This makes your code easier to read, reuse, and debug.
+
+✅ Correct:
 
 ```js
 const Layout = () => {
-  // your component code here
+  // component logic
 };
 
 export default Layout;
 ```
 
-❌ Avoid directly exporting anonymous functions like this:
+❌ Don’t do this:
 
 ```js
 export default () => {
-  return <View />;
+  // logic here
 };
 ```
 
-This improves component reusability and naming in error stacks and dev tools.
-
 ---
 
-## ✅ 4. Custom Background Wrapper
+## ✅ Use CustomBgColor for Page Backgrounds
 
-We have a `CustomBgColor` wrapper component located at:
-
-```
-/src/components/customBgColor.js
-```
-
-Wrap your pages with this component to apply consistent background styling.
+In `/components/customBgColor.js`, we created a wrapper that applies the app’s background styling. Just wrap your page content with it like this:
 
 ```js
 <CustomBgColor>
@@ -100,18 +92,20 @@ Wrap your pages with this component to apply consistent background styling.
 </CustomBgColor>
 ```
 
+This keeps all screens visually consistent.
+
 ---
 
-## ✅ 5. Icon Management via Centralized Import
+## ✅ Use the Icons Component for All Icons
 
-Instead of importing individual icons on each page like:
+Instead of importing multiple icons on every screen like this:
 
 ```js
 import AntDesign from '@expo/vector-icons/AntDesign';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 ```
 
-✅ **Use the centralized icon handler** in `/components/Icons.js`:
+**Just use the shortcut:**
 
 ```js
 import { Icons } from "../components/Icons";
@@ -121,25 +115,11 @@ const Icon = Icons.MaterialCommunityIcons;
 <Icon name="account-circle-outline" size={30} color="#008243" />
 ```
 
-### `Icons.js` Sample:
-
-```js
-// src/components/Icons.js
-import { AntDesign } from '@expo/vector-icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Feather } from '@expo/vector-icons';
-// Add more as needed...
-
-export const Icons = {
-  AntDesign,
-  MaterialCommunityIcons,
-  Feather,
-};
-```
+This is cleaner and more efficient — especially when using multiple icon sets.
 
 ---
 
-## 🧪 Sample Login Screen
+### ✅ Sample: Login Screen
 
 ```js
 import React from "react";
@@ -189,6 +169,3 @@ const styles = StyleSheet.create({
 
 export default Login;
 ```
-
----
-
