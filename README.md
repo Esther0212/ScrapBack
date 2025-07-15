@@ -1,18 +1,38 @@
-
 ---
 
 ```markdown
-# 📱 ScrapBack React Native Guidelines
+<p align="center">
+  <img alt="ScrapBack Logo" src="resources/scrapback_banner.png" width="450" />
+  <h2 align="center">ScrapBack 📦</h2>
+</p>
 
-Welcome to the ScrapBack project! Please follow these coding practices to keep our codebase clean, consistent, and easy to maintain.
+A React Native app for managing waste pickups and recycling requests with a modern, consistent code structure.
 
 ---
 
-## ✅ File Naming
+## 📁 Contents
+
+- [About](#about)
+- [File Naming](#file-naming)
+- [SafeAreaView Usage](#safeareaview-usage)
+- [Export Convention](#export-convention)
+- [Custom Components](#custom-components)
+- [Icons Best Practice](#icons-best-practice)
+- [Sample Login Page](#sample-login-page)
+
+---
+
+## 🧾 About
+
+ScrapBack helps users request waste pickups, locate recyclers, and manage their profile — all in one place. This document outlines best practices to keep our codebase clean, consistent, and scalable.
+
+---
+
+## 🐪 File Naming
 
 Use **camelCase** for all file and folder names.
 
-✅ Example:
+✅ Correct:
 ```
 
 loginScreen.js
@@ -30,21 +50,19 @@ custom\_tab\_bar.js
 
 ---
 
-## ✅ SafeAreaView: Always Use It!
+## 📐 SafeAreaView Usage
 
-To make sure your screen content doesn't overlap with the status bar (especially on devices like iPhone X), always use:
+Always wrap your screens in `SafeAreaView` to avoid overlapping with notches, top bars, and system UI elements.
 
 ```js
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 <SafeAreaProvider>
   <SafeAreaView style={styles.SafeAreaView}>
-    {/* Page content here */}
+    {/* Page content */}
   </SafeAreaView>
 </SafeAreaProvider>
 ````
-
-And your styles should include:
 
 ```js
 const styles = StyleSheet.create({
@@ -54,58 +72,56 @@ const styles = StyleSheet.create({
 });
 ```
 
-📎 Reference: [React Native and iPhone X SafeAreaView](https://www.bram.us/2018/02/20/react-native-and-iphone-x-safeareaview/)
+🔗 Reference:
+[React Native and iPhone X SafeAreaView](https://www.bram.us/2018/02/20/react-native-and-iphone-x-safeareaview/)
 
 ---
 
-## ✅ Export Default Format
+## 📤 Export Convention
 
-Always define your components before exporting them. This makes your code easier to read, reuse, and debug.
+Always export components this way to keep things modular and predictable.
 
 ✅ Correct:
 
 ```js
 const Layout = () => {
-  // component logic
+  // component code
 };
 
 export default Layout;
 ```
 
-❌ Don’t do this:
+❌ Avoid:
 
 ```js
 export default () => {
-  // logic here
+  // anonymous export
 };
 ```
 
 ---
 
-## ✅ Use CustomBgColor for Page Backgrounds
+## 🎨 Custom Components
 
-In `/components/customBgColor.js`, we created a wrapper that applies the app’s background styling. Just wrap your page content with it like this:
+Wrap your screens with `CustomBgColor` to apply our app's consistent background color.
 
 ```js
+import CustomBgColor from "../components/customBgColor";
+
 <CustomBgColor>
-  {/* Page content */}
+  {/* screen content here */}
 </CustomBgColor>
 ```
 
-This keeps all screens visually consistent.
+This keeps our UI clean and unified.
 
 ---
 
-## ✅ Use the Icons Component for All Icons
+## 🔤 Icons Best Practice
 
-Instead of importing multiple icons on every screen like this:
+All icon libraries are pre-imported in `/components/Icons.js`.
 
-```js
-import AntDesign from '@expo/vector-icons/AntDesign';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-```
-
-**Just use the shortcut:**
+✅ Use this instead of importing multiple icons manually:
 
 ```js
 import { Icons } from "../components/Icons";
@@ -115,11 +131,16 @@ const Icon = Icons.MaterialCommunityIcons;
 <Icon name="account-circle-outline" size={30} color="#008243" />
 ```
 
-This is cleaner and more efficient — especially when using multiple icon sets.
+❌ Avoid:
+
+```js
+import AntDesign from "@expo/vector-icons/AntDesign";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+```
 
 ---
 
-### ✅ Sample: Login Screen
+## 📄 Sample Login Page
 
 ```js
 import React from "react";
