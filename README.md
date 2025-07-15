@@ -1,3 +1,4 @@
+Got it! Here's your `README.md`, structured like the Lively Wallpaper one — clean, centered, easy to read, with headings, icons, and code formatting where needed.
 
 ---
 
@@ -190,4 +191,23 @@ const styles = StyleSheet.create({
 });
 
 export default Login;
+```
+
+---
+
+## 💬 Questions or Contributions?
+
+Open issues or feature suggestions are welcome in the [Discussions](https://github.com/yourusername/scrapback/discussions) tab or in the [Issues](https://github.com/yourusername/scrapback/issues) section.
+
+---
+
+## ⚖️ License
+
+This project is licensed under the [MIT License](LICENSE).
+
+```
+
+---
+
+Let me know if you'd like me to include badges, install instructions, screenshots, or a live demo section like in the Lively README.
 ```
