@@ -6,18 +6,50 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { FirebaseError } from "firebase/app";
 
+import { auth } from "../../firebase"; // Adjust path as needed
 import CustomBgColor from "../components/customBgColor";
 
 const { width } = Dimensions.get("window");
 
 const Login = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Please enter email and password");
+      return;
+    }
+
+   try {
+  await signInWithEmailAndPassword(auth, email, password);
+   Alert.alert("Login Success", "You have successfully logged in!");
+  router.replace("/Main");
+} catch (error) {
+  let message = "Login failed. Please try again.";
+
+  if (error.code === "auth/invalid-email") {
+    message = "Invalid email address.";
+  } else if (error.code === "auth/user-not-found") {
+    message = "User not found.";
+  } else if (error.code === "auth/wrong-password") {
+    message = "Incorrect password.";
+  }
+
+  Alert.alert("Login Error", message);
+}
+
+  };
 
   return (
     <CustomBgColor>
@@ -34,6 +66,8 @@ const Login = () => {
               style={styles.input}
               keyboardType="email-address"
               autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
             />
           </View>
 
@@ -45,6 +79,8 @@ const Login = () => {
                 placeholderTextColor="#888"
                 style={styles.input}
                 secureTextEntry={!passwordVisible}
+                value={password}
+                onChangeText={setPassword}
               />
               <TouchableOpacity
                 style={styles.eyeIcon}
@@ -59,28 +95,28 @@ const Login = () => {
             </View>
           </View>
 
-<View style={styles.row}>
-  <TouchableOpacity
-    style={styles.rememberMe}
-    onPress={() => setRememberMe(!rememberMe)}
-  >
-    <Ionicons
-      name={rememberMe ? "checkmark-circle" : "ellipse-outline"}
-      size={20}
-      color={rememberMe ? "#008243" : "#555"}
-    />
-    <Text style={styles.rememberText}>Remember me</Text>
-  </TouchableOpacity>
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={styles.rememberMe}
+              onPress={() => setRememberMe(!rememberMe)}
+            >
+              <Ionicons
+                name={rememberMe ? "checkmark-circle" : "ellipse-outline"}
+                size={20}
+                color={rememberMe ? "#008243" : "#555"}
+              />
+              <Text style={styles.rememberText}>Remember me</Text>
+            </TouchableOpacity>
 
-  <TouchableOpacity onPress={() => router.push("/forgotpass")}>
-    <Text style={styles.forgotText}>Forgot password?</Text>
-  </TouchableOpacity>
-</View>
+            <TouchableOpacity onPress={() => router.push("/forgotpass")}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={styles.loginButton}
             activeOpacity={0.8}
-            onPress={() => router.push("Main")}
+            onPress={handleLogin}
           >
             <Text style={styles.loginButtonText}>Log in</Text>
           </TouchableOpacity>

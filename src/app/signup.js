@@ -5,99 +5,202 @@ import {
   View,
   TouchableOpacity,
   TextInput,
+  Alert,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { collection, setDoc, doc } from "firebase/firestore";
+import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
 
 const Signup = () => {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [contact, setContact] = useState("");
+  const [address, setAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+
+  const handleSignup = async () => {
+    if (
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password ||
+      !contact ||
+      !address ||
+      !confirmPassword
+    ) {
+      Alert.alert("Please fill in all fields");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Passwords do not match");
+      return;
+    }
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = userCredential.user.uid;
+
+      await setDoc(doc(db, "user", uid), {
+        firstName,
+        lastName,
+        email,
+        contact,
+        address,
+        createdAt: new Date()
+      });
+
+      Alert.alert("Account created successfully!");
+      router.push("/"); // redirect to homepage or login
+    } catch (error) {
+      Alert.alert("Signup Error", error.message);
+    }
+  };
 
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
-          <Text style={styles.title}>Sign up to earn points!</Text>
-          <Text style={styles.subtitle}>Create your ScrapBack account now</Text>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.container}>
+            <Text style={styles.title}>Sign up to earn points!</Text>
+            <Text style={styles.subtitle}>Create your ScrapBack account now</Text>
 
-          {/* Name */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Name</Text>
-            <TextInput
-              placeholder="Your name"
-              placeholderTextColor="#777"
-              style={styles.input}
-            />
-          </View>
+            {/* Name Row */}
+            <View style={styles.rowContainer}>
+              <View style={[styles.inputContainer, styles.halfInput]}>
+                <Text style={styles.label}>First Name</Text>
+                <TextInput
+                  placeholder="First name"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  placeholderTextColor="#777"
+                  style={styles.input}
+                />
+              </View>
+              <View style={[styles.inputContainer, styles.halfInput, { marginLeft: 12 }]}>
+                <Text style={styles.label}>Last Name</Text>
+                <TextInput
+                  placeholder="Last name"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  placeholderTextColor="#777"
+                  style={styles.input}
+                />
+              </View>
+            </View>
 
-          {/* Email */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              placeholder="Your email"
-              placeholderTextColor="#777"
-              style={styles.input}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
-          {/* Contact Number */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Contact Number</Text>
-            <TextInput
-              placeholder="Your contact number"
-              placeholderTextColor="#777"
-              style={styles.input}
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          {/* Password */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Create a password</Text>
-            <View style={styles.passwordWrapper}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
               <TextInput
-                placeholder="Password"
+                placeholder="Your email"
+                value={email}
+                onChangeText={setEmail}
                 placeholderTextColor="#777"
                 style={styles.input}
-                secureTextEntry={!passwordVisible}
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setPasswordVisible(!passwordVisible)}
-              >
-                <Ionicons
-                  name={passwordVisible ? "eye-off" : "eye"}
-                  size={20}
-                  color="#555"
-                />
-              </TouchableOpacity>
             </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Contact Number</Text>
+              <TextInput
+                placeholder="Your contact number"
+                value={contact}
+                onChangeText={setContact}
+                placeholderTextColor="#777"
+                style={styles.input}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Address</Text>
+              <TextInput
+                placeholder="Your address"
+                value={address}
+                onChangeText={setAddress}
+                placeholderTextColor="#777"
+                style={styles.input}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Create a password</Text>
+              <View style={styles.passwordWrapper}>
+                <TextInput
+                  placeholder="Password"
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholderTextColor="#777"
+                  style={styles.input}
+                  secureTextEntry={!passwordVisible}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setPasswordVisible(!passwordVisible)}
+                >
+                  <Ionicons
+                    name={passwordVisible ? "eye-off" : "eye"}
+                    size={20}
+                    color="#555"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Confirm password</Text>
+              <View style={styles.passwordWrapper}>
+                <TextInput
+                  placeholder="Confirm password"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholderTextColor="#777"
+                  style={styles.input}
+                  secureTextEntry={!confirmPasswordVisible}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+                >
+                  <Ionicons
+                    name={confirmPasswordVisible ? "eye-off" : "eye"}
+                    size={20}
+                    color="#555"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.signupButton}
+              activeOpacity={0.85}
+              onPress={handleSignup}
+            >
+              <Text style={styles.signupButtonText}>Sign Up</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.loginLink}
+              onPress={() => router.push("/login")}
+            >
+              <Text style={styles.loginText}>
+                Already have an account?{" "}
+                <Text style={styles.loginTextBold}>Log in</Text>
+              </Text>
+            </TouchableOpacity>
           </View>
-
-          {/* Sign Up Button */}
-          <TouchableOpacity
-            style={styles.signupButton}
-            activeOpacity={0.85}
-            onPress={() => router.push("/")}
-          >
-            <Text style={styles.signupButtonText}>Sign Up</Text>
-          </TouchableOpacity>
-
-          {/* Log in Link */}
-          <TouchableOpacity
-            style={styles.loginLink}
-            onPress={() => router.push("/login")}
-          >
-            <Text style={styles.loginText}>
-              Already have an account?{" "}
-              <Text style={styles.loginTextBold}>Log in</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </CustomBgColor>
   );
@@ -106,6 +209,10 @@ const Signup = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
   },
   container: {
     flex: 1,
@@ -124,6 +231,13 @@ const styles = StyleSheet.create({
     color: "#555",
     textAlign: "center",
     marginBottom: 40,
+  },
+  rowContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  halfInput: {
+    flex: 1,
   },
   inputContainer: {
     marginBottom: 22,
