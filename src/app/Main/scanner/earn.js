@@ -14,7 +14,7 @@ export default function EarnPointsQR() {
         </Text>
 
         <Image
-          source={require("../../../assets/sample-qr.png")}
+          source={require("../../../assets/scanner/sample-qr.png")}
           style={styles.qrImage}
         />
 

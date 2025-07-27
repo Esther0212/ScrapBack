@@ -1,107 +1,410 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import {
   StyleSheet,
-  Text,
   View,
-  TouchableOpacity,
   Dimensions,
-  Image,
+  Text,
+  TouchableOpacity,
+  Animated,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
-import LogoImage from "../assets/login.png"; // Update path if needed
+import pacafacoLogo from "../assets/splash/pacafacoLogo.png";
+import upperVector from "../assets/splash/upperVector.png";
+import lowerVector from "../assets/splash/lowerVector.png";
+import scrap from "../assets/splash/scrap.png";
+import back from "../assets/splash/back.png";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
-const Splash = () => {
+const D = 800;
+const P = 300;
+
+export default function Splash() {
+  const hasSkipped = useRef(false);
+
+  const bg = useRef(new Animated.Value(0)).current;
+
+  const logoOp = useRef(new Animated.Value(0)).current;
+  const pacX = useRef(new Animated.Value(-width)).current;
+  const solX = useRef(new Animated.Value(width)).current;
+
+  const scrapOp = useRef(new Animated.Value(0)).current;
+  const backOp = useRef(new Animated.Value(0)).current;
+
+  const upY = useRef(new Animated.Value(-height)).current;
+  const downY = useRef(new Animated.Value(height)).current;
+
+  const scrapX = useRef(new Animated.Value(-width)).current;
+  const backX = useRef(new Animated.Value(width)).current;
+  const backY = useRef(new Animated.Value(-20)).current; // start slightly up (optional)
+
+  const exploreX = useRef(new Animated.Value(-width)).current;
+  const descX = useRef(new Animated.Value(width)).current;
+  const loginX = useRef(new Animated.Value(-width)).current;
+  const signupX = useRef(new Animated.Value(width)).current;
+
+  const playMainAnimations = Animated.parallel([
+    Animated.timing(upY, {
+      toValue: 0,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(downY, {
+      toValue: 0,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(scrapX, {
+      toValue: 0,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(backX, {
+      toValue: 0,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(scrapOp, {
+      toValue: 1,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(backOp, {
+      toValue: 1,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(exploreX, {
+      toValue: 0,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(descX, {
+      toValue: 0,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(loginX, {
+      toValue: 0,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(signupX, {
+      toValue: 0,
+      duration: D,
+      useNativeDriver: true,
+    }),
+  ]);
+
+  const playInitialAnimations = () => {
+    Animated.sequence([
+      Animated.delay(P),
+      Animated.parallel([
+        Animated.timing(logoOp, {
+          toValue: 1,
+          duration: D,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pacX, {
+          toValue: 0,
+          duration: D,
+          useNativeDriver: true,
+        }),
+        Animated.timing(solX, {
+          toValue: 0,
+          duration: D,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.delay(P),
+      Animated.timing(bg, { toValue: 1, duration: D, useNativeDriver: false }),
+      Animated.delay(P),
+      Animated.parallel([
+        Animated.timing(logoOp, {
+          toValue: 0,
+          duration: D,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pacX, {
+          toValue: -width,
+          duration: D,
+          useNativeDriver: true,
+        }),
+        Animated.timing(solX, {
+          toValue: width,
+          duration: D,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.delay(P),
+      playMainAnimations,
+    ]).start();
+  };
+
+  const handleSkip = () => {
+    if (hasSkipped.current) return;
+    hasSkipped.current = true;
+
+    // Immediately jump background color to green
+    bg.setValue(1);
+
+    // Instantly hide PACAFACO logo and texts
+    Animated.parallel([
+      Animated.timing(logoOp, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pacX, {
+        toValue: -width,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(solX, {
+        toValue: width,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      playMainAnimations.start();
+    });
+  };
+
+  useEffect(() => {
+    playInitialAnimations();
+  }, []);
+
+  const backgroundColor = bg.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#F5FFED", "#B6D799"],
+  });
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.content}>
-        <Image source={LogoImage} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.subtitle}>Explore the app</Text>
-        <Text style={styles.description}>
-          All your recyclables in one place,
-          {"\n"}rewarding you every step of the way.
-        </Text>
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={() => router.push("/login")}
+    <TouchableWithoutFeedback onPress={handleSkip}>
+      <Animated.View style={[styles.container, { backgroundColor }]}>
+        <Animated.Image
+          source={pacafacoLogo}
+          style={[styles.pacLogo, { opacity: logoOp }]}
+          resizeMode="contain"
+        />
+
+        <Animated.Text
+          style={[
+            styles.bigText,
+            { left: 60, transform: [{ translateX: pacX }], opacity: logoOp },
+          ]}
         >
-          <Text style={styles.loginButtonText}>Login</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.signUpButton}
-          onPress={() => router.push("/signup")}
+          PACAFACO
+        </Animated.Text>
+        <Animated.Text
+          style={[
+            styles.bigText,
+            { right: 60, transform: [{ translateX: solX }], opacity: logoOp },
+          ]}
         >
-          <Text style={styles.signUpButtonText}>Sign Up</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          Solutions
+        </Animated.Text>
+
+        <Animated.Image
+          source={upperVector}
+          style={[styles.upperVector, { transform: [{ translateY: upY }] }]}
+          resizeMode="contain"
+        />
+        <Animated.Image
+          source={lowerVector}
+          style={[styles.lowerVector, { transform: [{ translateY: downY }] }]}
+          resizeMode="contain"
+        />
+
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.content}>
+            <View style={styles.logoRow}>
+              <Animated.Image
+                source={scrap}
+                style={[
+                  styles.scrapImg,
+                  {
+                    transform: [{ translateX: scrapX }],
+                    opacity: scrapOp,
+                  },
+                ]}
+                resizeMode="contain"
+              />
+              <Animated.Image
+                source={back}
+                style={[
+                  styles.backImg,
+                  {
+                    transform: [{ translateX: backX }],
+                    opacity: backOp,
+                  },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
+
+            <Animated.Text
+              style={[
+                styles.subtitle,
+                { transform: [{ translateX: exploreX }] },
+              ]}
+            >
+              Explore the app
+            </Animated.Text>
+
+            <Animated.Text
+              style={[
+                styles.description,
+                { transform: [{ translateX: descX }] },
+              ]}
+            >
+              All your recyclables in one place,
+              {"\n"}rewarding you every step of the way.
+            </Animated.Text>
+
+            <Animated.View style={{ transform: [{ translateX: loginX }] }}>
+              <TouchableOpacity
+                style={styles.loginButton}
+                onPress={() => router.push("/login")}
+              >
+                <Text style={styles.loginButtonText}>Login</Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            <Animated.View style={{ transform: [{ translateX: signupX }] }}>
+              <TouchableOpacity
+                style={styles.signUpButton}
+                onPress={() => router.push("/signup")}
+              >
+                <Text style={styles.signUpButtonText}>Sign Up</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </SafeAreaView>
+      </Animated.View>
+    </TouchableWithoutFeedback>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F1EECF",
+  container: { flex: 1 },
+
+  pacLogo: {
+    position: "absolute",
+    top: height / 2 - 80,
+    left: width / 2 - 80,
+    width: 160,
+    height: 160,
+    zIndex: 5,
   },
+  bigText: {
+    position: "absolute",
+    top: height / 2 + 90,
+    fontSize: 32,
+    fontFamily: "Poppins_700Bold",
+    color: "#3A2E2E",
+    zIndex: 5,
+  },
+
+  upperVector: {
+    position: "absolute",
+    top: 0,
+    width: width,
+    height: (119 / 391) * width,
+    zIndex: 1,
+    alignSelf: "center",
+  },
+  lowerVector: {
+    position: "absolute",
+    bottom: 0,
+    width: width,
+    height: (482 / 393) * width,
+    zIndex: 1,
+    alignSelf: "center",
+  },
+
+  safeArea: { flex: 1, zIndex: 4 },
   content: {
     flex: 1,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 24,
   },
-  logo: {
-    width: 400,
-    height: 200,
-    resizeMode: "contain",
-    marginBottom: 20,
+
+  logoRow: {
+    height: (60 / 160) * (width * 0.45),
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 110,
+    position: "relative",
   },
+  scrapImg: {
+    position: "absolute",
+    left: width * -0.37, // but...
+    alignSelf: "center", // ensure it's still centered
+    width: width * 0.45,
+    height: (60 / 160) * (width * 0.45),
+    zIndex: 1,
+  },
+  backImg: {
+    position: "absolute",
+    left: width * 0.03 + -8.5,
+    top: height * 0.03 + 5,
+    width: width * 0.33,
+    height: (60 / 117) * (width * 0.33),
+    zIndex: 2,
+  },
+
   subtitle: {
-    fontSize: 26,           // bigger subtitle
-    fontWeight: "800",      // bolder
+    fontSize: 35,
+    fontFamily: "Poppins_700Bold",
     color: "#3A2E2E",
-    marginTop: 12,
+    textAlign: "center",
+    marginTop: 210,
     letterSpacing: 0.5,
   },
   description: {
-    textAlign: "center",
-    fontSize: 18,           // bigger description
+    fontSize: 18,
     color: "#4A4A4A",
+    textAlign: "center",
+    lineHeight: 26,
     marginVertical: 16,
-    lineHeight: 26,         // more line height for clarity
     letterSpacing: 0.3,
+    fontFamily: "Poppins_400Regular",
   },
+
   loginButton: {
     backgroundColor: "#008243",
     paddingVertical: 16,
-    width: "80%",
+    width: width - 50,
     borderRadius: 10,
-    marginTop: 28,
     alignItems: "center",
+    marginTop: 28,
   },
   loginButtonText: {
     color: "#FFFFFF",
-    fontSize: 18,           // bigger button text
+    fontSize: 18,
     fontWeight: "700",
     letterSpacing: 0.5,
+    fontFamily: "Poppins_700Bold",
   },
   signUpButton: {
     borderWidth: 1.5,
     borderColor: "#008243",
     paddingVertical: 16,
-    width: "80%",
+    width: width - 50,
     borderRadius: 10,
-    marginTop: 14,
     alignItems: "center",
+    marginTop: 14,
   },
   signUpButtonText: {
     color: "#008243",
-    fontSize: 18,           // bigger button text
+    fontSize: 18,
     fontWeight: "700",
     letterSpacing: 0.5,
+    fontFamily: "Poppins_700Bold",
   },
 });
-
-export default Splash;
