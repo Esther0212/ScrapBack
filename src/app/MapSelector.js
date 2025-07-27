@@ -15,9 +15,8 @@ export default function MapSelector() {
   const router = useRouter();
   const mapRef = useRef(null);
   const [searchText, setSearchText] = useState('');
-  const [selectedView, setSelectedView] = useState('map');
   const [region, setRegion] = useState({
-    latitude: 8.4542,
+    latitude: 8.4542, // Fallback: Cagayan de Oro
     longitude: 124.6319,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
@@ -27,6 +26,7 @@ export default function MapSelector() {
     longitude: 124.6319,
   });
 
+  // Request current location on mount
   useEffect(() => {
     (async () => {
       try {
@@ -49,6 +49,7 @@ export default function MapSelector() {
     })();
   }, []);
 
+  // Search for location by name
   const handleSearch = async () => {
     if (!searchText) return;
 
@@ -74,22 +75,16 @@ export default function MapSelector() {
 
   return (
     <View style={styles.container}>
-      {selectedView === 'map' ? (
-        <MapView
-          ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          region={region}
-          onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
-        >
-          {marker && <Marker coordinate={marker} />}
-        </MapView>
-      ) : (
-        <View style={styles.blankListView}>
-          <Text style={styles.blankText}>[ Drop-off stations here ]</Text>
-        </View>
-      )}
+      <MapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFill}
+        region={region}
+        onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
+      >
+        {marker && <Marker coordinate={marker} />}
+      </MapView>
 
-      {/* Top Overlay: Back + Search */}
+      {/* Top Overlay with Back + Search */}
       <View style={styles.topOverlay}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backButtonText}>{'<'}</Text>
@@ -103,43 +98,16 @@ export default function MapSelector() {
             onChangeText={setSearchText}
             onSubmitEditing={handleSearch}
           />
-        </View>
-      </View>
-
-      {/* Toggle: Drop-off stations */}
-      <View style={styles.toggleContainer}>
-  
-        <View style={styles.toggleButtons}>
-          <TouchableOpacity
-            style={[styles.toggleOption, selectedView === 'map' && styles.toggleSelected]}
-            onPress={() => setSelectedView('map')}
-          >
-            <Text
-              style={[styles.toggleOptionText, selectedView === 'map' && styles.toggleOptionTextSelected]}
-            >
-              Map
-            </Text>
+          <TouchableOpacity onPress={handleSearch}>
+            <Text style={styles.checkMark}>✓</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.toggleOption, selectedView === 'list' && styles.toggleSelected]}
-            onPress={() => setSelectedView('list')}
-          >
-            <Text
-              style={[styles.toggleOptionText, selectedView === 'list' && styles.toggleOptionTextSelected]}
-            >
-              List
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.toggleLabelBox}>
-          <Text style={styles.toggleLabel}>Drop-off stations</Text>
         </View>
       </View>
     </View>
   );
 }
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -177,56 +145,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
   },
-  toggleContainer: {
-    position: 'absolute',
-    top: 110,
-    left: 20,
-    right: 20,
-    zIndex: 10,
-    alignItems: 'flex-start',
-  },
-  toggleLabelBox: {
-    marginBottom: 8,
-    paddingLeft: 4,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  toggleButtons: {
-    flexDirection: 'row',
-    backgroundColor: '#ccc',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  toggleOption: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: '#ccc',
-  },
-  toggleSelected: {
-    backgroundColor: 'white',
-  },
-  toggleOptionText: {
-    fontSize: 16,
-    color: '#555',
-  },
-  toggleOptionTextSelected: {
+  checkMark: {
+    fontSize: 20,
     color: '#117D2E',
-    fontWeight: 'bold',
-  },
-  blankListView: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#f9f9f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  blankText: {
-    fontSize: 16,
-    color: '#aaa',
+    marginLeft: 8,
   },
 });

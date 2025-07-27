@@ -9,9 +9,14 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/vector-icons": "^14.1.0",
     "@expo-google-fonts/poppins": "^0.4.0",
     "@expo/vector-icons": "^14.1.0",
-    "expo": "~53.0.17",
+    "expo": "53.0.20",
+    "expo-constants": "~17.1.7",
+    "expo-linking": "~7.1.7",
+    "expo-location": "~18.1.6",
+    "expo-router": "~5.1.4",
     "expo-constants": "~17.1.7",
     "expo-font": "~13.3.2",
     "expo-linking": "~7.1.7",
@@ -20,11 +25,15 @@
     "firebase": "^12.0.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "react-dom": "19.0.0",
     "react-native": "0.79.5",
+    "react-native-maps": "1.20.1",
     "react-native-animatable": "^1.4.0",
     "react-native-reanimated": "^4.0.0",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
+    "react-native-vector-icons": "^10.3.0",
+    "react-native-web": "^0.20.0"
     "react-native-web": "^0.20.0",
     "expo-splash-screen": "~0.30.10"
   },

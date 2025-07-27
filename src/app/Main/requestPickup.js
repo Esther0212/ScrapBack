@@ -1,112 +1,31 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  ScrollView,
-} from "react-native";
-import * as Animatable from "react-native-animatable";
-import { Ionicons } from "@expo/vector-icons";
-
-const dummyData = [
-  {
-    id: "1",
-    status: "Requested",
-    statusColor: "#2da9ef",
-    recyclables: "Plastic, Metal, Glass",
-    weight: "2.5 kg",
-    datetime: "7 Sept, 13:00",
-    address: "123 Green Street, Brooklyn",
-  },
-  {
-    id: "2",
-    status: "Requested",
-    statusColor: "#2da9ef",
-    recyclables: "Plastic, Metal, Glass",
-    weight: "2.5 kg",
-    datetime: "7 Sept, 13:00",
-    address: "123 Green Street, Brooklyn",
-  },
-  {
-    id: "3",
-    status: "Pending",
-    statusColor: "#f4c430",
-    recyclables: "Plastic, Metal, Glass",
-    weight: "2.5 kg",
-    datetime: "7 Sept, 13:00",
-    address: "123 Green Street, Brooklyn",
-  },
-];
+import React from "react";
+import { StyleSheet, Text, View, Pressable } from "react-native";
+import { useRouter } from "expo-router";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import CustomBgColor from "../../components/customBgColor";
 
 const RequestPickup = () => {
-  const [showStatus, setShowStatus] = useState(true);
-
-  const renderCard = (item) => (
-    <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
-      <View style={[styles.statusTag, { backgroundColor: item.statusColor }]}>
-        <Text style={styles.statusLabel}>{item.status}</Text>
-      </View>
-      <View style={styles.cardContent}>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Recyclables:</Text> {item.recyclables}
-        </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Weight:</Text> {item.weight}
-        </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Datetime:</Text> {item.datetime}
-        </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Address:</Text> {item.address}
-        </Text>
-      </View>
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.cancelBtn}>
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.editBtn}>
-          <Text style={styles.editText}>Edit</Text>
-        </TouchableOpacity>
-      </View>
-    </Animatable.View>
-  );
+  const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Request for Pickup</Text>
+    <CustomBgColor>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.SafeAreaView}>
+          <View style={styles.container}>
+            <Text>Welcome to the Request for Pickup Page!</Text>
 
-      <TouchableOpacity
-        style={styles.statusToggle}
-        onPress={() => setShowStatus(!showStatus)}
-      >
-        <Text style={styles.statusToggleText}>Status</Text>
-        <Ionicons
-          name={showStatus ? "chevron-up" : "chevron-down"}
-          size={20}
-          color="#fff"
-        />
-      </TouchableOpacity>
-
-      {showStatus && (
-        <FlatList
-          data={dummyData}
-          renderItem={({ item }) => renderCard(item)}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 150 }}
-        />
-      )}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.fab}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    </View>
+            <Pressable
+              style={styles.button}
+              onPress={() => router.push("/PickupRequestForm")} // <-- this should match your filename
+            >
+              <Text style={styles.buttonText}>Go to Full Pickup Form</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </CustomBgColor>
   );
 };
-
-export default RequestPickup;
 
 const styles = StyleSheet.create({
   container: {
@@ -188,23 +107,22 @@ const styles = StyleSheet.create({
   editBtn: {
     backgroundColor: "#7ac47f",
     flex: 1,
-    padding: 10,
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
+    justifyContent: "center",
     alignItems: "center",
+    padding: 20,
   },
-  editText: {
+  button: {
+    marginTop: 20,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  buttonText: {
     color: "#fff",
+    fontSize: 16,
     fontWeight: "bold",
   },
-  
-  fab: {
-    backgroundColor: "#2fa64f",
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -28,
-  },
 });
+
+export default RequestPickup;
