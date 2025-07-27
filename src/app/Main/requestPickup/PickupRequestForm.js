@@ -77,8 +77,8 @@ export default function PickupRequestForm() {
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.requestButton}>
-        <FontAwesome name="truck" size={18} color="#fff" />
+      <TouchableOpacity style={styles.requestButton} onPress={() => router.push("Main/requestPickup")}>
+        <FontAwesome name="truck" size={18} color="#fff"/>
         <Text style={styles.requestButtonText}>Request Pickup</Text>
       </TouchableOpacity>
     </ScrollView>
