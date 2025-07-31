@@ -15,6 +15,7 @@ import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useRouter } from "expo-router";
 
 export default function PickupRequestForm() {
   const [selectedTypes, setSelectedTypes] = useState([]);
@@ -29,6 +30,7 @@ export default function PickupRequestForm() {
 
   const [showDateOnlyPicker, setShowDateOnlyPicker] = useState(false);
   const [showTimeOnlyPicker, setShowTimeOnlyPicker] = useState(false);
+const router = useRouter();
 
   const [date, setDate] = useState(new Date());
 
@@ -177,10 +179,17 @@ export default function PickupRequestForm() {
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.requestButton}>
-        <FontAwesome name="truck" size={18} color="#fff" />
-        <Text style={styles.requestButtonText}>Request Pickup</Text>
-      </TouchableOpacity>
+ <TouchableOpacity
+  style={styles.requestButton}
+  onPress={() => {
+    // Do validation here if needed
+    Alert.alert("Request Submitted", "Your pickup request has been sent.");
+    router.push("/Main/requestPickup"); // This will navigate back to the index/root screen
+  }}
+>
+  <FontAwesome name="truck" size={18} color="#fff" />
+  <Text style={styles.requestButtonText}>Request Pickup</Text>
+</TouchableOpacity>
 
       {showDateOnlyPicker && (
         <DateTimePicker
