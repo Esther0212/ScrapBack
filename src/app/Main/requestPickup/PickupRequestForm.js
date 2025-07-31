@@ -9,10 +9,12 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 export default function PickupRequestForm() {
   const [selectedTypes, setSelectedTypes] = useState([]);
@@ -23,9 +25,12 @@ export default function PickupRequestForm() {
   const [initialRegion, setInitialRegion] = useState(null);
   const [markerCoords, setMarkerCoords] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
-
-  const recyclableTypes = ["Plastic", "Paper", "Metal", "Glass"];
   const [addressName, setAddressName] = useState("");
+
+  const [showDateOnlyPicker, setShowDateOnlyPicker] = useState(false);
+  const [showTimeOnlyPicker, setShowTimeOnlyPicker] = useState(false);
+
+  const [date, setDate] = useState(new Date());
 
   const toggleType = (type) => {
     setSelectedTypes((prev) =>
@@ -65,7 +70,7 @@ export default function PickupRequestForm() {
         latitude: coords.latitude,
         longitude: coords.longitude,
       });
-      fetchAddressName(location.coords); // <-- add this line
+      fetchAddressName(location.coords);
       setLoadingLocation(false);
     })();
   }, []);
@@ -75,12 +80,48 @@ export default function PickupRequestForm() {
     setModalVisible(false);
   };
 
+  const onChangeDate = (event, selectedDate) => {
+    if (event.type === "dismissed") {
+      setShowDateOnlyPicker(false);
+      setShowTimeOnlyPicker(false);
+      return;
+    }
+
+    if (showDateOnlyPicker) {
+      setShowDateOnlyPicker(false);
+      if (selectedDate) {
+        const updatedDate = new Date(date);
+        updatedDate.setFullYear(selectedDate.getFullYear());
+        updatedDate.setMonth(selectedDate.getMonth());
+        updatedDate.setDate(selectedDate.getDate());
+        setDate(updatedDate);
+        setShowTimeOnlyPicker(true); // show time picker after date
+      }
+    } else if (showTimeOnlyPicker) {
+      setShowTimeOnlyPicker(false);
+      if (selectedDate) {
+        const updatedDate = new Date(date);
+        updatedDate.setHours(selectedDate.getHours());
+        updatedDate.setMinutes(selectedDate.getMinutes());
+        setDate(updatedDate);
+        const formatted = updatedDate.toLocaleString("en-US", {
+          month: "long",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+        setPickupDateTime(formatted);
+      }
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.label}>Type of recyclable</Text>
       <View style={styles.card}>
         <Text style={styles.selectLabel}>Select all that applies</Text>
-        {recyclableTypes.map((type) => (
+        {["Plastic", "Paper", "Metal", "Glass"].map((type) => (
           <TouchableOpacity
             key={type}
             onPress={() => toggleType(type)}
@@ -110,7 +151,10 @@ export default function PickupRequestForm() {
         onChangeText={setWeight}
       />
 
-      <TouchableOpacity style={styles.infoBox}>
+      <TouchableOpacity
+        style={styles.infoBox}
+        onPress={() => setShowDateOnlyPicker(true)}
+      >
         <MaterialIcons name="date-range" size={24} color="green" />
         <View style={styles.infoTextContainer}>
           <Text style={styles.infoTitle}>Pickup Date & Time</Text>
@@ -138,6 +182,25 @@ export default function PickupRequestForm() {
         <Text style={styles.requestButtonText}>Request Pickup</Text>
       </TouchableOpacity>
 
+      {showDateOnlyPicker && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onChange={onChangeDate}
+        />
+      )}
+
+      {showTimeOnlyPicker && (
+        <DateTimePicker
+          value={date}
+          mode="time"
+          is24Hour={false}
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onChange={onChangeDate}
+        />
+      )}
+
       {/* Map Modal */}
       <Modal visible={modalVisible} animationType="slide">
         <View style={{ flex: 1 }}>
@@ -158,13 +221,11 @@ export default function PickupRequestForm() {
                     onDragEnd={(e) => {
                       const coords = e.nativeEvent.coordinate;
                       setMarkerCoords(coords);
-                      fetchAddressName(coords); // update address on drag
+                      fetchAddressName(coords);
                     }}
                   />
                 )}
               </MapView>
-
-              {/* ✅ Add this below the MapView */}
               <TextInput
                 style={styles.addressInput}
                 value={addressName}
@@ -174,7 +235,6 @@ export default function PickupRequestForm() {
               />
             </>
           )}
-
           <View style={styles.modalFooter}>
             <TouchableOpacity
               style={styles.cancelBtn}
@@ -198,6 +258,7 @@ export default function PickupRequestForm() {
 const styles = StyleSheet.create({
   container: {
     padding: 20,
+    paddingTop: 40, 
     backgroundColor: "#F0F0C0",
     flexGrow: 1,
   },
@@ -316,16 +377,15 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
- addressInput: {
-  marginTop: 12,
-  fontSize: 16,
-  fontWeight: "500",
-  textAlign: "center",
-  padding: 10,
-  borderColor: "#ccc",
-  borderWidth: 1,
-  borderRadius: 8,
-  backgroundColor: "#fff",
-},
-
+  addressInput: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: "500",
+    textAlign: "center",
+    padding: 10,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+  },
 });
