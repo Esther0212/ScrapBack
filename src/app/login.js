@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -18,6 +19,38 @@ const { width } = Dimensions.get("window");
 const Login = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState({ email: "", password: "" });
+
+  const validateEmail = (email) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  };
+
+  const handleLogin = () => {
+    let tempErrors = { email: "", password: "" };
+    let isValid = true;
+
+    if (!email) {
+      tempErrors.email = "Email is required";
+      isValid = false;
+    } else if (!validateEmail(email)) {
+      tempErrors.email = "Enter a valid email address";
+      isValid = false;
+    }
+
+    if (!password) {
+      tempErrors.password = "Password is required";
+      isValid = false;
+    }
+
+    setErrors(tempErrors);
+
+    if (isValid) {
+      router.push("Main");
+    }
+  };
 
   return (
     <CustomBgColor>
@@ -34,7 +67,15 @@ const Login = () => {
               style={styles.input}
               keyboardType="email-address"
               autoCapitalize="none"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                setErrors({ ...errors, email: "" });
+              }}
             />
+            {errors.email ? (
+              <Text style={styles.errorText}>{errors.email}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -45,6 +86,11 @@ const Login = () => {
                 placeholderTextColor="#888"
                 style={styles.input}
                 secureTextEntry={!passwordVisible}
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  setErrors({ ...errors, password: "" });
+                }}
               />
               <TouchableOpacity
                 style={styles.eyeIcon}
@@ -57,30 +103,33 @@ const Login = () => {
                 />
               </TouchableOpacity>
             </View>
+            {errors.password ? (
+              <Text style={styles.errorText}>{errors.password}</Text>
+            ) : null}
           </View>
 
-<View style={styles.row}>
-  <TouchableOpacity
-    style={styles.rememberMe}
-    onPress={() => setRememberMe(!rememberMe)}
-  >
-    <Ionicons
-      name={rememberMe ? "checkmark-circle" : "ellipse-outline"}
-      size={20}
-      color={rememberMe ? "#008243" : "#555"}
-    />
-    <Text style={styles.rememberText}>Remember me</Text>
-  </TouchableOpacity>
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={styles.rememberMe}
+              onPress={() => setRememberMe(!rememberMe)}
+            >
+              <Ionicons
+                name={rememberMe ? "checkmark-circle" : "ellipse-outline"}
+                size={20}
+                color={rememberMe ? "#008243" : "#555"}
+              />
+              <Text style={styles.rememberText}>Remember me</Text>
+            </TouchableOpacity>
 
-  <TouchableOpacity onPress={() => router.push("/forgotpass")}>
-    <Text style={styles.forgotText}>Forgot password?</Text>
-  </TouchableOpacity>
-</View>
+            <TouchableOpacity onPress={() => router.push("/forgotpass")}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={styles.loginButton}
             activeOpacity={0.8}
-            onPress={() => router.push("Main")}
+            onPress={handleLogin}
           >
             <Text style={styles.loginButtonText}>Log in</Text>
           </TouchableOpacity>
@@ -198,6 +247,11 @@ const styles = StyleSheet.create({
   signupTextBold: {
     fontWeight: "700",
     textDecorationLine: "underline",
+  },
+  errorText: {
+    color: "red",
+    fontSize: 13,
+    marginTop: 4,
   },
 });
 
