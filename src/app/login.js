@@ -14,7 +14,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { FirebaseError } from "firebase/app";
 
-import { auth } from "../../firebase"; // Adjust path as needed
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
 
 const { width } = Dimensions.get("window");
@@ -30,26 +32,39 @@ const Login = () => {
       Alert.alert("Please enter email and password");
       return;
     }
-
-   try {
-  await signInWithEmailAndPassword(auth, email, password);
-   Alert.alert("Login Success", "You have successfully logged in!");
-  router.replace("/Main");
-} catch (error) {
-  let message = "Login failed. Please try again.";
-
-  if (error.code === "auth/invalid-email") {
-    message = "Invalid email address.";
-  } else if (error.code === "auth/user-not-found") {
-    message = "User not found.";
-  } else if (error.code === "auth/wrong-password") {
-    message = "Incorrect password.";
-  }
-
-  Alert.alert("Login Error", message);
-}
-
-  };
+  
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+  
+      // Fetch user info from Firestore
+      const userDocRef = doc(db, "user", user.uid); // not 'users'
+      const userDocSnap = await getDoc(userDocRef);
+  
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        const firstName = userData.firstName || "";
+  
+        // Save to AsyncStorage BEFORE navigating
+        await AsyncStorage.setItem("firstName", firstName);
+      }
+  
+      Alert.alert("Login Success", "You have successfully logged in!");
+      router.replace("/Main");
+    } catch (error) {
+      let message = "Login failed. Please try again.";
+  
+      if (error.code === "auth/invalid-email") {
+        message = "Invalid email address.";
+      } else if (error.code === "auth/user-not-found") {
+        message = "User not found.";
+      } else if (error.code === "auth/wrong-password") {
+        message = "Incorrect password.";
+      }
+  
+      Alert.alert("Login Error", message);
+    }
+  };  
 
   return (
     <CustomBgColor>
