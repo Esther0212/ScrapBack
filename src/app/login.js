@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -22,6 +22,7 @@ import CustomBgColor from "../components/customBgColor";
 const { width } = Dimensions.get("window");
 
 const Login = () => {
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -37,7 +38,7 @@ const Login = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
   
-      // Fetch user info from Firestore
+      // 🔥 Fetch user info from Firestore
       const userDocRef = doc(db, "user", user.uid); // not 'users'
       const userDocSnap = await getDoc(userDocRef);
   
@@ -45,7 +46,7 @@ const Login = () => {
         const userData = userDocSnap.data();
         const firstName = userData.firstName || "";
   
-        // Save to AsyncStorage BEFORE navigating
+        // ✅ Save to AsyncStorage BEFORE navigating
         await AsyncStorage.setItem("firstName", firstName);
       }
   
@@ -64,7 +65,18 @@ const Login = () => {
   
       Alert.alert("Login Error", message);
     }
-  };  
+  };
+  
+  useEffect(() => {
+    const loadFirstName = async () => {
+      const name = await AsyncStorage.getItem("firstName");
+      if (name) {
+        setFirstName(name);
+      }
+    };
+    loadFirstName();
+  }, []);
+  
 
   return (
     <CustomBgColor>
