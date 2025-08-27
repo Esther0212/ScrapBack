@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -21,19 +21,34 @@ import CustomBgColor from "../components/customBgColor";
 const { width } = Dimensions.get("window");
 
 const Login = () => {
-  const [firstName, setFirstName] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
 
-  const validateEmail = (email) => {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(email);
-  };
+  // Validate email format
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const handleLogin = () => {
+  // Auto-login check on mount
+  useEffect(() => {
+    const checkStoredUser = async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem("user");
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          setName(parsedUser.name || "");
+          router.replace("/Main");
+        }
+      } catch (err) {
+        console.log("Auto-login error:", err);
+      }
+    };
+    checkStoredUser();
+  }, []);
+
+  const handleLogin = async () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
 
@@ -51,9 +66,48 @@ const Login = () => {
     }
 
     setErrors(tempErrors);
+    if (!isValid) return;
 
-    if (isValid) {
-      router.push("Main");
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setName(userData.name || ""); // <-- fetch `name` from Firestore
+
+        // Save session if rememberMe is checked
+        if (rememberMe) {
+          await AsyncStorage.setItem(
+            "user",
+            JSON.stringify({
+              uid: user.uid,
+              email: user.email,
+              name: userData.name || "",
+            })
+          );
+        } else {
+          await AsyncStorage.removeItem("user");
+        }
+
+        router.push("/Main");
+      } else {
+        Alert.alert("Error", "User data not found in Firestore.");
+      }
+    } catch (error) {
+      console.log("Login error:", error);
+      Alert.alert("Login Failed", error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      await AsyncStorage.removeItem("user");
+      router.replace("/login");
+    } catch (err) {
+      console.log("Logout error:", err);
     }
   };
 
@@ -64,6 +118,7 @@ const Login = () => {
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Login to your account</Text>
 
+          {/* Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email address</Text>
             <TextInput
@@ -78,11 +133,10 @@ const Login = () => {
                 setErrors({ ...errors, email: "" });
               }}
             />
-            {errors.email ? (
-              <Text style={styles.errorText}>{errors.email}</Text>
-            ) : null}
+            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
           </View>
 
+          {/* Password */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordWrapper}>
@@ -108,11 +162,10 @@ const Login = () => {
                 />
               </TouchableOpacity>
             </View>
-            {errors.password ? (
-              <Text style={styles.errorText}>{errors.password}</Text>
-            ) : null}
+            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
           </View>
 
+          {/* Remember Me + Forgot Password */}
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.rememberMe}
@@ -131,6 +184,7 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
+          {/* Login Button */}
           <TouchableOpacity
             style={styles.loginButton}
             activeOpacity={0.8}
@@ -139,13 +193,13 @@ const Login = () => {
             <Text style={styles.loginButtonText}>Log in</Text>
           </TouchableOpacity>
 
+          {/* Signup Link */}
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => router.push("/signup")}
           >
             <Text style={styles.signupText}>
-              Don't have an account?{" "}
-              <Text style={styles.signupTextBold}>Sign up</Text>
+              Don't have an account? <Text style={styles.signupTextBold}>Sign up</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -155,109 +209,25 @@ const Login = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: "center",
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: "800",
-    color: "#3A2E2E",
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 17,
-    color: "#555",
-    textAlign: "center",
-    marginBottom: 42,
-  },
-  inputContainer: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#3A2E2E",
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: "#F1E3D3",
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    fontSize: 16,
-    color: "#3A2E2E",
-    borderWidth: 1,
-    borderColor: "#E0D4C3",
-  },
-  passwordWrapper: {
-    position: "relative",
-  },
-  eyeIcon: {
-    position: "absolute",
-    right: 16,
-    top: 14,
-    padding: 4,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 42,
-  },
-  rememberMe: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  rememberText: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: "#3A2E2E",
-  },
-  forgotText: {
-    fontSize: 14,
-    color: "#3A2E2E",
-    textDecorationLine: "underline",
-  },
-  loginButton: {
-    backgroundColor: "#008243",
-    paddingVertical: 18,
-    borderRadius: 14,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 5,
-    elevation: 4,
-  },
-  loginButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-  signupLink: {
-    marginTop: 24,
-    alignItems: "center",
-  },
-  signupText: {
-    fontSize: 14,
-    color: "#3A2E2E",
-  },
-  signupTextBold: {
-    fontWeight: "700",
-    textDecorationLine: "underline",
-  },
-  errorText: {
-    color: "red",
-    fontSize: 13,
-    marginTop: 4,
-  },
+  safeArea: { flex: 1 },
+  container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
+  title: { fontSize: 34, fontWeight: "800", color: "#3A2E2E", textAlign: "center", marginBottom: 6 },
+  subtitle: { fontSize: 17, color: "#555", textAlign: "center", marginBottom: 42 },
+  inputContainer: { marginBottom: 24 },
+  label: { fontSize: 15, fontWeight: "700", color: "#3A2E2E", marginBottom: 6 },
+  input: { backgroundColor: "#F1E3D3", borderRadius: 14, paddingVertical: 16, paddingHorizontal: 18, fontSize: 16, color: "#3A2E2E", borderWidth: 1, borderColor: "#E0D4C3" },
+  passwordWrapper: { position: "relative" },
+  eyeIcon: { position: "absolute", right: 16, top: 14, padding: 4 },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 42 },
+  rememberMe: { flexDirection: "row", alignItems: "center" },
+  rememberText: { marginLeft: 6, fontSize: 14, color: "#3A2E2E" },
+  forgotText: { fontSize: 14, color: "#3A2E2E", textDecorationLine: "underline" },
+  loginButton: { backgroundColor: "#008243", paddingVertical: 18, borderRadius: 14, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.25, shadowOffset: { width: 0, height: 3 }, shadowRadius: 5, elevation: 4 },
+  loginButtonText: { color: "#FFFFFF", fontSize: 18, fontWeight: "600", letterSpacing: 0.5 },
+  signupLink: { marginTop: 24, alignItems: "center" },
+  signupText: { fontSize: 14, color: "#3A2E2E" },
+  signupTextBold: { fontWeight: "700", textDecorationLine: "underline" },
+  errorText: { color: "red", fontSize: 13, marginTop: 4 },
 });
 
 export default Login;

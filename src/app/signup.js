@@ -12,21 +12,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, setDoc, doc } from "firebase/firestore";
-import { auth, db } from "../../firebase";
+import { setDoc, doc } from "firebase/firestore";
+import { auth, db } from "../../firebase"; // ✅ make sure firebase.js exports auth & db
 import CustomBgColor from "../components/customBgColor";
 
 const Signup = () => {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");
-  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
 
-  const [name, setName] = useState("");
   const [errors, setErrors] = useState({
     name: "",
     email: "",
@@ -36,9 +32,9 @@ const Signup = () => {
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const validatePassword = (password) =>
-    /^(?=.*[A-Z])(?=.*\d).{8,}$/.test(password); // min 8 chars, 1 uppercase, 1 digit
+    /^(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     let tempErrors = { name: "", email: "", contact: "", password: "" };
     let isValid = true;
 
@@ -81,12 +77,35 @@ const Signup = () => {
 
     setErrors(tempErrors);
 
-    if (isValid) {
+    if (!isValid) {
+      Alert.alert("❌ Error", "Please fix the highlighted fields.");
+      return;
+    }
+
+    try {
+      // ✅ Create user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      // ✅ Save extra info in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        name: name,
+        email: email,
+        contact: contact,
+        createdAt: new Date(),
+      });
+
+      // ✅ Show success notification
       Alert.alert("✅ Success", "Account created successfully!", [
         { text: "OK", onPress: () => router.push("/") },
       ]);
-    } else {
-      Alert.alert("❌ Error", "Please fix the highlighted fields.");
+    } catch (error) {
+      console.error("Signup error:", error);
+      Alert.alert("⚠️ Signup Failed", error.message);
     }
   };
 
@@ -98,99 +117,99 @@ const Signup = () => {
             <Text style={styles.title}>Sign up to earn points!</Text>
             <Text style={styles.subtitle}>Create your ScrapBack account now</Text>
 
-          {/* Name */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Name</Text>
-            <TextInput
-              placeholder="Your name"
-              placeholderTextColor="#777"
-              style={styles.input}
-              value={name}
-              onChangeText={(text) => {
-                setName(text);
-                setErrors({ ...errors, name: "" });
-              }}
-            />
-            {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
-          </View>
-
-          {/* Email */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              placeholder="Your email"
-              placeholderTextColor="#777"
-              style={styles.input}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                setErrors({ ...errors, email: "" });
-              }}
-            />
-            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
-          </View>
-
-          {/* Contact Number */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Contact Number</Text>
-            <TextInput
-              placeholder="Your contact number"
-              placeholderTextColor="#777"
-              style={styles.input}
-              keyboardType="phone-pad"
-              value={contact}
-              maxLength={11} // Prevents typing more than 11 digits
-              onChangeText={(text) => {
-                setContact(text.replace(/[^0-9]/g, "")); // Only digits
-                setErrors({ ...errors, contact: "" });
-              }}
-            />
-            {errors.contact ? (
-              <Text style={styles.errorText}>{errors.contact}</Text>
-            ) : null}
-          </View>
-
-          {/* Password */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Create a password</Text>
-            <View style={styles.passwordWrapper}>
+            {/* Name */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Name</Text>
               <TextInput
-                placeholder="Password"
+                placeholder="Your name"
                 placeholderTextColor="#777"
                 style={styles.input}
-                secureTextEntry={!passwordVisible}
-                value={password}
+                value={name}
                 onChangeText={(text) => {
-                  setPassword(text);
-                  setErrors({ ...errors, password: "" });
+                  setName(text);
+                  setErrors({ ...errors, name: "" });
                 }}
               />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setPasswordVisible(!passwordVisible)}
-              >
-                <Ionicons
-                  name={passwordVisible ? "eye-off" : "eye"}
-                  size={20}
-                  color="#555"
-                />
-              </TouchableOpacity>
+              {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
             </View>
-            {errors.password ? (
-              <Text style={styles.errorText}>{errors.password}</Text>
-            ) : null}
-          </View>
 
-          {/* Sign Up Button */}
-          <TouchableOpacity
-            style={styles.signupButton}
-            activeOpacity={0.85}
-            onPress={handleSignup}
-          >
-            <Text style={styles.signupButtonText}>Sign Up</Text>
-          </TouchableOpacity>
+            {/* Email */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                placeholder="Your email"
+                placeholderTextColor="#777"
+                style={styles.input}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  setErrors({ ...errors, email: "" });
+                }}
+              />
+              {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+            </View>
+
+            {/* Contact Number */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Contact Number</Text>
+              <TextInput
+                placeholder="Your contact number"
+                placeholderTextColor="#777"
+                style={styles.input}
+                keyboardType="phone-pad"
+                value={contact}
+                maxLength={11}
+                onChangeText={(text) => {
+                  setContact(text.replace(/[^0-9]/g, ""));
+                  setErrors({ ...errors, contact: "" });
+                }}
+              />
+              {errors.contact ? (
+                <Text style={styles.errorText}>{errors.contact}</Text>
+              ) : null}
+            </View>
+
+            {/* Password */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Create a password</Text>
+              <View style={styles.passwordWrapper}>
+                <TextInput
+                  placeholder="Password"
+                  placeholderTextColor="#777"
+                  style={styles.input}
+                  secureTextEntry={!passwordVisible}
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    setErrors({ ...errors, password: "" });
+                  }}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setPasswordVisible(!passwordVisible)}
+                >
+                  <Ionicons
+                    name={passwordVisible ? "eye-off" : "eye"}
+                    size={20}
+                    color="#555"
+                  />
+                </TouchableOpacity>
+              </View>
+              {errors.password ? (
+                <Text style={styles.errorText}>{errors.password}</Text>
+              ) : null}
+            </View>
+
+            {/* Sign Up Button */}
+            <TouchableOpacity
+              style={styles.signupButton}
+              activeOpacity={0.85}
+              onPress={handleSignup}
+            >
+              <Text style={styles.signupButtonText}>Sign Up</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.loginLink}
