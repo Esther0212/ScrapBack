@@ -26,6 +26,8 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({ email: "", password: "" });
 
   const validateEmail = (email) => {
@@ -33,7 +35,7 @@ const Login = () => {
     return regex.test(email);
   };
 
-  const handleLogin = async () => {
+  const handleLogin = () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
 
@@ -52,47 +54,10 @@ const Login = () => {
 
     setErrors(tempErrors);
 
-    if (!isValid) return;
-
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      const userDocRef = doc(db, "user", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        const firstName = userData.firstName || "";
-        await AsyncStorage.setItem("firstName", firstName);
-      }
-
-      Alert.alert("Login Success", "You have successfully logged in!");
-      router.replace("/Main");
-    } catch (error) {
-      let message = "Login failed. Please try again.";
-
-      if (error.code === "auth/invalid-email") {
-        message = "Invalid email address.";
-      } else if (error.code === "auth/user-not-found") {
-        message = "User not found.";
-      } else if (error.code === "auth/wrong-password") {
-        message = "Incorrect password.";
-      }
-
-      Alert.alert("Login Error", message);
+    if (isValid) {
+      router.push("Main");
     }
   };
-
-  useEffect(() => {
-    const loadFirstName = async () => {
-      const name = await AsyncStorage.getItem("firstName");
-      if (name) {
-        setFirstName(name);
-      }
-    };
-    loadFirstName();
-  }, []);
 
   return (
     <CustomBgColor>
@@ -112,10 +77,12 @@ const Login = () => {
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
-                setErrors((prev) => ({ ...prev, email: "" }));
+                setErrors({ ...errors, email: "" });
               }}
             />
-            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+            {errors.email ? (
+              <Text style={styles.errorText}>{errors.email}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -129,7 +96,7 @@ const Login = () => {
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
-                  setErrors((prev) => ({ ...prev, password: "" }));
+                  setErrors({ ...errors, password: "" });
                 }}
               />
               <TouchableOpacity
@@ -143,7 +110,9 @@ const Login = () => {
                 />
               </TouchableOpacity>
             </View>
-            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+            {errors.password ? (
+              <Text style={styles.errorText}>{errors.password}</Text>
+            ) : null}
           </View>
 
           <View style={styles.row}>
