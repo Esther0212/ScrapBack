@@ -100,7 +100,10 @@ const RequestPickup = () => {
         />
       )}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.fab} onPress={() => router.push("Main/requestPickup/PickupRequestForm")}>
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => router.push("Main/requestPickup/PickupRequestForm")}
+        >
           <Ionicons name="add" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -199,14 +202,22 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
-  
+
   fab: {
-    backgroundColor: "#2fa64f",
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -28,
-  },
+  position: "absolute",
+  bottom: 24,
+  right: 24,
+  backgroundColor: "#2fa64f",
+  width: 56,
+  height: 56,
+  borderRadius: 28,
+  alignItems: "center",
+  justifyContent: "center",
+  elevation: 5,
+  shadowColor: "#000",
+  shadowOpacity: 0.2,
+  shadowOffset: { width: 0, height: 2 },
+  shadowRadius: 4,
+},
+
 });
