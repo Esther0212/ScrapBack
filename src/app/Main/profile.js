@@ -21,6 +21,8 @@ import { auth, db, storage } from "../../../firebase";
 import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";  
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from "firebase/auth";
+import * as FileSystem from 'expo-file-system';
+
 
 const Profile = () => {
   const [name, setName] = useState("");
@@ -100,7 +102,6 @@ const Profile = () => {
   };
 
   // Upload profile picture to Firebase Storage
-  // Upload profile picture to Firebase Storage
   const handleProfileSave = async () => {
     if (!tempProfile) return;
     setUploading(true);
@@ -109,33 +110,38 @@ const Profile = () => {
       const user = auth.currentUser;
       if (!user) return;
 
-      // Convert local file to blob
-      const response = await fetch(tempProfile);
-      const blob = await response.blob();
+      // Convert image to Base64
+      const base64 = await FileSystem.readAsStringAsync(tempProfile, { encoding: FileSystem.EncodingType.Base64 });
 
-      // Upload to Firebase Storage
-      const storageRef = ref(storage, `profilePics/${user.uid}.jpg`);
-      await uploadBytes(storageRef, blob);
+      const userRef = doc(db, "user", user.uid);
 
-      // Get download URL
-      const downloadURL = await getDownloadURL(storageRef);
-
-      // Save download URL in Firestore (create/update doc)
-      await setDoc(doc(db, "user", user.uid), { profilePic: downloadURL }, { merge: true });
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        await updateDoc(userRef, { profilePic: base64 });
+      } else {
+        await setDoc(userRef, {
+          name: user.displayName || "",
+          email: user.email,
+          profilePic: base64,
+          createdAt: new Date(),
+        });
+      }
 
       // Update local state
-      setProfilePic({ uri: downloadURL });
+      setProfilePic({ uri: `data:image/jpeg;base64,${base64}` });
       setTempProfile(null);
       setProfileModalVisible(false);
 
       Alert.alert("Success", "Profile picture saved successfully!");
     } catch (error) {
-      console.log("Profile upload error:", error);
+      console.log("🔥 Profile upload error:", error);
       Alert.alert("Error", "Failed to save profile picture. Try again.");
     } finally {
       setUploading(false);
     }
   };
+
+
 
 
 
