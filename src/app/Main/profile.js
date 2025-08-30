@@ -35,9 +35,9 @@ const Profile = () => {
 
   // Modal and image
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [profileOptionsVisible, setProfileOptionsVisible] = useState(false);
   const [tempProfile, setTempProfile] = useState(null);
   const [uploading, setUploading] = useState(false);
-
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
 
@@ -66,7 +66,15 @@ const Profile = () => {
           setEmail(data.email || user.email);
           setPhone(data.contact || "");   
           setPoints(data.points || 0);
-          if (data.profilePic) setProfilePic({ uri: data.profilePic });
+
+          if (data.profilePic) {
+            // Check if it's Base64 or URL
+            if (data.profilePic.startsWith("data:")) {
+              setProfilePic({ uri: data.profilePic });
+            } else {
+              setProfilePic({ uri: `data:image/jpeg;base64,${data.profilePic}` });
+            }
+          }
         }
       } catch (error) {
         console.log("Error fetching user data:", error);
@@ -140,10 +148,6 @@ const Profile = () => {
       setUploading(false);
     }
   };
-
-
-
-
 
   // Open edit modal
   const openEditModal = (section) => {
@@ -350,31 +354,40 @@ const Profile = () => {
 
             {/* Profile Picture Modal */}
             <Modal visible={profileModalVisible} transparent animationType="slide">
-            <View style={styles.modalBackground}>
-              <View style={{ width: "90%", backgroundColor:"#fff", borderRadius: 15, padding: 20, alignItems:"center" }}>
-                {tempProfile && (
-                  <Image source={{ uri: tempProfile }} style={{ width:250, height:250, borderRadius: 125 }} />
-                )}
-                {uploading && <ActivityIndicator size="large" color="#A6D97B" style={{ marginTop: 15 }} />}
-                <View style={{ flexDirection:"row", marginTop:20, width:"100%" }}>
-                  <TouchableOpacity
-                    style={{ flex:1, marginRight:5, backgroundColor:"#ccc", padding:12, borderRadius:10, alignItems:"center" }}
-                    onPress={() => { setProfileModalVisible(false); setTempProfile(null); }}
-                    disabled={uploading}
-                  >
-                    <Text>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{ flex:1, marginLeft:5, backgroundColor:"#A6D97B", padding:12, borderRadius:10, alignItems:"center" }}
-                    onPress={handleProfileSave}
-                    disabled={uploading}
-                  >
-                    <Text>Save</Text>
-                  </TouchableOpacity>
+              <View style={styles.modalBackground}>
+                <View style={{ width: "90%", backgroundColor:"#fff", borderRadius: 15, padding: 20, alignItems:"center" }}>
+                  
+                  {/* Tap image to pick a new one */}
+                  {tempProfile && (
+                    <TouchableOpacity onPress={pickImage}>
+                      <Image source={{ uri: tempProfile }} style={{ width: 250, height: 250, borderRadius: 125 }} />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Upload indicator */}
+                  {uploading && <ActivityIndicator size="large" color="#A6D97B" style={{ marginTop: 15 }} />}
+
+                  {/* Buttons */}
+                  <View style={{ flexDirection: "row", marginTop: 20, width: "100%" }}>
+                    <TouchableOpacity
+                      style={{ flex: 1, marginRight: 5, backgroundColor: "#ccc", padding: 12, borderRadius: 10, alignItems: "center" }}
+                      onPress={() => { setProfileModalVisible(false); setTempProfile(null); }}
+                      disabled={uploading}
+                    >
+                      <Text>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, marginLeft: 5, backgroundColor: "#A6D97B", padding: 12, borderRadius: 10, alignItems: "center" }}
+                      onPress={handleProfileSave}
+                      disabled={uploading}
+                    >
+                      <Text>Save</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          </Modal>
+            </Modal>
+
 
 
             <DateTimePickerModal
