@@ -92,7 +92,7 @@ const Signup = () => {
       const user = userCredential.user;
 
       // ✅ Save extra info in Firestore
-      await setDoc(doc(db, "users", user.uid), {
+      await setDoc(doc(db, "user", user.uid), {
         name: name,
         email: email,
         contact: contact,

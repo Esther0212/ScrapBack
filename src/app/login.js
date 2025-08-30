@@ -72,7 +72,7 @@ const Login = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const userDoc = await getDoc(doc(db, "user", user.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
         setName(userData.name || ""); // <-- fetch `name` from Firestore

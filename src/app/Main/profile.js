@@ -18,7 +18,7 @@ import { Ionicons, Feather, Entypo } from "@expo/vector-icons";
 import CustomBgColor from "../../components/customBgColor";
 
 import { auth, db, storage } from "../../../firebase"; 
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";  
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from "firebase/auth";
 
@@ -55,14 +55,14 @@ const Profile = () => {
         const user = auth.currentUser;
         if (!user) return;
 
-        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const userDoc = await getDoc(doc(db, "user", user.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
           setName(data.name || "");
           setBirthdate(data.birthdate || "");
           setAddress(data.address || "");
           setEmail(data.email || user.email);
-          setPhone(data.phone || "");
+          setPhone(data.contact || "");   
           setPoints(data.points || 0);
           if (data.profilePic) setProfilePic({ uri: data.profilePic });
         }
@@ -100,6 +100,7 @@ const Profile = () => {
   };
 
   // Upload profile picture to Firebase Storage
+  // Upload profile picture to Firebase Storage
   const handleProfileSave = async () => {
     if (!tempProfile) return;
     setUploading(true);
@@ -119,8 +120,8 @@ const Profile = () => {
       // Get download URL
       const downloadURL = await getDownloadURL(storageRef);
 
-      // Save download URL in Firestore (create doc if it doesn't exist)
-      await setDoc(doc(db, "users", user.uid), { profilePic: downloadURL }, { merge: true });
+      // Save download URL in Firestore (create/update doc)
+      await setDoc(doc(db, "user", user.uid), { profilePic: downloadURL }, { merge: true });
 
       // Update local state
       setProfilePic({ uri: downloadURL });
@@ -135,6 +136,7 @@ const Profile = () => {
       setUploading(false);
     }
   };
+
 
 
   // Open edit modal
@@ -180,7 +182,7 @@ const Profile = () => {
       const user = auth.currentUser;
       if (!user) return;
 
-      const userRef = doc(db, "users", user.uid);
+      const userRef = doc(db, "user", user.uid);
       const updateData = {};
 
       if (editingSection === "General info") {
@@ -188,9 +190,12 @@ const Profile = () => {
         updateData.birthdate = birthdate;
         updateData.address = address;
       } else if (editingSection === "Contact info") {
-        updateData.phone = phone;
+        updateData.contact = phone;   
         updateData.email = email;
+
+        if (!phone) delete updateData.contact;
       }
+
 
       await updateDoc(userRef, updateData);
       Alert.alert("Success", "Profile updated successfully!");
@@ -339,31 +344,32 @@ const Profile = () => {
 
             {/* Profile Picture Modal */}
             <Modal visible={profileModalVisible} transparent animationType="slide">
-              <View style={styles.modalBackground}>
-                <View style={{ width: "90%", backgroundColor:"#fff", borderRadius: 15, padding: 20, alignItems:"center" }}>
-                  {tempProfile && (
-                    <Image source={{ uri: tempProfile }} style={{ width:250, height:250, borderRadius: 125 }} />
-                  )}
-                  {uploading && <ActivityIndicator size="large" color="#A6D97B" style={{ marginTop: 15 }} />}
-                  <View style={{ flexDirection:"row", marginTop:20, width:"100%" }}>
-                    <TouchableOpacity
-                      style={{ flex:1, marginRight:5, backgroundColor:"#ccc", padding:12, borderRadius:10, alignItems:"center" }}
-                      onPress={() => { setProfileModalVisible(false); setTempProfile(null); }}
-                      disabled={uploading}
-                    >
-                      <Text>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={{ flex:1, marginLeft:5, backgroundColor:"#A6D97B", padding:12, borderRadius:10, alignItems:"center" }}
-                      onPress={handleProfileSave}
-                      disabled={uploading}
-                    >
-                      <Text>Save</Text>
-                    </TouchableOpacity>
-                  </View>
+            <View style={styles.modalBackground}>
+              <View style={{ width: "90%", backgroundColor:"#fff", borderRadius: 15, padding: 20, alignItems:"center" }}>
+                {tempProfile && (
+                  <Image source={{ uri: tempProfile }} style={{ width:250, height:250, borderRadius: 125 }} />
+                )}
+                {uploading && <ActivityIndicator size="large" color="#A6D97B" style={{ marginTop: 15 }} />}
+                <View style={{ flexDirection:"row", marginTop:20, width:"100%" }}>
+                  <TouchableOpacity
+                    style={{ flex:1, marginRight:5, backgroundColor:"#ccc", padding:12, borderRadius:10, alignItems:"center" }}
+                    onPress={() => { setProfileModalVisible(false); setTempProfile(null); }}
+                    disabled={uploading}
+                  >
+                    <Text>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex:1, marginLeft:5, backgroundColor:"#A6D97B", padding:12, borderRadius:10, alignItems:"center" }}
+                    onPress={handleProfileSave}
+                    disabled={uploading}
+                  >
+                    <Text>Save</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-            </Modal>
+            </View>
+          </Modal>
+
 
             <DateTimePickerModal
               isVisible={isDatePickerVisible}
