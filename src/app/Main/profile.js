@@ -28,7 +28,6 @@ const Profile = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showRetypePassword, setShowRetypePassword] = useState(false);
-  
 
   const [editingSection, setEditingSection] = useState(null);
 
@@ -68,141 +67,141 @@ const Profile = () => {
               <View style={styles.editForm}>
                 {editingSection === "General info" && (
                   <>
-                     <Text style={styles.label}>Full Name</Text>
-    <View style={styles.infoRow}>
-      <TextInput
-        value={name}
-        onChangeText={setName}
-        style={styles.input}
-      />
-    </View>
+                    <Text style={styles.label}>Full Name</Text>
+                    <View style={styles.infoRow}>
+                      <TextInput
+                        value={name}
+                        onChangeText={setName}
+                        style={styles.input}
+                      />
+                    </View>
 
-    <Text style={styles.label}>Birthday</Text>
-    <View style={styles.infoRow}>
-      <TextInput
-        value={birthdate}
-        onChangeText={setBirthdate}
-        style={styles.input}
-        placeholder="YYYY-MM-DD"
-      />
-    </View>
-    <Text style={styles.label}>Address</Text>
-    <View style={styles.infoRow}>
-      <TextInput
-        value={address}
-        onChangeText={setAddress}
-        style={styles.input}
-        placeholder="Enter your address"
-      />
-    </View>
-  </>
-)}
+                    <Text style={styles.label}>Birthday</Text>
+                    <View style={styles.infoRow}>
+                      <TextInput
+                        value={birthdate}
+                        onChangeText={setBirthdate}
+                        style={styles.input}
+                        placeholder="YYYY-MM-DD"
+                      />
+                    </View>
+                    <Text style={styles.label}>Address</Text>
+                    <View style={styles.infoRow}>
+                      <TextInput
+                        value={address}
+                        onChangeText={setAddress}
+                        style={styles.input}
+                        placeholder="Enter your address"
+                      />
+                    </View>
+                  </>
+                )}
                 {editingSection === "Password" && (
                   <>
-          
-          <Text style={styles.label}>Current Password</Text>
-          <View style={styles.passwordRow}>
-            <TextInput
-  value={currentPassword}
-  onChangeText={setCurrentPassword}
-  onBlur={() => handleSendCurrent(currentPassword)}
-  style={styles.input}
-  secureTextEntry={!showCurrentPassword}
-  autoComplete="current-password"      // <--- ADD THIS
+                    <Text style={styles.label}>Current Password</Text>
+                    <View style={styles.passwordRow}>
+                      <TextInput
+                        value={currentPassword}
+                        onChangeText={setCurrentPassword}
+                        onBlur={() => handleSendCurrent(currentPassword)}
+                        style={styles.input}
+                        secureTextEntry={!showCurrentPassword}
+                        autoComplete="current-password" // <--- ADD THIS
+                      />
+                      <TouchableOpacity
+                        onPress={() =>
+                          setShowCurrentPassword(!showCurrentPassword)
+                        }
+                        style={styles.eyeIcon}
+                      >
+                        <Ionicons
+                          name={showCurrentPassword ? "eye-off" : "eye"}
+                          size={20}
+                          color="gray"
+                        />
+                      </TouchableOpacity>
+                    </View>
 
-/>
-            <TouchableOpacity
-              onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons
-                name={showCurrentPassword ? "eye-off" : "eye"}
-                size={20}
-                color="gray"
-              />
-            </TouchableOpacity>
-          </View>
+                    <Text style={styles.label}>New Password</Text>
+                    <View style={styles.passwordRow}>
+                      <TextInput
+                        style={styles.input}
+                        secureTextEntry={!showNewPassword}
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                        placeholder=""
+                        onBlur={() => handleSendNew(newPassword)}
+                        autoComplete="new-password" // <--- ADD THIS
+                        textContentType="newPassword" // <--- ADD THIS
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowNewPassword(!showNewPassword)}
+                        style={styles.eyeIcon}
+                      >
+                        <Ionicons
+                          name={showNewPassword ? "eye" : "eye-off"}
+                          size={20}
+                          color="gray"
+                        />
+                      </TouchableOpacity>
+                    </View>
 
-          <Text style={styles.label}>New Password</Text>
-<View style={styles.passwordRow}>
-  <TextInput
-  style={styles.input}
-  secureTextEntry={!showNewPassword}
-  value={newPassword}
-  onChangeText={setNewPassword}
-  placeholder=""
-  onBlur={() => handleSendNew(newPassword)}
-  autoComplete="new-password"          // <--- ADD THIS
-  textContentType="newPassword"        // <--- ADD THIS
-/>
-  <TouchableOpacity
-    onPress={() => setShowNewPassword(!showNewPassword)}
-    style={styles.eyeIcon}
-  >
-    <Ionicons
-      name={showNewPassword ? "eye" : "eye-off"}
-      size={20}
-      color="gray"
-    />
-  </TouchableOpacity>
-</View>
-
-
-
-          <Text style={styles.label}>Retype New Password</Text>
-          <View style={styles.passwordRow}>
-            <TextInput
-  value={retypePassword}
-  onChangeText={setRetypePassword}
-  onBlur={() => handleSendRetype(retypePassword)}
-  style={styles.input}
-  secureTextEntry={!showRetypePassword}
-  autoComplete="new-password"          // <--- ADD THIS
-  textContentType="newPassword"        // <--- ADD THIS
-/>
-            <TouchableOpacity
-              onPress={() => setShowRetypePassword(!showRetypePassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons
-                name={showRetypePassword ? "eye" : "eye-off"}
-                size={20}
-                color="gray"
-              />
-            </TouchableOpacity>
-          </View>
+                    <Text style={styles.label}>Retype New Password</Text>
+                    <View style={styles.passwordRow}>
+                      <TextInput
+                        value={retypePassword}
+                        onChangeText={setRetypePassword}
+                        onBlur={() => handleSendRetype(retypePassword)}
+                        style={styles.input}
+                        secureTextEntry={!showRetypePassword}
+                        autoComplete="new-password" // <--- ADD THIS
+                        textContentType="newPassword" // <--- ADD THIS
+                      />
+                      <TouchableOpacity
+                        onPress={() =>
+                          setShowRetypePassword(!showRetypePassword)
+                        }
+                        style={styles.eyeIcon}
+                      >
+                        <Ionicons
+                          name={showRetypePassword ? "eye" : "eye-off"}
+                          size={20}
+                          color="gray"
+                        />
+                      </TouchableOpacity>
+                    </View>
 
                     <Text style={styles.forgotText}>Forgot password?</Text>
                   </>
                 )}
 
-{editingSection === "Contact info" && (
-  <>
-    <Text style={styles.label}>Phone</Text>
-    <View style={styles.infoRow}>
-      <Feather name="phone" size={20} style={styles.icon} />
-      <TextInput
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-        style={styles.input}
-        placeholder=""
-      />
-    </View>
+                {editingSection === "Contact info" && (
+                  <>
+                    <Text style={styles.label}>Phone</Text>
+                    <View style={styles.infoRow}>
+                      <Feather name="phone" size={20} style={styles.icon} />
+                      <TextInput
+                        value={phone}
+                        onChangeText={setPhone}
+                        keyboardType="phone-pad"
+                        style={styles.input}
+                        placeholder=""
+                      />
+                    </View>
 
-    <Text style={styles.label}>Email</Text>
-    <View style={styles.infoRow}>
-      <Entypo name="email" size={20} style={styles.icon} />
-      <TextInput
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        style={styles.input}
-        placeholder="email address"
-      />
-    </View>
-  </>
-)}
+                    <Text style={styles.label}>Email</Text>
+                    <View style={styles.infoRow}>
+                      <Entypo name="email" size={20} style={styles.icon} />
+                      <TextInput
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        style={styles.input}
+                        placeholder="email address"
+                      />
+                    </View>
+                  </>
+                )}
 
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
                   <Text style={styles.saveText}>Save</Text>
@@ -222,7 +221,11 @@ const Profile = () => {
                     style={styles.icon}
                   />
                   <Text style={styles.itemText}>General info</Text>
-                  <Feather name="chevron-right" size={20} style={styles.arrow} />
+                  <Feather
+                    name="chevron-right"
+                    size={20}
+                    style={styles.arrow}
+                  />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -231,7 +234,11 @@ const Profile = () => {
                 >
                   <Feather name="lock" size={20} style={styles.icon} />
                   <Text style={styles.itemText}>Password</Text>
-                  <Feather name="chevron-right" size={20} style={styles.arrow} />
+                  <Feather
+                    name="chevron-right"
+                    size={20}
+                    style={styles.arrow}
+                  />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -240,7 +247,11 @@ const Profile = () => {
                 >
                   <Entypo name="email" size={20} style={styles.icon} />
                   <Text style={styles.itemText}>Contact info</Text>
-                  <Feather name="chevron-right" size={20} style={styles.arrow} />
+                  <Feather
+                    name="chevron-right"
+                    size={20}
+                    style={styles.arrow}
+                  />
                 </TouchableOpacity>
               </>
             )}
@@ -322,10 +333,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   input: {
-  flex: 1,
-  padding: 10,
-  outlineWidth: 0,
-},
+    flex: 1,
+    padding: 10,
+    outlineWidth: 0,
+  },
   saveBtn: {
     backgroundColor: "#A6D97B",
     padding: 12,
@@ -347,20 +358,20 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: "#fff",
   },
-// ...existing styles...
+  // ...existing styles...
   passwordRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  borderWidth: 1,
-  borderColor: '#ccc',
-  paddingHorizontal: 10,
-  borderRadius: 8,
-  marginBottom: 15,
-},
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
 
-eyeIcon: {
-  padding: 8,
-},
+  eyeIcon: {
+    padding: 8,
+  },
 
   forgotText: {
     color: "gray",
