@@ -11,9 +11,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 const rewards = [
   {
@@ -21,6 +21,7 @@ const rewards = [
     name: "Rice Sack",
     subtitle: "Redeemable Onsite",
     icon: require("../../assets/redeem/rice.png"),
+    route: "/Main/rewards/rice", 
   },
   {
     id: 2,
@@ -37,6 +38,8 @@ const rewards = [
 ];
 
 const RedeemRewards = () => {
+  const router = useRouter(); 
+
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
@@ -61,7 +64,10 @@ const RedeemRewards = () => {
                   <Image source={item.icon} style={styles.icon} />
                   <Text style={styles.cardTitle}>{item.name}</Text>
                   <Text style={styles.subtitle}>{item.subtitle}</Text>
-                  <TouchableOpacity style={styles.redeemButton}>
+                  <TouchableOpacity
+                    style={styles.redeemButton}
+                    onPress={() => item.route && router.push(item.route)} 
+                  >
                     <Text style={styles.redeemText}>Redeem</Text>
                   </TouchableOpacity>
                 </View>
@@ -97,7 +103,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   intro: {
-    fontSize: width < 400 ? 16 : 20, // responsive font
+    fontSize: width < 400 ? 16 : 20,
     fontFamily: "Poppins_700Bold",
     marginBottom: 30,
     textAlign: "center",
@@ -107,7 +113,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   card: {
-    width: width * 0.28, // responsive card size
+    width: width * 0.28,
     backgroundColor: "#B6D799",
     borderRadius: 12,
     padding: 16,
@@ -121,29 +127,29 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
   cardTitle: {
-    fontSize: width < 400 ? 14 : 16, // responsive font
+    fontSize: width < 400 ? 14 : 16,
     fontFamily: "Poppins_700Bold",
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: width < 400 ? 10 : 12, // responsive font
+    fontSize: width < 400 ? 10 : 12,
     fontFamily: "Poppins_400Regular",
     color: "#333",
     marginBottom: 12,
     textAlign: "center",
   },
- redeemButton: {
+  redeemButton: {
     backgroundColor: "#008243",
     borderRadius: 8,
-    paddingVertical: 6,   // fixed padding, dili na depende sa height
-    paddingHorizontal: 14, // fixed padding, dili na depende sa width
-    alignItems: "center",  // ensure text stays centered
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    alignItems: "center",
     justifyContent: "center",
   },
   redeemText: {
     color: "white",
     fontFamily: "Poppins_700Bold",
-    fontSize: 14,   // fixed size para clean
+    fontSize: 14,
     textAlign: "center",
   },
 });

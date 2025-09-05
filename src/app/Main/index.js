@@ -14,8 +14,10 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../../../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { useRouter } from "expo-router";
 
 const { width, height } = Dimensions.get("window");
+const router = useRouter(); // 👈 initialize router
 
 const recyclingIcons = [
   { name: "Plastic", source: require("../../assets/home/plastic.png") },
@@ -105,7 +107,10 @@ const Home = () => {
             </View>
 
             <View style={styles.rightContainer}>
-              <TouchableOpacity style={styles.redeemButton}>
+   <TouchableOpacity
+                style={styles.redeemButton}
+                onPress={() => router.push("/Main/redeem_rewards")} // 👈 navigate to redeem_rewards.js
+              >
                 <Text style={styles.redeemText}>🎁 Redeem Rewards</Text>
               </TouchableOpacity>
             </View>
