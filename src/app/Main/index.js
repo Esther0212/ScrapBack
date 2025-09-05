@@ -108,7 +108,7 @@ const Home = () => {
             <View style={styles.rightContainer}>
               <TouchableOpacity
                 style={styles.redeemButton}
-                onPress={() => router.push("/redeem_rewards")} // 👈 navigate to redeem_rewards.js
+                onPress={() => router.push("/Main/redeem_rewards")} // 👈 navigate to redeem_rewards.js
               >
                 <Text style={styles.redeemText}>🎁 Redeem Rewards</Text>
               </TouchableOpacity>
