@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import CustomBgColor from "../components/customBgColor";
 
@@ -28,7 +28,27 @@ const Login = () => {
     return regex.test(email);
   };
 
-  const handleLogin = () => {
+  // Load saved credentials if available
+  useEffect(() => {
+    const loadSavedCredentials = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem("userEmail");
+        const savedPassword = await AsyncStorage.getItem("userPassword");
+
+        if (savedEmail && savedPassword) {
+          setEmail(savedEmail);
+          setPassword(savedPassword);
+          setRememberMe(true);
+        }
+      } catch (e) {
+        console.log("Error loading saved credentials", e);
+      }
+    };
+
+    loadSavedCredentials();
+  }, []);
+
+  const handleLogin = async () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
 
@@ -48,7 +68,18 @@ const Login = () => {
     setErrors(tempErrors);
 
     if (isValid) {
-      router.push("Main");
+      try {
+        if (rememberMe) {
+          await AsyncStorage.setItem("userEmail", email);
+          await AsyncStorage.setItem("userPassword", password);
+        } else {
+          await AsyncStorage.removeItem("userEmail");
+          await AsyncStorage.removeItem("userPassword");
+        }
+        router.push("Main");
+      } catch (e) {
+        console.log("Error saving data", e);
+      }
     }
   };
 
