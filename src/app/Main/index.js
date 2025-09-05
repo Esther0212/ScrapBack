@@ -14,7 +14,6 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { router } from "expo-router";
 
 const { width, height } = Dimensions.get("window");
 
@@ -106,10 +105,7 @@ const Home = () => {
             </View>
 
             <View style={styles.rightContainer}>
-              <TouchableOpacity
-                style={styles.redeemButton}
-                onPress={() => router.push("/Main/redeem_rewards")} // 👈 navigate to redeem_rewards.js
-              >
+              <TouchableOpacity style={styles.redeemButton}>
                 <Text style={styles.redeemText}>🎁 Redeem Rewards</Text>
               </TouchableOpacity>
             </View>
@@ -233,7 +229,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 2,
-  },
+  },  
   iconImage: {
     width: 50,
     height: 50,
