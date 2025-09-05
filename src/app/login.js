@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -12,44 +12,87 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { FirebaseError } from "firebase/app";
+import { doc, getDoc } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { auth } from "../../firebase"; // Adjust path as needed
+import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
 
 const { width } = Dimensions.get("window");
 
 const Login = () => {
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [errors, setErrors] = useState({ email: "", password: "" });
+
+  const validateEmail = (email) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Please enter email and password");
-      return;
+    let tempErrors = { email: "", password: "" };
+    let isValid = true;
+
+    if (!email) {
+      tempErrors.email = "Email is required";
+      isValid = false;
+    } else if (!validateEmail(email)) {
+      tempErrors.email = "Enter a valid email address";
+      isValid = false;
     }
 
-   try {
-  await signInWithEmailAndPassword(auth, email, password);
-   Alert.alert("Login Success", "You have successfully logged in!");
-  router.replace("/Main");
-} catch (error) {
-  let message = "Login failed. Please try again.";
+    if (!password) {
+      tempErrors.password = "Password is required";
+      isValid = false;
+    }
 
-  if (error.code === "auth/invalid-email") {
-    message = "Invalid email address.";
-  } else if (error.code === "auth/user-not-found") {
-    message = "User not found.";
-  } else if (error.code === "auth/wrong-password") {
-    message = "Incorrect password.";
-  }
+    setErrors(tempErrors);
 
-  Alert.alert("Login Error", message);
-}
+    if (!isValid) return;
 
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        const firstName = userData.firstName || "";
+        await AsyncStorage.setItem("firstName", firstName);
+      }
+
+      Alert.alert("Login Success", "You have successfully logged in!");
+      router.replace("/Main");
+    } catch (error) {
+      let message = "Login failed. Please try again.";
+
+      if (error.code === "auth/invalid-email") {
+        message = "Invalid email address.";
+      } else if (error.code === "auth/user-not-found") {
+        message = "User not found.";
+      } else if (error.code === "auth/wrong-password") {
+        message = "Incorrect password.";
+      }
+
+      Alert.alert("Login Error", message);
+    }
   };
+
+  useEffect(() => {
+    const loadFirstName = async () => {
+      const name = await AsyncStorage.getItem("firstName");
+      if (name) {
+        setFirstName(name);
+      }
+    };
+    loadFirstName();
+  }, []);
 
   return (
     <CustomBgColor>
@@ -67,8 +110,12 @@ const Login = () => {
               keyboardType="email-address"
               autoCapitalize="none"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                setErrors((prev) => ({ ...prev, email: "" }));
+              }}
             />
+            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -80,7 +127,10 @@ const Login = () => {
                 style={styles.input}
                 secureTextEntry={!passwordVisible}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  setErrors((prev) => ({ ...prev, password: "" }));
+                }}
               />
               <TouchableOpacity
                 style={styles.eyeIcon}
@@ -93,6 +143,7 @@ const Login = () => {
                 />
               </TouchableOpacity>
             </View>
+            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
           </View>
 
           <View style={styles.row}>
@@ -234,6 +285,11 @@ const styles = StyleSheet.create({
   signupTextBold: {
     fontWeight: "700",
     textDecorationLine: "underline",
+  },
+  errorText: {
+    color: "red",
+    fontSize: 13,
+    marginTop: 4,
   },
 });
 
