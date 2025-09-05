@@ -66,73 +66,6 @@ const Signup = () => {
     }
   };
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [contact, setContact] = useState("");
-  const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState({
-    name: "",
-    email: "",
-    contact: "",
-    password: "",
-  });
-
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const validatePassword = (password) =>
-    /^(?=.*[A-Z])(?=.*\d).{8,}$/.test(password); // min 8 chars, 1 uppercase, 1 digit
-
-  const handleSignup = () => {
-    let tempErrors = { name: "", email: "", contact: "", password: "" };
-    let isValid = true;
-
-    // Name validation
-    if (!name.trim()) {
-      tempErrors.name = "Name is required";
-      isValid = false;
-    } else if (name.length < 3) {
-      tempErrors.name = "Name must be at least 3 characters";
-      isValid = false;
-    }
-
-    // Email validation
-    if (!email.trim()) {
-      tempErrors.email = "Email is required";
-      isValid = false;
-    } else if (!validateEmail(email)) {
-      tempErrors.email = "Enter a valid email";
-      isValid = false;
-    }
-
-    // Contact validation
-    if (!contact.trim()) {
-      tempErrors.contact = "Contact number is required";
-      isValid = false;
-    } else if (!/^\d{11}$/.test(contact)) {
-      tempErrors.contact = "Contact number must be 11 digits";
-      isValid = false;
-    }
-
-    // Password validation
-    if (!password) {
-      tempErrors.password = "Password is required";
-      isValid = false;
-    } else if (!validatePassword(password)) {
-      tempErrors.password =
-        "Password must be at least 8 chars, include 1 uppercase & 1 number";
-      isValid = false;
-    }
-
-    setErrors(tempErrors);
-
-    if (isValid) {
-      Alert.alert("✅ Success", "Account created successfully!", [
-        { text: "OK", onPress: () => router.push("/") },
-      ]);
-    } else {
-      Alert.alert("❌ Error", "Please fix the highlighted fields.");
-    }
-  };
-
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
@@ -325,7 +258,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E0D4C3",
   },
-  passwordWrapper: { position: "relative" },
+  passwordWrapper: {
+    position: "relative",
+  },
   eyeIcon: {
     position: "absolute",
     right: 16,
@@ -350,10 +285,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 0.5,
   },
-  loginLink: { marginTop: 26, alignItems: "center" },
-  loginText: { fontSize: 14, color: "#3A2E2E" },
-  loginTextBold: { fontWeight: "700", textDecorationLine: "underline" },
-  errorText: { color: "red", fontSize: 13, marginTop: 4 },
+  loginLink: {
+    marginTop: 26,
+    alignItems: "center",
+  },
+  loginText: {
+    fontSize: 14,
+    color: "#3A2E2E",
+  },
+  loginTextBold: {
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
 });
 
 export default Signup;
