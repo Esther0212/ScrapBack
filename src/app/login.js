@@ -55,7 +55,11 @@ const Login = () => {
     if (!isValid) return;
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
 
       const userDocRef = doc(db, "user", user.uid);
@@ -65,6 +69,15 @@ const Login = () => {
         const userData = userDocSnap.data();
         const firstName = userData.firstName || "";
         await AsyncStorage.setItem("firstName", firstName);
+      }
+
+      // ✅ Remember Me logic
+      if (rememberMe) {
+        await AsyncStorage.setItem("savedEmail", email);
+        await AsyncStorage.setItem("savedPassword", password);
+      } else {
+        await AsyncStorage.removeItem("savedEmail");
+        await AsyncStorage.removeItem("savedPassword");
       }
 
       Alert.alert("Login Success", "You have successfully logged in!");
@@ -85,6 +98,23 @@ const Login = () => {
   };
 
   useEffect(() => {
+    const loadSavedCredentials = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem("savedEmail");
+        const savedPassword = await AsyncStorage.getItem("savedPassword");
+
+        if (savedEmail && savedPassword) {
+          setEmail(savedEmail);
+          setPassword(savedPassword);
+          setRememberMe(true);
+        }
+      } catch (e) {
+        console.log("Error loading saved credentials:", e);
+      }
+    };
+
+    loadSavedCredentials();
+
     const loadFirstName = async () => {
       const name = await AsyncStorage.getItem("firstName");
       if (name) {
@@ -115,7 +145,9 @@ const Login = () => {
                 setErrors((prev) => ({ ...prev, email: "" }));
               }}
             />
-            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+            {errors.email ? (
+              <Text style={styles.errorText}>{errors.email}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -143,7 +175,9 @@ const Login = () => {
                 />
               </TouchableOpacity>
             </View>
-            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+            {errors.password ? (
+              <Text style={styles.errorText}>{errors.password}</Text>
+            ) : null}
           </View>
 
           <View style={styles.row}>
