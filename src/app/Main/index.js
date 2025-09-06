@@ -14,8 +14,10 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../../../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { useRouter } from "expo-router";
 
 const { width, height } = Dimensions.get("window");
+const router = useRouter(); // 👈 initialize router
 
 const recyclingIcons = [
   { name: "Plastic", source: require("../../assets/home/plastic.png") },
@@ -35,7 +37,7 @@ const recyclingIcons = [
 
 const Home = () => {
   const [firstName, setFirstName] = useState("");
-  const [hasNewNotification, setHasNewNotification] = useState(false); // <-- NEW STATE
+  const [hasNewNotification, setHasNewNotification] = useState(false);
 
   useEffect(() => {
     const loadFirstName = async () => {
@@ -47,10 +49,8 @@ const Home = () => {
     loadFirstName();
   }, []);
 
-  // Simulate checking for new notifications
   useEffect(() => {
     const checkNotifications = async () => {
-      // Replace this logic with your actual Firestore call
       const user = auth.currentUser;
       if (!user) return;
 
@@ -59,7 +59,6 @@ const Home = () => {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        // Suppose it has a field like: { unreadCount: number }
         setHasNewNotification(data.unreadCount > 0);
       }
     };
@@ -108,7 +107,10 @@ const Home = () => {
             </View>
 
             <View style={styles.rightContainer}>
-              <TouchableOpacity style={styles.redeemButton}>
+   <TouchableOpacity
+                style={styles.redeemButton}
+                onPress={() => router.push("/Main/redeem_rewards")} // 👈 navigate to redeem_rewards.js
+              >
                 <Text style={styles.redeemText}>🎁 Redeem Rewards</Text>
               </TouchableOpacity>
             </View>
@@ -116,13 +118,27 @@ const Home = () => {
 
           {/* Recycling Guide */}
           <Text style={styles.sectionTitle}>Recycling Guide</Text>
-          <View style={styles.iconGrid}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.iconScroll}
+          >
             {recyclingIcons.map((item, index) => (
-              <TouchableOpacity key={index} style={styles.iconButton}>
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.iconButton,
+                  index !== 0 && index !== recyclingIcons.length - 1
+                    ? { marginRight: 10, marginLeft: 0 } // middle items only
+                    : index === 0
+                    ? { marginRight: 10 } // first item only has right margin
+                    : { marginLeft: 0 }, // last item no margin right
+                ]}
+              >
                 <Image source={item.source} style={styles.iconImage} />
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
         </ScrollView>
       </SafeAreaView>
     </CustomBgColor>
@@ -162,11 +178,11 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#B6D799",
     borderRadius: 10,
-    alignItems: "flex-end", // aligns left and right containers at bottom
+    alignItems: "flex-end",
   },
   leftContainer: {
     width: "50%",
-    justifyContent: "flex-end", // pushes inner content (pointsLabel + rowContainer) to the bottom
+    justifyContent: "flex-end",
   },
   pointsLabel: {
     fontSize: 14,
@@ -175,8 +191,8 @@ const styles = StyleSheet.create({
   },
   rowContainer: {
     flexDirection: "row",
-    alignItems: "flex-end", // aligns text and icon to the bottom
-    gap: 6, // optional spacing between icon and number
+    alignItems: "flex-end",
+    gap: 6,
     flex: 1,
   },
   lettermarkLogo: {
@@ -209,24 +225,19 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     marginBottom: 12,
   },
-  iconGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
+  iconScroll: {},
   iconButton: {
-    width: "18%",
-    aspectRatio: 1,
-    marginBottom: 12,
+    width: 50,
+    height: 50,
     borderRadius: 10,
     backgroundColor: "#008243",
     alignItems: "center",
     justifyContent: "center",
     elevation: 2,
-  },
+  },  
   iconImage: {
-    width: 18,
-    height: 18,
+    width: 50,
+    height: 50,
   },
 });
 

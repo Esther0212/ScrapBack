@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,17 +7,17 @@ import {
   TouchableOpacity,
   Animated,
   TouchableWithoutFeedback,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
-import pacafacoLogo from "../assets/splash/pacafacoLogo.png";
-import upperVector from "../assets/splash/upperVector.png";
-import lowerVector from "../assets/splash/lowerVector.png";
-import scrap from "../assets/splash/scrap.png";
-import back from "../assets/splash/back.png";
+import pacafacoLogo from '../assets/splash/pacafacoLogo.png';
+import upperVector from '../assets/splash/upperVector.png';
+import lowerVector from '../assets/splash/lowerVector.png';
+import scrap from '../assets/splash/scrap.png';
+import back from '../assets/splash/back.png';
 
-const { width, height } = Dimensions.get("window");
+const { width, height } = Dimensions.get('window');
 
 const D = 800;
 const P = 300;
@@ -30,6 +30,7 @@ export default function Splash() {
   const logoOp = useRef(new Animated.Value(0)).current;
   const pacX = useRef(new Animated.Value(-width)).current;
   const solX = useRef(new Animated.Value(width)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const scrapOp = useRef(new Animated.Value(0)).current;
   const backOp = useRef(new Animated.Value(0)).current;
@@ -39,67 +40,82 @@ export default function Splash() {
 
   const scrapX = useRef(new Animated.Value(-width)).current;
   const backX = useRef(new Animated.Value(width)).current;
-  const backY = useRef(new Animated.Value(-20)).current; // start slightly up (optional)
 
   const exploreX = useRef(new Animated.Value(-width)).current;
   const descX = useRef(new Animated.Value(width)).current;
+  // add these animated values for subtitle/description opacity
+  const subtitleOp = useRef(new Animated.Value(0)).current;
+  const descOp = useRef(new Animated.Value(0)).current;
   const loginX = useRef(new Animated.Value(-width)).current;
   const signupX = useRef(new Animated.Value(width)).current;
 
+  // text width state
+  const [pacWidth, setPacWidth] = useState(0);
+  const [solWidth, setSolWidth] = useState(0);
+
+  // when we have both widths, calculate positions + scale
+  const [layoutReady, setLayoutReady] = useState(false);
+  const pacFinalX = useRef(0);
+  const solFinalX = useRef(0);
+
+  useEffect(() => {
+    if (pacWidth && solWidth) {
+      const GAP = width * 0.1;
+
+      let totalWidth = pacWidth + solWidth + GAP;
+
+      let scale = 1;
+      if (totalWidth > width * 0.9) {
+        // scale down so it fits within 90% of screen
+        scale = (width * 0.9) / totalWidth;
+      }
+
+      const scaledPac = pacWidth * scale;
+      const scaledSol = solWidth * scale;
+      const scaledGap = GAP * scale;
+
+      pacFinalX.current = (width - (scaledPac + scaledSol + scaledGap)) / 2;
+      solFinalX.current = pacFinalX.current + scaledPac + scaledGap;
+
+      scaleAnim.setValue(scale);
+      setLayoutReady(true);
+    }
+  }, [pacWidth, solWidth]);
+
   const playMainAnimations = Animated.parallel([
-    Animated.timing(upY, {
-      toValue: 0,
-      duration: D,
-      useNativeDriver: true,
-    }),
-    Animated.timing(downY, {
-      toValue: 0,
-      duration: D,
-      useNativeDriver: true,
-    }),
-    Animated.timing(scrapX, {
-      toValue: 0,
-      duration: D,
-      useNativeDriver: true,
-    }),
-    Animated.timing(backX, {
-      toValue: 0,
-      duration: D,
-      useNativeDriver: true,
-    }),
+    Animated.timing(upY, { toValue: 0, duration: D, useNativeDriver: true }),
+    Animated.timing(downY, { toValue: 0, duration: D, useNativeDriver: true }),
+    Animated.timing(scrapX, { toValue: 0, duration: D, useNativeDriver: true }),
+    Animated.timing(backX, { toValue: 0, duration: D, useNativeDriver: true }),
     Animated.timing(scrapOp, {
       toValue: 1,
       duration: D,
       useNativeDriver: true,
     }),
-    Animated.timing(backOp, {
-      toValue: 1,
-      duration: D,
-      useNativeDriver: true,
-    }),
+    Animated.timing(backOp, { toValue: 1, duration: D, useNativeDriver: true }),
     Animated.timing(exploreX, {
       toValue: 0,
       duration: D,
       useNativeDriver: true,
     }),
-    Animated.timing(descX, {
-      toValue: 0,
-      duration: D,
-      useNativeDriver: true,
-    }),
-    Animated.timing(loginX, {
-      toValue: 0,
-      duration: D,
-      useNativeDriver: true,
-    }),
+    Animated.timing(descX, { toValue: 0, duration: D, useNativeDriver: true }),
+    Animated.timing(loginX, { toValue: 0, duration: D, useNativeDriver: true }),
     Animated.timing(signupX, {
       toValue: 0,
       duration: D,
       useNativeDriver: true,
     }),
+    // fade in subtitle & description here
+    Animated.timing(subtitleOp, {
+      toValue: 1,
+      duration: D,
+      useNativeDriver: true,
+    }),
+    Animated.timing(descOp, { toValue: 1, duration: D, useNativeDriver: true }),
   ]);
 
   const playInitialAnimations = () => {
+    if (!layoutReady) return;
     Animated.sequence([
       Animated.delay(P),
       Animated.parallel([
@@ -109,12 +125,12 @@ export default function Splash() {
           useNativeDriver: true,
         }),
         Animated.timing(pacX, {
-          toValue: 0,
+          toValue: pacFinalX.current,
           duration: D,
           useNativeDriver: true,
         }),
         Animated.timing(solX, {
-          toValue: 0,
+          toValue: solFinalX.current,
           duration: D,
           useNativeDriver: true,
         }),
@@ -148,10 +164,8 @@ export default function Splash() {
     if (hasSkipped.current) return;
     hasSkipped.current = true;
 
-    // Immediately jump background color to green
     bg.setValue(1);
 
-    // Instantly hide PACAFACO logo and texts
     Animated.parallel([
       Animated.timing(logoOp, {
         toValue: 0,
@@ -174,13 +188,48 @@ export default function Splash() {
   };
 
   useEffect(() => {
-    playInitialAnimations();
-  }, []);
+    if (layoutReady) {
+      playInitialAnimations();
+    }
+  }, [layoutReady]);
 
   const backgroundColor = bg.interpolate({
     inputRange: [0, 1],
-    outputRange: ["#F5FFED", "#B6D799"],
+    outputRange: ['#F5FFED', '#B6D799'],
   });
+
+  // inside Splash.js
+  useEffect(() => {
+    if (pacWidth && solWidth) {
+      // ✅ GAP = 3% of width (closer), but clamp so it’s not too small/big
+      const minGap = 20; // pixels
+      const maxGap = 40; // pixels
+      let GAP = width * 0.03; // 3% of screen width
+      GAP = Math.max(minGap, Math.min(GAP, maxGap)); // clamp
+
+      // total width including gap
+      let totalWidth = pacWidth + solWidth + GAP;
+
+      // default scale = 1
+      let scale = 1;
+      const maxAvailable = width * 0.9; // leave 5% margin on each side
+      if (totalWidth > maxAvailable) {
+        // scale down texts proportionally if they don’t fit
+        scale = maxAvailable / totalWidth;
+      }
+
+      const scaledPac = pacWidth * scale;
+      const scaledSol = solWidth * scale;
+      const scaledGap = GAP * scale;
+
+      // Center both words together with equal margins left/right
+      pacFinalX.current = (width - (scaledPac + scaledSol + scaledGap)) / 2;
+      solFinalX.current = pacFinalX.current + scaledPac + scaledGap;
+
+      scaleAnim.setValue(scale);
+      setLayoutReady(true);
+    }
+  }, [pacWidth, solWidth]);
 
   return (
     <TouchableWithoutFeedback onPress={handleSkip}>
@@ -191,23 +240,42 @@ export default function Splash() {
           resizeMode="contain"
         />
 
+        {/* Hidden measure texts */}
+        <Text
+          style={[styles.bigText, { position: 'absolute', opacity: 0 }]}
+          onLayout={(e) => setPacWidth(e.nativeEvent.layout.width)}>
+          PACAFACO
+        </Text>
+        <Text
+          style={[styles.bigText, { position: 'absolute', opacity: 0 }]}
+          onLayout={(e) => setSolWidth(e.nativeEvent.layout.width)}>
+          Solutions
+        </Text>
+
+        {/* Animated PACAFACO */}
         <Animated.Text
           style={[
             styles.bigText,
-            { left: 60, transform: [{ translateX: pacX }], opacity: logoOp },
-          ]}
-        >
+            {
+              transform: [{ translateX: pacX }, { scale: scaleAnim }],
+              opacity: logoOp,
+            },
+          ]}>
           PACAFACO
         </Animated.Text>
+
         <Animated.Text
           style={[
             styles.bigText,
-            { right: 60, transform: [{ translateX: solX }], opacity: logoOp },
-          ]}
-        >
+            {
+              transform: [{ translateX: solX }, { scale: scaleAnim }],
+              opacity: logoOp,
+            },
+          ]}>
           Solutions
         </Animated.Text>
 
+        {/* rest of your splash layout unchanged */}
         <Animated.Image
           source={upperVector}
           style={[styles.upperVector, { transform: [{ translateY: upY }] }]}
@@ -249,27 +317,30 @@ export default function Splash() {
             <Animated.Text
               style={[
                 styles.subtitle,
-                { transform: [{ translateX: exploreX }] },
-              ]}
-            >
+                {
+                  transform: [{ translateX: exploreX }],
+                  opacity: subtitleOp, // initially 0
+                },
+              ]}>
               Explore the app
             </Animated.Text>
 
             <Animated.Text
               style={[
                 styles.description,
-                { transform: [{ translateX: descX }] },
-              ]}
-            >
+                {
+                  transform: [{ translateX: descX }],
+                  opacity: descOp, // initially 0
+                },
+              ]}>
               All your recyclables in one place,
-              {"\n"}rewarding you every step of the way.
+              {'\n'}rewarding you every step of the way.
             </Animated.Text>
 
             <Animated.View style={{ transform: [{ translateX: loginX }] }}>
               <TouchableOpacity
                 style={styles.loginButton}
-                onPress={() => router.push("/login")}
-              >
+                onPress={() => router.push('/login')}>
                 <Text style={styles.loginButtonText}>Login</Text>
               </TouchableOpacity>
             </Animated.View>
@@ -277,8 +348,7 @@ export default function Splash() {
             <Animated.View style={{ transform: [{ translateX: signupX }] }}>
               <TouchableOpacity
                 style={styles.signUpButton}
-                onPress={() => router.push("/signup")}
-              >
+                onPress={() => router.push('/signup')}>
                 <Text style={styles.signUpButtonText}>Sign Up</Text>
               </TouchableOpacity>
             </Animated.View>
@@ -293,7 +363,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   pacLogo: {
-    position: "absolute",
+    position: 'absolute',
     top: height / 2 - 80,
     left: width / 2 - 80,
     width: 160,
@@ -301,56 +371,56 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   bigText: {
-    position: "absolute",
+    position: 'absolute',
     top: height / 2 + 90,
     fontSize: 32,
-    fontFamily: "Poppins_700Bold",
-    color: "#3A2E2E",
+    fontFamily: 'Poppins_700Bold',
+    color: '#3A2E2E',
     zIndex: 5,
   },
 
   upperVector: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     width: width,
     height: (119 / 391) * width,
     zIndex: 1,
-    alignSelf: "center",
+    alignSelf: 'center',
   },
   lowerVector: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 0,
     width: width,
     height: (482 / 393) * width,
     zIndex: 1,
-    alignSelf: "center",
+    alignSelf: 'center',
   },
 
   safeArea: { flex: 1, zIndex: 4 },
   content: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 24,
   },
 
   logoRow: {
     height: (60 / 160) * (width * 0.45),
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 110,
-    position: "relative",
+    position: 'relative',
   },
   scrapImg: {
-    position: "absolute",
-    left: width * -0.37, // but...
-    alignSelf: "center", // ensure it's still centered
+    position: 'absolute',
+    left: width * -0.37,
+    alignSelf: 'center',
     width: width * 0.45,
     height: (60 / 160) * (width * 0.45),
     zIndex: 1,
   },
   backImg: {
-    position: "absolute",
+    position: 'absolute',
     left: width * 0.03 + -8.5,
     top: height * 0.03 + 5,
     width: width * 0.33,
@@ -360,51 +430,51 @@ const styles = StyleSheet.create({
 
   subtitle: {
     fontSize: 35,
-    fontFamily: "Poppins_700Bold",
-    color: "#3A2E2E",
-    textAlign: "center",
+    fontFamily: 'Poppins_700Bold',
+    color: '#3A2E2E',
+    textAlign: 'center',
     marginTop: 210,
     letterSpacing: 0.5,
   },
   description: {
     fontSize: 18,
-    color: "#4A4A4A",
-    textAlign: "center",
+    color: '#4A4A4A',
+    textAlign: 'center',
     lineHeight: 26,
     marginVertical: 16,
     letterSpacing: 0.3,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: 'Poppins_400Regular',
   },
 
   loginButton: {
-    backgroundColor: "#008243",
+    backgroundColor: '#008243',
     paddingVertical: 16,
     width: width - 50,
     borderRadius: 10,
-    alignItems: "center",
+    alignItems: 'center',
     marginTop: 28,
   },
   loginButtonText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
     letterSpacing: 0.5,
-    fontFamily: "Poppins_700Bold",
+    fontFamily: 'Poppins_700Bold',
   },
   signUpButton: {
     borderWidth: 1.5,
-    borderColor: "#008243",
+    borderColor: '#008243',
     paddingVertical: 16,
     width: width - 50,
     borderRadius: 10,
-    alignItems: "center",
+    alignItems: 'center',
     marginTop: 14,
   },
   signUpButtonText: {
-    color: "#008243",
+    color: '#008243',
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
     letterSpacing: 0.5,
-    fontFamily: "Poppins_700Bold",
+    fontFamily: 'Poppins_700Bold',
   },
 });

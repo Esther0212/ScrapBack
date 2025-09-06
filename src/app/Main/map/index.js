@@ -91,10 +91,6 @@ export default function MapSelector() {
 
       {/* Top Overlay: Back + Search */}
       <View style={styles.topOverlay}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>{'<'}</Text>
-        </TouchableOpacity>
-
         <View style={styles.searchBox}>
           <TextInput
             style={styles.searchInput}
@@ -221,7 +217,7 @@ const styles = StyleSheet.create({
   },
   blankListView: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#F0F1C5',
     justifyContent: 'center',
     alignItems: 'center',
   },
