@@ -30,6 +30,18 @@ const offers = [
     points: 450,
     image: require("../../../assets/redeem/rice.png"),
   },
+  {
+    id: 3,
+    title: "1 Kilo Rice",
+    points: 100,
+    image: require("../../../assets/redeem/tut.jpg"), // placeholder rice image
+  },
+  {
+    id: 4,
+    title: "5 Kilos Rice",
+    points: 450,
+    image: require("../../../assets/redeem/tut.jpg"),
+  },
 ];
 
 const Rice = () => {
@@ -51,16 +63,25 @@ const Rice = () => {
         <ScrollView contentContainerStyle={styles.scrollView}>
           <View style={styles.cardContainer}>
             {offers.map((offer) => (
-              <View key={offer.id} style={styles.card}>
+              <TouchableOpacity
+                key={offer.id}
+                style={styles.card}
+                activeOpacity={0.8}
+                onPress={() => {
+                  // Example action when clicking a card
+                  // Pwede ka mo-redirect sa details page or redeem function
+                  router.push(`/Main/rewards/${offer.id}`);
+                }}
+              >
                 {/* Full-width Image */}
                 <Image source={offer.image} style={styles.image} />
                 {/* Title */}
                 <Text style={styles.cardTitle}>{offer.title}</Text>
-                {/* Points Button */}
-                <TouchableOpacity style={styles.pointsButton}>
+                {/* Points Display */}
+                <View style={styles.pointsButton}>
                   <Text style={styles.pointsText}>{offer.points} Points</Text>
-                </TouchableOpacity>
-              </View>
+                </View>
+              </TouchableOpacity>
             ))}
           </View>
         </ScrollView>
@@ -95,14 +116,14 @@ const styles = StyleSheet.create({
   },
   card: {
     width: width * 0.42,
-    backgroundColor: "#B6D799", // balik ang imong original green
+    backgroundColor: "#B6D799", // imong original green
     borderRadius: 12,
-    overflow: "hidden", // para ang image musunod sa rounded edges
+    overflow: "hidden", // rounded edges apply sa image
     margin: 8,
     alignItems: "center",
   },
   image: {
-    width: "100%", // sagad sa width
+    width: "100%",
     height: width * 0.3,
     resizeMode: "cover",
   },
