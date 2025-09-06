@@ -22,7 +22,7 @@ const offers = [
     id: 1,
     title: "1 Kilo Rice",
     points: 100,
-    image: require("../../../assets/redeem/dog.png"), // placeholder rice image
+    image: require("../../../assets/redeem/dog.png"),
   },
   {
     id: 2,
@@ -34,7 +34,7 @@ const offers = [
     id: 3,
     title: "1 Kilo Rice",
     points: 100,
-    image: require("../../../assets/redeem/tut.jpg"), // placeholder rice image
+    image: require("../../../assets/redeem/tut.jpg"),
   },
   {
     id: 4,
@@ -68,9 +68,10 @@ const Rice = () => {
                 style={styles.card}
                 activeOpacity={0.8}
                 onPress={() => {
-                  // Example action when clicking a card
-                  // Pwede ka mo-redirect sa details page or redeem function
-                  router.push(`/Main/rewards/${offer.id}`);
+                  router.push({
+                    pathname: "/Main/rewards/rice_description",
+                    params: { id: offer.id },
+                  });
                 }}
               >
                 {/* Full-width Image */}
@@ -116,9 +117,9 @@ const styles = StyleSheet.create({
   },
   card: {
     width: width * 0.42,
-    backgroundColor: "#B6D799", // imong original green
+    backgroundColor: "#B6D799",
     borderRadius: 12,
-    overflow: "hidden", // rounded edges apply sa image
+    overflow: "hidden", 
     margin: 8,
     alignItems: "center",
   },
