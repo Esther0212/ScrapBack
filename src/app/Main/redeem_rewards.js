@@ -29,6 +29,7 @@ const rewards = [
     name: "Load",
     subtitle: "Redeemable Onsite/Online",
     icon: require("../../assets/redeem/load.png"),
+    route: "/Main/rewards/load",
   },
   {
     id: 3,
