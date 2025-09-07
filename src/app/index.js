@@ -28,8 +28,8 @@ export default function Splash() {
   const bg = useRef(new Animated.Value(0)).current;
 
   const logoOp = useRef(new Animated.Value(0)).current;
-  const pacX = useRef(new Animated.Value(-width)).current;
-  const solX = useRef(new Animated.Value(width)).current;
+  const pacX = useRef(new Animated.Value(0)).current;
+const solX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const scrapOp = useRef(new Animated.Value(0)).current;
@@ -145,16 +145,16 @@ export default function Splash() {
           useNativeDriver: true,
         }),
         Animated.timing(pacX, {
-          toValue: -width,
+          toValue: -pacWidth * scaleAnim.__getValue(), // push off left
           duration: D,
           useNativeDriver: true,
         }),
         Animated.timing(solX, {
-          toValue: width,
+          toValue: width, // push off right
           duration: D,
           useNativeDriver: true,
         }),
-      ]),
+      ]),      
       Animated.delay(P),
       playMainAnimations,
     ]).start();
@@ -201,35 +201,31 @@ export default function Splash() {
   // inside Splash.js
   useEffect(() => {
     if (pacWidth && solWidth) {
-      // ✅ GAP = 3% of width (closer), but clamp so it’s not too small/big
-      const minGap = 20; // pixels
-      const maxGap = 40; // pixels
-      let GAP = width * 0.03; // 3% of screen width
-      GAP = Math.max(minGap, Math.min(GAP, maxGap)); // clamp
-
-      // total width including gap
+      const GAP = Math.max(20, Math.min(width * 0.03, 40));
+  
       let totalWidth = pacWidth + solWidth + GAP;
-
-      // default scale = 1
       let scale = 1;
-      const maxAvailable = width * 0.9; // leave 5% margin on each side
+      const maxAvailable = width * 0.9;
+  
       if (totalWidth > maxAvailable) {
-        // scale down texts proportionally if they don’t fit
         scale = maxAvailable / totalWidth;
       }
-
+  
       const scaledPac = pacWidth * scale;
       const scaledSol = solWidth * scale;
       const scaledGap = GAP * scale;
-
-      // Center both words together with equal margins left/right
+  
       pacFinalX.current = (width - (scaledPac + scaledSol + scaledGap)) / 2;
       solFinalX.current = pacFinalX.current + scaledPac + scaledGap;
-
+  
+      // ✅ reset starting positions OFFSCREEN
+      pacX.setValue(-scaledPac); // just off left
+      solX.setValue(width);      // just off right
+  
       scaleAnim.setValue(scale);
       setLayoutReady(true);
     }
-  }, [pacWidth, solWidth]);
+  }, [pacWidth, solWidth]);  
 
   return (
     <TouchableWithoutFeedback onPress={handleSkip}>
