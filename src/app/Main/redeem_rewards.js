@@ -36,6 +36,7 @@ const rewards = [
     name: "GCash",
     subtitle: "Redeemable Online",
     icon: require("../../assets/redeem/gcash.png"),
+    route: "/Main/rewards/gcash",
   },
 ];
 
