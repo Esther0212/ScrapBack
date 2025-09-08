@@ -15,36 +15,47 @@ export default function MapSelector() {
   const router = useRouter();
   const mapRef = useRef(null);
   const [searchText, setSearchText] = useState('');
+  const [locationReady, setLocationReady] = useState(false);
+
   const [region, setRegion] = useState({
-    latitude: 8.4542, // Fallback: Cagayan de Oro
+    latitude: 8.4542, // fallback: Cagayan de Oro
     longitude: 124.6319,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   });
+
   const [marker, setMarker] = useState({
     latitude: 8.4542,
     longitude: 124.6319,
   });
 
-  // Request current location on mount
+  // Request location permission and current location
   useEffect(() => {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
+        if (status !== 'granted') {
+          console.warn('Permission not granted. Using default location.');
+          setLocationReady(true);
+          return;
+        }
 
         const location = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = location.coords;
+
         const newRegion = {
           latitude,
           longitude,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         };
+
         setRegion(newRegion);
         setMarker({ latitude, longitude });
+        setLocationReady(true);
       } catch (error) {
         console.warn('Location error. Showing default region.');
+        setLocationReady(true);
       }
     })();
   }, []);
@@ -52,7 +63,6 @@ export default function MapSelector() {
   // Search for location by name
   const handleSearch = async () => {
     if (!searchText) return;
-
     try {
       const results = await Location.geocodeAsync(searchText);
       if (results.length > 0) {
@@ -73,18 +83,26 @@ export default function MapSelector() {
     }
   };
 
+  if (!locationReady) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading map...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
-        region={region}
+        initialRegion={region} // use initialRegion to avoid blank map on Android
         onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
       >
         {marker && <Marker coordinate={marker} />}
       </MapView>
 
-      {/* Top Overlay with Back + Search */}
+      {/* Top Overlay: Back button + Search */}
       <View style={styles.topOverlay}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backButtonText}>{'<'}</Text>
@@ -107,10 +125,12 @@ export default function MapSelector() {
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1 },
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   topOverlay: {
     position: 'absolute',
@@ -121,13 +141,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  backButton: {
-    marginRight: 10,
-  },
-  backButtonText: {
-    fontSize: 28,
-    color: '#333',
-  },
+  backButton: { marginRight: 10 },
+  backButtonText: { fontSize: 28, color: '#333' },
   searchBox: {
     flex: 1,
     backgroundColor: 'white',
@@ -141,13 +156,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
-  checkMark: {
-    fontSize: 20,
-    color: '#117D2E',
-    marginLeft: 8,
-  },
+  searchInput: { flex: 1, fontSize: 16 },
+  checkMark: { fontSize: 20, color: '#117D2E', marginLeft: 8 },
 });
