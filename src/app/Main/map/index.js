@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { UrlTile, Marker } from "react-native-maps";
 
 export default function MapSelector() {
   const router = useRouter();
@@ -76,11 +76,15 @@ export default function MapSelector() {
     <View style={styles.container}>
       {selectedView === 'map' ? (
         <MapView
+          style={{ flex: 1 }}
+          initialRegion={region}
           ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          region={region}
-          onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
+          onLongPress={e => setMarker(e.nativeEvent.coordinate)}
         >
+          <UrlTile
+            urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+            maximumZ={19}
+          />
           {marker && <Marker coordinate={marker} />}
         </MapView>
       ) : (
@@ -89,7 +93,7 @@ export default function MapSelector() {
         </View>
       )}
 
-      {/* Top Overlay: Back + Search */}
+      {/* Top Overlay: Search */}
       <View style={styles.topOverlay}>
         <View style={styles.searchBox}>
           <TextInput
@@ -104,7 +108,6 @@ export default function MapSelector() {
 
       {/* Toggle: Drop-off stations */}
       <View style={styles.toggleContainer}>
-  
         <View style={styles.toggleButtons}>
           <TouchableOpacity
             style={[styles.toggleOption, selectedView === 'map' && styles.toggleSelected]}
