@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import CustomBgColor from "../../../components/customBgColor";
 
 // Reward descriptions for GCash
@@ -57,7 +58,7 @@ const GcashDescription = () => {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <Text>No description found for this reward.</Text>
+          <Text style={styles.notFoundText}>No description found for this reward.</Text>
         </SafeAreaView>
       </CustomBgColor>
     );
@@ -69,53 +70,48 @@ const GcashDescription = () => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push("/Main/rewards/gcash")}>
-            <Ionicons name="arrow-back" size={24} color="black" />
+            <Ionicons name="arrow-back" size={24} color="#008243" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{reward.title}</Text>
           <View style={{ width: 24 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Image */}
-          <Image source={reward.image} style={styles.image} />
+          {/* Image with gradient background */}
+          <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
+            <Image source={reward.image} style={styles.image} />
+          </LinearGradient>
 
           {/* Card Content */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.text}>
               <Text style={styles.bold}>ABOUT ScrapBack{"\n"}</Text>
-              ScrapBack is a digital recycling rewards system developed for
-              PACAFACO residents and contributors. It encourages proper waste
-              disposal by converting recyclable materials into reward points
-              which users can redeem for goods like rice, mobile load, or
-              vouchers.
+              ScrapBack is a digital recycling rewards system developed for PACAFACO residents and contributors. It encourages proper waste disposal by converting recyclable materials into reward points which users can redeem for goods like rice, mobile load, or vouchers.
             </Text>
 
-            <Text style={styles.sectionTitle}>ABOUT THIS REWARD</Text>
+            <Text style={styles.sectionTitle}>About this Reward</Text>
             <Text style={styles.text}>{reward.description}</Text>
 
-            <Text style={styles.sectionTitle}>HOW TO REDEEM REWARDS</Text>
+            <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
             <Text style={styles.text}>
               1. Go to any designated PACAFACO collection point.{"\n"}
               2. Show your QR code from the ScrapBack app to the staff.{"\n"}
               3. Staff will scan your QR and validate your points.{"\n"}
               4. Choose your reward and confirm redemption.{"\n"}
-              5. Once approved, receive your reward on the spot or be notified
-              for scheduled claiming.{"\n\n"}
+              5. Once approved, receive your reward on the spot or be notified for scheduled claiming.{"\n\n"}
               <Text style={styles.bold}>
-                Note: Ensure you meet the minimum points required for the
-                specific reward before attempting to redeem.
+                Note: Ensure you meet the minimum points required for the specific reward before attempting to redeem.
               </Text>
             </Text>
 
             {/* CTA Button */}
             <TouchableOpacity
-              style={styles.ctaButton}
+              activeOpacity={0.85}
               onPress={() => setModalVisible(true)}
+              style={styles.ctaButtonSolid}
             >
-              <Text style={styles.ctaText}>
-                Redeem for {reward.points} Points
-              </Text>
+              <Text style={styles.ctaText}>Redeem for {reward.points} Points</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -158,52 +154,69 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "Poppins_700Bold",
   },
   scrollContainer: {
     padding: 16,
     alignItems: "center",
+    paddingBottom: 40,
+  },
+  imageWrapper: {
+    width: "100%",
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   image: {
     width: "100%",
-    height: 200,
+    height: 220,
     resizeMode: "contain",
-    marginBottom: 16,
   },
   card: {
     backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 18,
+    padding: 22,
     width: "100%",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 4,
   },
   sectionTitle: {
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
-    marginTop: 10,
-    marginBottom: 8,
+    marginTop: 12,
+    marginBottom: 6,
+    color: "#2E7D32",
   },
   text: {
     fontSize: 14,
     fontFamily: "Poppins_400Regular",
     color: "#444",
-    lineHeight: 20,
-    marginBottom: 8,
+    lineHeight: 22,
+    marginBottom: 12,
   },
   bold: {
     fontFamily: "Poppins_700Bold",
   },
-  ctaButton: {
+  ctaButtonSolid: {
     backgroundColor: "#008243",
-    borderRadius: 8,
+    borderRadius: 10,
     paddingVertical: 14,
     marginTop: 24,
     alignItems: "center",
+    shadowColor: "#008243",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
   },
   ctaText: {
     color: "white",
@@ -240,5 +253,12 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
+  },
+  notFoundText: {
+    fontSize: 16,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#888",
+    textAlign: "center",
+    marginTop: 40,
   },
 });

@@ -1,5 +1,5 @@
 // src/app/Main/redeem_rewards.js
-import React from "react";
+import React, { useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,11 +8,13 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import CustomBgColor from "../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import CustomBgColor from "../../components/customBgColor";
 
 const { width } = Dimensions.get("window");
 
@@ -51,32 +53,88 @@ const RedeemRewards = () => {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Redeem Rewards</Text>
+          <Text style={styles.headerTitle}>🎁 Redeem Rewards</Text>
           <View style={{ width: 24 }} />
         </View>
+
+        {/* Eco friendly background accents */}
+        <Ionicons
+          name="leaf"
+          size={140}
+          color="green"
+          style={[styles.bgIcon, { top: 100, left: -30, transform: [{ rotate: "-20deg" }] }]}
+        />
+        <Ionicons
+          name="earth"
+          size={120}
+          color="green"
+          style={[styles.bgIcon, { bottom: 150, right: -20, opacity: 0.07 }]}
+        />
+        <Ionicons
+          name="leaf"
+          size={100}
+          color="green"
+          style={[styles.bgIcon, { bottom: 60, left: 40, transform: [{ rotate: "30deg" }] }]}
+        />
+
 
         <ScrollView contentContainerStyle={styles.scrollView}>
           <View style={styles.content}>
             <Text style={styles.intro}>
-              Here are the rewards you {"\n"}can redeem using your earned points:
+              ♻ Here are the rewards you {"\n"}can redeem using your earned
+              points:
             </Text>
 
             <View style={styles.cardContainer}>
-              {rewards.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.card}
-                  activeOpacity={0.8}
-                  onPress={() => item.route && router.push(item.route)}
-                >
-                  <Image source={item.icon} style={styles.icon} />
-                  <Text style={styles.cardTitle}>{item.name}</Text>
-                  <Text style={styles.subtitle}>{item.subtitle}</Text>
-                  <View style={styles.redeemButton}>
-                    <Text style={styles.redeemText}>Redeem</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+              {rewards.map((item) => {
+                const scaleAnim = useRef(new Animated.Value(1)).current;
+
+                const handlePressIn = () => {
+                  Animated.spring(scaleAnim, {
+                    toValue: 0.95,
+                    useNativeDriver: true,
+                  }).start();
+                };
+                const handlePressOut = () => {
+                  Animated.spring(scaleAnim, {
+                    toValue: 1,
+                    useNativeDriver: true,
+                  }).start();
+                };
+
+                return (
+                  <Animated.View
+                    key={item.id}
+                    style={[
+                      styles.cardWrapper,
+                      { transform: [{ scale: scaleAnim }] },
+                    ]}
+                  >
+                    <TouchableOpacity
+                      activeOpacity={0.9}
+                      onPress={() => item.route && router.push(item.route)}
+                      onPressIn={handlePressIn}
+                      onPressOut={handlePressOut}
+                    >
+                      <LinearGradient
+                        colors={["#CDEAC0", "#8ED081"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.card}
+                      >
+                        <Image source={item.icon} style={styles.icon} />
+                        <Text style={styles.cardTitle}>{item.name}</Text>
+                        <Text style={styles.subtitle}>{item.subtitle}</Text>
+
+                        {/* Redeem Button */}
+                        <View style={styles.redeemButton}>
+                          <Text style={styles.redeemText}>Redeem</Text>
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </Animated.View>
+                );
+              })}
             </View>
           </View>
         </ScrollView>
@@ -96,38 +154,47 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "Poppins_700Bold",
   },
   scrollView: {
     flexGrow: 1,
-    justifyContent: "center",
     padding: 16,
   },
   content: {
     alignItems: "center",
   },
   intro: {
-    fontSize: width < 400 ? 16 : 20,
-    fontFamily: "Poppins_700Bold",
-    marginBottom: 30,
+    fontSize: width < 400 ? 16 : 18,
+    fontFamily: "Poppins_500Medium",
+    marginBottom: 20,
     textAlign: "center",
+    color: "#1A1A1A",
   },
   cardContainer: {
     flexDirection: "row",
     justifyContent: "center",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  cardWrapper: {
+    margin: 8,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
   },
   card: {
-    width: width * 0.28,
-    backgroundColor: "#B6D799",
-    borderRadius: 12,
+    width: width * 0.42,
+    borderRadius: 16,
     padding: 16,
     alignItems: "center",
-    marginHorizontal: 5,
   },
   icon: {
-    width: width * 0.15,
-    height: width * 0.15,
+    width: width * 0.18,
+    height: width * 0.18,
     marginBottom: 10,
     resizeMode: "contain",
   },
@@ -136,19 +203,20 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     marginBottom: 4,
     textAlign: "center",
+    color: "#1A1A1A",
   },
   subtitle: {
     fontSize: width < 400 ? 10 : 12,
     fontFamily: "Poppins_400Regular",
-    color: "#333",
+    color: "#444",
     marginBottom: 12,
     textAlign: "center",
   },
   redeemButton: {
     backgroundColor: "#008243",
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -157,6 +225,11 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     fontSize: 14,
     textAlign: "center",
+  },
+  // Eco background icons (subtle)
+  bgIcon: {
+    position: "absolute",
+    opacity: 0.07,
   },
 });
 
