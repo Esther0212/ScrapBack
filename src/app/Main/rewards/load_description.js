@@ -72,7 +72,7 @@ const LoadDescription = () => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push("/Main/rewards/load")}>
-            <Ionicons name="arrow-back" size={24} color="#008243" />
+            <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{reward.title}</Text>
           <View style={{ width: 24 }} />
