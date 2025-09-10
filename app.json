@@ -21,7 +21,6 @@
         "foregroundImage": "./src/assets/splash-icon.png",
         "backgroundColor": "#F0F1C5"
       },
-      "permissions": ["ACCESS_FINE_LOCATION"],
       "edgeToEdgeEnabled": true
     },
     "web": {

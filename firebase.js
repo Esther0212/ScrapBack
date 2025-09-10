@@ -1,9 +1,11 @@
+// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAnalytics } from "firebase/analytics";
+import { getAuth } from "firebase/auth"; 
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage"; // optional, only if you upload images/files
 
-// Your Firebase project config
+
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCx8xp6oZDH_tojkX6TZSkDHMqRjrOBzHw",
   authDomain: "scrapback.firebaseapp.com",
@@ -11,13 +13,13 @@ const firebaseConfig = {
   storageBucket: "scrapback.firebasestorage.app",
   messagingSenderId: "982925588158",
   appId: "1:982925588158:web:966a341afbf3d60c4110ef",
-  measurementId: "G-26CLPX2974", // fine to leave, just unused
+  measurementId: "G-26CLPX2974"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-// Export services you’ll use
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+export { auth, db };
