@@ -3,25 +3,27 @@ import { StyleSheet, Text, View, ScrollView, Image, Pressable, Animated } from "
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 
-const PlasticDetail = () => {
+const ClothesDetail = () => {
   const [showGuidelinesPage, setShowGuidelinesPage] = useState(false);
   const [showDos, setShowDos] = useState(true);
 
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
   const dosList = [
-    "Do rinse plastic bottles before recycling.",
-    "Do separate plastics by type if required by your local recycling program.",
-    "Do remove caps and labels if specified by recycling guidelines.",
-    "Do crush bottles to save space.",
-    "Do reuse plastic containers whenever possible."
+    "Do donate gently used clothes to charity shops or shelters.",
+    "Do repurpose old clothes into cleaning rags, quilts, or craft projects.",
+    "Do use textile recycling programs for worn-out or damaged clothes.",
+    "Do check for clothing brand take-back programs for recycling or repurposing options.",
+    "Do wash clothes before donating or recycling to ensure cleanliness.",
+    "Do remove accessories (e.g., buttons, zippers) before recycling if necessary."
   ];
 
   const dontsList = [
-    "Don't throw plastic bags in regular recycling bins.",
-    "Don't mix plastics with food waste.",
-    "Don't recycle dirty or contaminated plastics.",
-    "Don't recycle plastics that are not accepted by your local program."
+    "Don't throw clothes in regular trash bins.",
+    "Don't donate stained, wet, or moldy clothes.",
+    "Don't mix textiles with other types of recyclables.",
+    "Don't ignore local recycling guidelines for specific fabrics.",
+    "Don't send clothes that cannot be reused to charity shops."
   ];
 
   const openGuidelines = () => {
@@ -44,11 +46,10 @@ const PlasticDetail = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
-        {/* Top Image for Main Section */}
-        <View style={styles.topImageContainer}>
+        {/* Top Image */}
+        <View style={styles.imageContainer}>
           <Image 
-            source={require('../../../assets/P1.png')} // replace with your plastic image path
+            source={require('../../../assets/bin.png')} 
             style={styles.topImage} 
             resizeMode="contain" 
           />
@@ -56,25 +57,25 @@ const PlasticDetail = () => {
 
         {/* Original Steps & Benefits */}
         <View style={styles.card}>
-          <Text style={styles.title}>How to Recycle Plastic</Text>
+          <Text style={styles.title}>How to Recycle Clothes</Text>
 
           <Pressable style={styles.redButton}>
-            <Text style={styles.redButtonText}>Plastic bin</Text>
+            <Text style={styles.redButtonText}>Textile bin</Text>
           </Pressable>
 
           <View style={styles.listContainer}>
-            <Text style={styles.listItem}>• Separate plastics from other recyclables.</Text>
-            <Text style={styles.listItem}>• Rinse containers to remove residue.</Text>
-            <Text style={styles.listItem}>• Flatten bottles to save space.</Text>
-            <Text style={styles.listItem}>• Avoid mixing with non-recyclable plastics.</Text>
+            <Text style={styles.listItem}>• Separate clean clothes from damaged or moldy items.</Text>
+            <Text style={styles.listItem}>• Fold or roll clothes for easier transport.</Text>
+            <Text style={styles.listItem}>• Donate wearable items to charity if possible.</Text>
+            <Text style={styles.listItem}>• Do not mix with non-textile waste.</Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. Environmental Impact{"\n"}Recycling plastics reduces landfill waste and prevents ocean pollution.
+            1. Environmental Impact{"\n"}Recycling clothes reduces landfill waste and lowers environmental pollution.
           </Text>
           <Text style={styles.benefitItem}>
-            2. Economic Efficiency{"\n"}Supports plastic recycling industries and creates reusable materials.
+            2. Economic Efficiency{"\n"}Supports textile recycling industries and creates affordable second-hand clothing.
           </Text>
 
           <Pressable
@@ -93,18 +94,19 @@ const PlasticDetail = () => {
               <Ionicons name="arrow-back" size={24} color="#388E3C" />
             </Pressable>
 
-            {/* Top Image for Guidelines */}
-            <View style={styles.topImageContainer}>
-              <Image 
-                source={require('../../../assets/p2.png')} // same image above guidelines
-                style={styles.topImage} 
-                resizeMode="contain" 
-              />
-            </View>
+            {/* Overlay Top Image */}
+           <View style={{ alignItems: "center", marginBottom: 16 }}>
+  <Image 
+    source={require('../../../assets/g1.png')} 
+    style={styles.topImage} 
+    resizeMode="contain" 
+  />
+</View>
 
-            <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }], marginTop: 16 }]}>
+            {/* Animated Guidelines Card */}
+            <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }], marginTop: 20 }]}>
               <View style={styles.guidelinesHeader}>
-                <Text style={styles.title}>Plastic Guidelines</Text>
+                <Text style={styles.title}>Clothes Guidelines</Text>
                 <Pressable
                   style={[styles.toggleButton, showDos ? styles.activeDos : styles.activeDonts]}
                   onPress={() => setShowDos(!showDos)}
@@ -120,7 +122,7 @@ const PlasticDetail = () => {
                       name={showDos ? "checkmark-circle" : "close-circle"}
                       size={20}
                       color={showDos ? "#388E3C" : "#D32F2F"}
-                      style={{ marginRight: 2 }}
+                      style={{ marginRight: 2}}
                     />
                     <Text style={styles.listItem}>{item}</Text>
                   </View>
@@ -137,9 +139,9 @@ const PlasticDetail = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F6F6E9" },
   scrollContent: { padding: 16 },
-  topImageContainer: { alignItems: "center", marginBottom: 16 },
+  imageContainer: { alignItems: "center", marginBottom: 16 },
   topImage: { width: 150, height: 150 },
-  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 16, marginTop: 16 },
+  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 16, marginTop: 90 },
   title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
   redButton: { backgroundColor: "#D32F2F", borderRadius: 8, padding: 8, alignSelf: "flex-start", marginBottom: 12 },
   redButtonText: { color: "#fff", fontWeight: "600" },
@@ -149,7 +151,6 @@ const styles = StyleSheet.create({
   benefitItem: { fontSize: 14, marginBottom: 8, lineHeight: 20 },
   viewGuidelinesButton: { backgroundColor: "#008243", borderRadius: 10, padding: 12, alignItems: "center", marginTop: 12 },
   viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-
   fullOverlay: {
     position: "absolute",
     top: 0,
@@ -187,4 +188,4 @@ const styles = StyleSheet.create({
   toggleText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });
 
-export default PlasticDetail;
+export default ClothesDetail;

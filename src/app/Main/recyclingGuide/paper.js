@@ -3,25 +3,26 @@ import { StyleSheet, Text, View, ScrollView, Image, Pressable, Animated } from "
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 
-const PlasticDetail = () => {
+const PaperDetail = () => {
   const [showGuidelinesPage, setShowGuidelinesPage] = useState(false);
   const [showDos, setShowDos] = useState(true);
 
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
   const dosList = [
-    "Do rinse plastic bottles before recycling.",
-    "Do separate plastics by type if required by your local recycling program.",
-    "Do remove caps and labels if specified by recycling guidelines.",
-    "Do crush bottles to save space.",
-    "Do reuse plastic containers whenever possible."
+    "Do recycle newspapers, magazines, and office paper.",
+    "Do flatten cardboard and paperboard for easier recycling.",
+    "Do remove staples and bindings before recycling.",
+    "Do check for local paper recycling programs.",
+    "Do keep paper dry to prevent contamination."
   ];
 
   const dontsList = [
-    "Don't throw plastic bags in regular recycling bins.",
-    "Don't mix plastics with food waste.",
-    "Don't recycle dirty or contaminated plastics.",
-    "Don't recycle plastics that are not accepted by your local program."
+    "Don't recycle paper with food stains or grease.",
+    "Don't include tissues, napkins, or paper towels.",
+    "Don't mix with plastic-coated or laminated paper.",
+    "Don't send wet or moldy paper to recycling.",
+    "Don't throw non-paper materials in the paper bin."
   ];
 
   const openGuidelines = () => {
@@ -48,7 +49,7 @@ const PlasticDetail = () => {
         {/* Top Image for Main Section */}
         <View style={styles.topImageContainer}>
           <Image 
-            source={require('../../../assets/P1.png')} // replace with your plastic image path
+            source={require('../../../assets/pa1.png')} // replace with your paper image path
             style={styles.topImage} 
             resizeMode="contain" 
           />
@@ -56,25 +57,25 @@ const PlasticDetail = () => {
 
         {/* Original Steps & Benefits */}
         <View style={styles.card}>
-          <Text style={styles.title}>How to Recycle Plastic</Text>
+          <Text style={styles.title}>How to Recycle Paper</Text>
 
           <Pressable style={styles.redButton}>
-            <Text style={styles.redButtonText}>Plastic bin</Text>
+            <Text style={styles.redButtonText}>Paper bin</Text>
           </Pressable>
 
           <View style={styles.listContainer}>
-            <Text style={styles.listItem}>• Separate plastics from other recyclables.</Text>
-            <Text style={styles.listItem}>• Rinse containers to remove residue.</Text>
-            <Text style={styles.listItem}>• Flatten bottles to save space.</Text>
-            <Text style={styles.listItem}>• Avoid mixing with non-recyclable plastics.</Text>
+            <Text style={styles.listItem}>• Separate clean paper from contaminated items.</Text>
+            <Text style={styles.listItem}>• Flatten cardboard and paper for transport.</Text>
+            <Text style={styles.listItem}>• Donate reusable paper for crafts if possible.</Text>
+            <Text style={styles.listItem}>• Avoid mixing with non-paper recyclables.</Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. Environmental Impact{"\n"}Recycling plastics reduces landfill waste and prevents ocean pollution.
+            1. Environmental Impact{"\n"}Recycling paper reduces deforestation and landfill waste.
           </Text>
           <Text style={styles.benefitItem}>
-            2. Economic Efficiency{"\n"}Supports plastic recycling industries and creates reusable materials.
+            2. Economic Efficiency{"\n"}Supports recycling industries and reduces production costs for paper products.
           </Text>
 
           <Pressable
@@ -96,7 +97,7 @@ const PlasticDetail = () => {
             {/* Top Image for Guidelines */}
             <View style={styles.topImageContainer}>
               <Image 
-                source={require('../../../assets/p2.png')} // same image above guidelines
+                source={require('../../../assets/pa2.png')} // same image above guidelines
                 style={styles.topImage} 
                 resizeMode="contain" 
               />
@@ -104,7 +105,7 @@ const PlasticDetail = () => {
 
             <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }], marginTop: 16 }]}>
               <View style={styles.guidelinesHeader}>
-                <Text style={styles.title}>Plastic Guidelines</Text>
+                <Text style={styles.title}>Paper Guidelines</Text>
                 <Pressable
                   style={[styles.toggleButton, showDos ? styles.activeDos : styles.activeDonts]}
                   onPress={() => setShowDos(!showDos)}
@@ -187,4 +188,4 @@ const styles = StyleSheet.create({
   toggleText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });
 
-export default PlasticDetail;
+export default PaperDetail;

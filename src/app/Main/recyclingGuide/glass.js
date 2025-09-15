@@ -3,25 +3,26 @@ import { StyleSheet, Text, View, ScrollView, Image, Pressable, Animated } from "
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 
-const PlasticDetail = () => {
+const GlassDetail = () => {
   const [showGuidelinesPage, setShowGuidelinesPage] = useState(false);
   const [showDos, setShowDos] = useState(true);
 
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
   const dosList = [
-    "Do rinse plastic bottles before recycling.",
-    "Do separate plastics by type if required by your local recycling program.",
-    "Do remove caps and labels if specified by recycling guidelines.",
-    "Do crush bottles to save space.",
-    "Do reuse plastic containers whenever possible."
+    "Do rinse glass bottles and jars before recycling.",
+    "Do separate colored glass from clear glass if required by your local program.",
+    "Do remove lids and caps from glass containers.",
+    "Do recycle broken glass only if accepted by your local recycling facility.",
+    "Do use designated glass recycling bins."
   ];
 
   const dontsList = [
-    "Don't throw plastic bags in regular recycling bins.",
-    "Don't mix plastics with food waste.",
-    "Don't recycle dirty or contaminated plastics.",
-    "Don't recycle plastics that are not accepted by your local program."
+    "Don't throw ceramics, mirrors, or light bulbs into glass recycling.",
+    "Don't include contaminated or food-soiled glass.",
+    "Don't mix different types of glass that are not accepted together.",
+    "Don't burn glass items.",
+    "Don't place glass in regular trash bins if recycling is available."
   ];
 
   const openGuidelines = () => {
@@ -44,37 +45,35 @@ const PlasticDetail = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
         {/* Top Image for Main Section */}
         <View style={styles.topImageContainer}>
-          <Image 
-            source={require('../../../assets/P1.png')} // replace with your plastic image path
-            style={styles.topImage} 
-            resizeMode="contain" 
+          <Image
+            source={require('../../../assets/g1.png')} // replace with your glass image path
+            style={styles.topImage}
+            resizeMode="contain"
           />
         </View>
 
-        {/* Original Steps & Benefits */}
         <View style={styles.card}>
-          <Text style={styles.title}>How to Recycle Plastic</Text>
+          <Text style={styles.title}>How to Recycle Glass</Text>
 
           <Pressable style={styles.redButton}>
-            <Text style={styles.redButtonText}>Plastic bin</Text>
+            <Text style={styles.redButtonText}>Glass bin</Text>
           </Pressable>
 
           <View style={styles.listContainer}>
-            <Text style={styles.listItem}>• Separate plastics from other recyclables.</Text>
-            <Text style={styles.listItem}>• Rinse containers to remove residue.</Text>
-            <Text style={styles.listItem}>• Flatten bottles to save space.</Text>
-            <Text style={styles.listItem}>• Avoid mixing with non-recyclable plastics.</Text>
+            <Text style={styles.listItem}>• Rinse all glass containers before recycling.</Text>
+            <Text style={styles.listItem}>• Remove lids and caps.</Text>
+            <Text style={styles.listItem}>• Separate colored and clear glass if required.</Text>
+            <Text style={styles.listItem}>• Avoid mixing with non-recyclable glass.</Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. Environmental Impact{"\n"}Recycling plastics reduces landfill waste and prevents ocean pollution.
+            1. Environmental Impact{"\n"}Recycling glass reduces landfill waste and saves raw materials.
           </Text>
           <Text style={styles.benefitItem}>
-            2. Economic Efficiency{"\n"}Supports plastic recycling industries and creates reusable materials.
+            2. Economic Efficiency{"\n"}Supports glass recycling industries and reduces energy usage in production.
           </Text>
 
           <Pressable
@@ -85,7 +84,6 @@ const PlasticDetail = () => {
           </Pressable>
         </View>
 
-        {/* Guidelines Overlay */}
         {showGuidelinesPage && (
           <View style={styles.fullOverlay}>
             {/* Back Arrow */}
@@ -93,18 +91,19 @@ const PlasticDetail = () => {
               <Ionicons name="arrow-back" size={24} color="#388E3C" />
             </Pressable>
 
-            {/* Top Image for Guidelines */}
+            {/* Top Image for Guidelines Overlay */}
             <View style={styles.topImageContainer}>
-              <Image 
-                source={require('../../../assets/p2.png')} // same image above guidelines
-                style={styles.topImage} 
-                resizeMode="contain" 
+              <Image
+                source={require('../../../assets/g2.png')} // same image above guidelines
+                style={styles.topImage}
+                resizeMode="contain"
               />
             </View>
 
-            <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }], marginTop: 16 }]}>
+            {/* Animated Guidelines Card */}
+            <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }], marginTop: 20 }]}>
               <View style={styles.guidelinesHeader}>
-                <Text style={styles.title}>Plastic Guidelines</Text>
+                <Text style={styles.title}>Glass Guidelines</Text>
                 <Pressable
                   style={[styles.toggleButton, showDos ? styles.activeDos : styles.activeDonts]}
                   onPress={() => setShowDos(!showDos)}
@@ -139,7 +138,7 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16 },
   topImageContainer: { alignItems: "center", marginBottom: 16 },
   topImage: { width: 150, height: 150 },
-  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 16, marginTop: 16 },
+  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 16, marginTop: 90 },
   title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
   redButton: { backgroundColor: "#D32F2F", borderRadius: 8, padding: 8, alignSelf: "flex-start", marginBottom: 12 },
   redButtonText: { color: "#fff", fontWeight: "600" },
@@ -187,4 +186,4 @@ const styles = StyleSheet.create({
   toggleText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });
 
-export default PlasticDetail;
+export default GlassDetail;

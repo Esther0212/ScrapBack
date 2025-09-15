@@ -155,15 +155,43 @@ const Home = () => {
                     : { marginLeft: 0 },
                 ]}
                 onPressIn={() => setPressedIndex(index)} // Show label on press
-                onPress={() => router.push("/Main/recyclingGuide")}
-              >
-                <Image source={item.source} style={styles.iconImage} />
-                {pressedIndex === index && (
-                  <Text style={styles.iconText}>{item.name}</Text>
-                )}
-              </Pressable>
+onPress={() => {
+  if (item.name === "Plastic") {
+    router.replace("/Main/recyclingGuide"); // Use replace for default page
+  } else if (item.name === "Paper") {
+    router.push("/Main/recyclingGuide/paper");
+  } else if (item.name === "Metal") {
+    router.push("/Main/recyclingGuide/metal");
+  } else if (item.name === "Glass") {
+    router.push("/Main/recyclingGuide/glass");
+  } else if (item.name === "eWaste") {
+    router.push("/Main/recyclingGuide/ewaste");
+  } else if (item.name === "Batteries") {
+    router.push("/Main/recyclingGuide/batteries");
+  } else if (item.name === "Carton") {
+    router.push("/Main/recyclingGuide/carton");
+  } else if (item.name === "Clothes") {
+    router.push("/Main/recyclingGuide/clothes");
+  } else if (item.name === "Construction") {
+    router.push("/Main/recyclingGuide/construction");
+  } else if (item.name === "Organic") {
+    router.push("/Main/recyclingGuide/organic");
+  } else {
+    router.push({
+      pathname: "/Main/RecyclingDetail",
+      params: { name: item.name },
+    });
+  }
+}}
+onPressOut={() => setPressedIndex(null)} // Hide label on release
+>
+  <Image source={item.source} style={styles.iconImage} />
+  {pressedIndex === index && <Text style={styles.iconText}>{item.name}</Text>}
+</Pressable>
+
             ))}
           </ScrollView>
+          
 
           {/* 🔹 Educational Content Banners */}
           {eduImages.length > 0 &&
