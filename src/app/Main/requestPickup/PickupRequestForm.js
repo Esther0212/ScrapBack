@@ -42,15 +42,41 @@ export default function PickupRequestForm() {
     );
   };
 
-  const fetchAddressName = async (coords) => {
-    const [address] = await Location.reverseGeocodeAsync(coords);
-    if (address) {
-      const name = `${address.name || ""} ${address.street || ""}, ${
-        address.city || ""
-      }`.trim();
-      setAddressName(name);
+const fetchAddressName = async (coords) => {
+  try {
+    // Always try Google Geocoding API first
+    const resp = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.latitude},${coords.longitude}&key=YOUR_API_KEY`
+    );
+    const data = await resp.json();
+
+    let formatted = "";
+    if (data.results && data.results.length > 0) {
+      formatted = data.results[0].formatted_address;
     }
-  };
+
+    // If Google failed, fallback to expo-location
+    if (!formatted) {
+      const [address] = await Location.reverseGeocodeAsync(coords);
+      if (address) {
+        const parts = [
+          address.name,
+          address.street,
+          address.district,
+          address.city,
+          address.region,
+          address.country,
+        ].filter(Boolean);
+        formatted = parts.join(", ");
+      }
+    }
+
+    setAddressName(formatted || "Unknown location");
+  } catch (err) {
+    console.error("Geocoding failed:", err);
+    setAddressName("Unknown location");
+  }
+};
 
   useEffect(() => {
     (async () => {
@@ -123,16 +149,13 @@ export default function PickupRequestForm() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F7F6D4" }}>
       <ScrollView contentContainerStyle={styles.container}>
- 
-
-<TouchableOpacity
-  style={styles.backButton}
-  onPress={() => router.back()}
->
-  <Ionicons name="chevron-back" size={22}  />
-  <Text style={styles.backButtonText}>Request Pickup</Text>
-</TouchableOpacity>
-
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="chevron-back" size={22} />
+          <Text style={styles.backButtonText}>Request Pickup</Text>
+        </TouchableOpacity>
 
         <Text style={styles.label}>Type of recyclable</Text>
         <View style={styles.card}>
@@ -234,53 +257,67 @@ export default function PickupRequestForm() {
         {/* Map Modal */}
         <Modal visible={modalVisible} animationType="slide">
           <View style={{ flex: 1 }}>
-            <Text style={styles.modalHeader}>Select Pickup Location</Text>
+            {/* Floating header with back + search */}
+            <View style={styles.mapHeaderOverlay}>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={styles.backBtnOverlay}
+              >
+                <Ionicons name="chevron-back" size={24} color="#000" />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.searchOverlay}
+                placeholder="Search"
+                value={addressName}
+                onChangeText={setAddressName}
+              />
+            </View>
+
             {loadingLocation ? (
               <ActivityIndicator style={{ marginTop: 20 }} size="large" />
             ) : (
-              <>
-                <MapView
-                  style={{ flex: 1 }}
-                  initialRegion={initialRegion}
-                  onPress={(e) => setMarkerCoords(e.nativeEvent.coordinate)}
-                >
-                  <UrlTile
-                    urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                    maximumZ={19}
-                  />
-                  {markerCoords && (
-                    <Marker
-                      coordinate={markerCoords}
-                      draggable
-                      onDragEnd={(e) => {
-                        const coords = e.nativeEvent.coordinate;
-                        setMarkerCoords(coords);
-                        fetchAddressName(coords);
-                      }}
-                    />
-                  )}
-                </MapView>
-                <TextInput
-                  style={styles.addressInput}
-                  value={addressName}
-                  onChangeText={setAddressName}
-                  placeholder="Fetching address..."
-                  multiline
+              <MapView
+                style={{ flex: 1 }}
+                initialRegion={initialRegion}
+                onPress={(e) => {
+                  const coords = e.nativeEvent.coordinate;
+                  setMarkerCoords(coords);
+                  fetchAddressName(coords); // ✅ improved geocoding
+                }}
+              >
+                <UrlTile
+                  urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+                  maximumZ={19}
                 />
-              </>
+                {markerCoords && (
+                  <Marker
+                    coordinate={markerCoords}
+                    draggable
+                    onDragEnd={(e) => {
+                      const coords = e.nativeEvent.coordinate;
+                      setMarkerCoords(coords);
+                      fetchAddressName(coords); // ✅ improved geocoding
+                    }}
+                  >
+                    <FontAwesome name="map-marker" size={38} color="red" />
+                  </Marker>
+                )}
+              </MapView>
             )}
-            <View style={styles.modalFooter}>
+
+            {/* Floating footer buttons */}
+            <View style={styles.footerOverlay}>
               <TouchableOpacity
-                style={styles.cancelBtn}
+                style={styles.cancelBtnOverlay}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={styles.footerText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.confirmBtn}
+                style={styles.confirmBtnOverlay}
                 onPress={confirmLocation}
               >
-                <Text style={styles.confirmBtnText}>Confirm</Text>
+                <Text style={styles.footerText}>Confirm</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -517,5 +554,80 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
     marginLeft: 6,
+  },
+  mapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: "#f2f2f2",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === "ios" ? 8 : 6,
+    marginLeft: 10,
+    fontSize: 15,
+  },
+  mapHeaderOverlay: {
+    position: "absolute",
+    top: 40, // adjust if header overlaps status bar
+    left: 10,
+    right: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  backBtnOverlay: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.8)", // subtle round bg
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchOverlay: {
+    flex: 1,
+    marginLeft: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === "ios" ? 8 : 6,
+    fontSize: 15,
+  },
+
+  footerOverlay: {
+    position: "absolute",
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    zIndex: 10,
+  },
+  cancelBtnOverlay: {
+    flex: 1,
+    marginRight: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.6)", // dark translucent
+    alignItems: "center",
+  },
+  confirmBtnOverlay: {
+    flex: 1,
+    marginLeft: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: "#7EBF62", // green confirm
+    alignItems: "center",
+  },
+  footerText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
   },
 });

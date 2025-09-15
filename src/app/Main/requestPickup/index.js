@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -51,7 +51,6 @@ const dummyData = [
 
 const RequestPickup = () => {
   const router = useRouter();
-  const [showStatus, setShowStatus] = useState(true);
 
   const renderCard = (item) => (
     <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
@@ -86,37 +85,18 @@ const RequestPickup = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Request for Pickup</Text>
+       {/* Static "Status" label bar */}
+      <View style={styles.statusBar}>
+        <Text style={styles.statusBarText}>Status</Text>
+      </View>
 
-      <TouchableOpacity
-        style={styles.statusToggle}
-        onPress={() => setShowStatus(!showStatus)}
-      >
-        <Text style={styles.statusToggleText}>Status</Text>
-        <Ionicons
-          name={showStatus ? "chevron-up" : "chevron-down"}
-          size={22}
-          color="#fff"
-        />
-      </TouchableOpacity>
-
-      {showStatus ? (
-        <FlatList
-          data={dummyData}
-          renderItem={({ item }) => renderCard(item)}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 150 }}
-        />
-      ) : (
-        <Animatable.View
-          animation="fadeIn"
-          duration={500}
-          style={styles.summaryCard}
-        >
-          <Text style={styles.summaryHint}>
-            Tap "Status" above to expand and view details
-          </Text>
-        </Animatable.View>
-      )}
+      {/* Directly show FlatList, no dropdown */}
+      <FlatList
+        data={dummyData}
+        renderItem={({ item }) => renderCard(item)}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 150 }}
+      />
 
       <TouchableOpacity
         style={styles.fab}
@@ -143,19 +123,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: "#333",
   },
-  statusToggle: {
+  statusBar: {
     backgroundColor: "#7ac47f",
     padding: 14,
     borderRadius: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     marginBottom: 16,
   },
-  statusToggleText: {
+  statusBarText: {
     fontWeight: "700",
-    fontSize: 18, // bigger text
+    fontSize: 15,
     color: "#fff",
+    textAlign: "center",
   },
   card: {
     backgroundColor: "#fff",
@@ -218,19 +196,6 @@ const styles = StyleSheet.create({
   editText: {
     color: "#fff",
     fontWeight: "bold",
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: "#F8F6C8",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  summaryHint: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    fontStyle: "italic",
   },
   fab: {
     position: "absolute",
