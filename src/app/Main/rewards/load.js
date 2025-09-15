@@ -1,4 +1,4 @@
-// src/app/Main/rewards/rice.js
+// src/app/Main/rewards/load.js
 import React from "react";
 import {
   StyleSheet,
@@ -20,31 +20,31 @@ const { width } = Dimensions.get("window");
 const offers = [
   {
     id: 1,
-    title: "1 Kilo Rice",
+    title: "₱50 Load",
     points: 100,
-    image: require("../../../assets/redeem/dog.png"),
+    image: require("../../../assets/redeem/load.png"),
   },
   {
     id: 2,
-    title: "5 Kilos Rice",
-    points: 450,
-    image: require("../../../assets/redeem/rice.png"),
+    title: "₱100 Load",
+    points: 200,
+    image: require("../../../assets/redeem/load.png"),
   },
   {
     id: 3,
-    title: "1 Kilo Rice",
-    points: 100,
-    image: require("../../../assets/redeem/tut.jpg"),
+    title: "₱200 Load",
+    points: 400,
+    image: require("../../../assets/redeem/load.png"),
   },
   {
     id: 4,
-    title: "5 Kilos Rice",
-    points: 450,
-    image: require("../../../assets/redeem/tut.jpg"),
+    title: "₱500 Load",
+    points: 1000,
+    image: require("../../../assets/redeem/load.png"),
   },
 ];
 
-const Rice = () => {
+const Load = () => {
   const router = useRouter();
 
   return (
@@ -55,7 +55,7 @@ const Rice = () => {
           <TouchableOpacity onPress={() => router.push("/Main/redeem_rewards")}>
             <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>ScrapBack Offers</Text>
+          <Text style={styles.headerTitle}>ScrapBack Load Offers</Text>
           <View style={{ width: 24 }} />
         </View>
 
@@ -69,7 +69,7 @@ const Rice = () => {
                 activeOpacity={0.8}
                 onPress={() => {
                   router.push({
-                    pathname: "/Main/rewards/rice_description",
+                    pathname: "/Main/rewards/load_description",
                     params: { id: offer.id },
                   });
                 }}
@@ -91,7 +91,7 @@ const Rice = () => {
   );
 };
 
-export default Rice;
+export default Load;
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     width: width * 0.42,
     backgroundColor: "#B6D799",
     borderRadius: 12,
-    overflow: "hidden", 
+    overflow: "hidden",
     margin: 8,
     alignItems: "center",
   },

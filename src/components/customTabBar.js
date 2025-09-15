@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   TouchableWithoutFeedback,
@@ -19,8 +19,21 @@ const tabIcons = {
 
 const CustomTabBar = ({ state, navigation }) => {
   const insets = useSafeAreaInsets();
-  const { width } = Dimensions.get("window");
-  const tabWidth = width / state.routes.length;
+
+  // Track screen dimensions dynamically
+  const [screen, setScreen] = useState(Dimensions.get("window"));
+  const { width } = screen;
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener("change", ({ window }) => {
+      setScreen(window);
+    });
+    return () => subscription?.remove();
+  }, []);
+
+  // Icons spaced evenly
+  const spacedIcons = ["index", "map", "scanner", "requestPickup", "profile"];
+  const tabWidth = width / spacedIcons.length;
 
   const translateX = useRef(new Animated.Value(0)).current;
   const prevIndexRef = useRef(state.index);
@@ -30,26 +43,27 @@ const CustomTabBar = ({ state, navigation }) => {
   const previousRoute = state.routes[prevIndexRef.current];
 
   const isScannerTab = currentRoute.name === "scanner";
-  const wasScannerTab = previousRoute.name === "scanner";
 
-  // Animate slider (non-scanner)
+  // Animate slider (non-scanner tabs only)
   useEffect(() => {
     if (!isScannerTab) {
-      const fromIndex = wasScannerTab
-        ? state.routes.findIndex((r) => r.name === "scanner")
-        : prevIndexRef.current;
-      const toValue = state.index * tabWidth;
+      const fromKey = state.routes[prevIndexRef.current].name;
+      const toKey = currentRoute.name;
 
-      translateX.setValue(fromIndex * tabWidth);
+      const fromIndex = spacedIcons.indexOf(fromKey);
+      const toIndex = spacedIcons.indexOf(toKey);
 
-      Animated.spring(translateX, {
-        toValue,
-        useNativeDriver: true,
-        bounciness: 10,
-      }).start();
+      if (toIndex !== -1) {
+        translateX.setValue(fromIndex * tabWidth);
+        Animated.spring(translateX, {
+          toValue: toIndex * tabWidth,
+          useNativeDriver: true,
+          bounciness: 10,
+        }).start();
+      }
     }
 
-    // Animate scanner scale
+    // Animate scanner scaling
     if (isScannerTab) {
       Animated.spring(scaleAnim, {
         toValue: 1.15,
@@ -65,22 +79,26 @@ const CustomTabBar = ({ state, navigation }) => {
     }
 
     prevIndexRef.current = state.index;
-  }, [state.index]);
+  }, [state.index, tabWidth]);
+
+  const scannerSize = 70; // diameter of scanner circle (for centering)
 
   return (
     <View style={[styles.tabContainer, { paddingBottom: insets.bottom }]}>
-      {/* Oval slider - hidden when scanner is selected */}
+      {/* Oval slider (hidden on scanner) */}
       {!isScannerTab &&
         (() => {
           const { Icon, name } = tabIcons[currentRoute.name] || {};
+          const indexInSpaced = spacedIcons.indexOf(currentRoute.name);
+          if (indexInSpaced === -1) return null;
           return (
             <Animated.View
               style={[
                 styles.slider,
                 {
-                  width: tabWidth * 0.7,
+                  width: tabWidth * 0.6, // 60% of tabWidth
+                  left: tabWidth * 0.2, // center slider inside tab space
                   transform: [{ translateX }],
-                  left: tabWidth * 0.2,
                 },
               ]}
             >
@@ -91,14 +109,74 @@ const CustomTabBar = ({ state, navigation }) => {
           );
         })()}
 
-      {/* Tab icons */}
-      {state.routes.map((route, index) => {
-        const isFocused = state.index === index;
-        const { Icon, name } = tabIcons[route.name] || {};
-        if (!Icon || !name) return null;
+      {/* Left group (home + location) */}
+      <View style={[styles.group, { width: tabWidth * 2 }]}>
+        {["index", "map"].map((key) => {
+          const route = state.routes.find((r) => r.name === key);
+          if (!route) return null;
+          const isFocused = state.index === state.routes.indexOf(route);
+          const { Icon, name } = tabIcons[route.name];
+          const color = isFocused ? "transparent" : "#90C67C";
 
-        const isScanner = route.name === "scanner";
-        const color = isFocused ? "transparent" : "#90C67C";
+          return (
+            <TouchableWithoutFeedback
+              key={route.key}
+              onPress={() => {
+                const event = navigation.emit({
+                  type: "tabPress",
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              }}
+            >
+              <View style={styles.tabItem}>
+                {!isFocused && <Icon name={name} size={24} color={color} />}
+              </View>
+            </TouchableWithoutFeedback>
+          );
+        })}
+      </View>
+
+      {/* Right group (truck + profile) */}
+      <View style={[styles.group, { width: tabWidth * 2 }]}>
+        {["requestPickup", "profile"].map((key) => {
+          const route = state.routes.find((r) => r.name === key);
+          if (!route) return null;
+          const isFocused = state.index === state.routes.indexOf(route);
+          const { Icon, name } = tabIcons[route.name];
+          const color = isFocused ? "transparent" : "#90C67C";
+
+          return (
+            <TouchableWithoutFeedback
+              key={route.key}
+              onPress={() => {
+                const event = navigation.emit({
+                  type: "tabPress",
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              }}
+            >
+              <View style={styles.tabItem}>
+                {!isFocused && <Icon name={name} size={24} color={color} />}
+              </View>
+            </TouchableWithoutFeedback>
+          );
+        })}
+      </View>
+
+      {/* Scanner absolutely centered */}
+      {(() => {
+        const route = state.routes.find((r) => r.name === "scanner");
+        if (!route) return null;
+        const { Icon, name } = tabIcons["scanner"];
+        const isFocused = state.index === state.routes.indexOf(route);
 
         return (
           <TouchableWithoutFeedback
@@ -109,49 +187,32 @@ const CustomTabBar = ({ state, navigation }) => {
                 target: route.key,
                 canPreventDefault: true,
               });
-
               if (!isFocused && !event.defaultPrevented) {
                 navigation.navigate(route.name);
               }
             }}
           >
-            <View style={[styles.tabItem, { width: tabWidth }]}>
-              {isScanner ? (
-                <TouchableWithoutFeedback
-                  onPress={() => {
-                    const event = navigation.emit({
-                      type: "tabPress",
-                      target: route.key,
-                      canPreventDefault: true,
-                    });
-
-                    if (!isFocused && !event.defaultPrevented) {
-                      navigation.navigate(route.name);
-                    }
-                  }}
-                >
-                  <Animated.View
-                    style={[
-                      styles.scannerWrapper,
-                      { transform: [{ scale: scaleAnim }] },
-                    ]}
-                  >
-                    <View style={styles.scannerCircle}>
-                      <Icon name={name} size={28} color="#90C67C" />
-                    </View>
-                  </Animated.View>
-                </TouchableWithoutFeedback>
-              ) : (
-                !isFocused && (
-                  <View>
-                    <Icon name={name} size={24} color={color} />
-                  </View>
-                )
-              )}
-            </View>
+            <Animated.View
+              style={[
+                styles.scannerWrapper,
+                {
+                  left: width / 2 - scannerSize / 2, // true horizontal center
+                  transform: [{ scale: scaleAnim }],
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.scannerCircle,
+                  { width: scannerSize, height: scannerSize },
+                ]}
+              >
+                <Icon name={name} size={28} color="#90C67C" />
+              </View>
+            </Animated.View>
           </TouchableWithoutFeedback>
         );
-      })}
+      })()}
     </View>
   );
 };
@@ -160,16 +221,21 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "#008243",
-    justifyContent: "space-around",
     alignItems: "center",
     height: 70,
     position: "relative",
+    justifyContent: "space-between",
+  },
+  group: {
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   tabItem: {
     alignItems: "center",
     justifyContent: "center",
     top: 5,
     zIndex: 1,
+    flex: 1,
   },
   slider: {
     position: "absolute",
@@ -189,12 +255,11 @@ const styles = StyleSheet.create({
   },
   scannerWrapper: {
     position: "absolute",
-    top: -50,
+    top: -35, // lifts scanner above icons
     zIndex: 10,
   },
   scannerCircle: {
     backgroundColor: "#FFFFFF",
-    padding: 18,
     borderRadius: 50,
     justifyContent: "center",
     alignItems: "center",

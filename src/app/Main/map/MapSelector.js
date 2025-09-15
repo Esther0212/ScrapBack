@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { UrlTile, Marker } from "react-native-maps";
 
 export default function MapSelector() {
   const router = useRouter();
@@ -76,11 +76,15 @@ export default function MapSelector() {
   return (
     <View style={styles.container}>
       <MapView
+        style={{ flex: 1 }}
+        initialRegion={region}
         ref={mapRef}
-        style={StyleSheet.absoluteFill}
-        region={region}
-        onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
+        onLongPress={e => setMarker(e.nativeEvent.coordinate)}
       >
+        <UrlTile
+          urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+          maximumZ={19}
+        />
         {marker && <Marker coordinate={marker} />}
       </MapView>
 

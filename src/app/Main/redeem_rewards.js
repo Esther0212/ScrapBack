@@ -1,3 +1,4 @@
+// src/app/Main/redeem_rewards.js
 import React from "react";
 import {
   StyleSheet,
@@ -21,24 +22,26 @@ const rewards = [
     name: "Rice Sack",
     subtitle: "Redeemable Onsite",
     icon: require("../../assets/redeem/rice.png"),
-    route: "/Main/rewards/rice", 
+    route: "/Main/rewards/rice",
   },
   {
     id: 2,
     name: "Load",
     subtitle: "Redeemable Onsite/Online",
     icon: require("../../assets/redeem/load.png"),
+    route: "/Main/rewards/load",
   },
   {
     id: 3,
     name: "GCash",
     subtitle: "Redeemable Online",
     icon: require("../../assets/redeem/gcash.png"),
+    route: "/Main/rewards/gcash",
   },
 ];
 
 const RedeemRewards = () => {
-  const router = useRouter(); 
+  const router = useRouter();
 
   return (
     <CustomBgColor>
@@ -60,17 +63,19 @@ const RedeemRewards = () => {
 
             <View style={styles.cardContainer}>
               {rewards.map((item) => (
-                <View key={item.id} style={styles.card}>
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.card}
+                  activeOpacity={0.8}
+                  onPress={() => item.route && router.push(item.route)}
+                >
                   <Image source={item.icon} style={styles.icon} />
                   <Text style={styles.cardTitle}>{item.name}</Text>
                   <Text style={styles.subtitle}>{item.subtitle}</Text>
-                  <TouchableOpacity
-                    style={styles.redeemButton}
-                    onPress={() => item.route && router.push(item.route)} 
-                  >
+                  <View style={styles.redeemButton}>
                     <Text style={styles.redeemText}>Redeem</Text>
-                  </TouchableOpacity>
-                </View>
+                  </View>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
@@ -130,6 +135,7 @@ const styles = StyleSheet.create({
     fontSize: width < 400 ? 14 : 16,
     fontFamily: "Poppins_700Bold",
     marginBottom: 4,
+    textAlign: "center",
   },
   subtitle: {
     fontSize: width < 400 ? 10 : 12,
