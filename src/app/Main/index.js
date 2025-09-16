@@ -13,7 +13,7 @@ import CustomBgColor from "../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
@@ -36,6 +36,7 @@ const Home = () => {
   const [firstName, setFirstName] = useState("");
   const [hasNewNotification, setHasNewNotification] = useState(false);
   const [pressedIndex, setPressedIndex] = useState(null);
+  const [eduImages, setEduImages] = useState([]); // 🔹 Array for educational images
 
   useEffect(() => {
     const loadFirstName = async () => {
@@ -59,89 +60,124 @@ const Home = () => {
     checkNotifications();
   }, []);
 
+  // 🔹 Fetch ALL educational content images
+  useEffect(() => {
+    const fetchEducationalContent = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "educationalContent"));
+        const images = [];
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.image) {
+            // Add base64 prefix
+            images.push(`data:image/png;base64,${data.image}`);
+          }
+        });
+
+        setEduImages(images);
+      } catch (error) {
+        console.error("Error fetching educational content:", error);
+      }
+    };
+    fetchEducationalContent();
+  }, []);
+
   return (
     <CustomBgColor>
-        <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={styles.scrollView}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Image
+              source={require("../../assets/home/wordmarkLogo.png")}
+              style={styles.wordmarkLogo}
+              resizeMode="contain"
+            />
+            <Ionicons
+              name={hasNewNotification ? "notifications" : "notifications-outline"}
+              size={24}
+              color="black"
+            />
+          </View>
+
+          {/* Greeting */}
+          <Text style={styles.greeting}>Hi, {firstName}</Text>
+          <Text style={styles.subGreeting}>
+            Every action counts—start recycling today!
+          </Text>
+
+          {/* Points and Rewards */}
+          <View style={styles.pointsContainer}>
+            <View style={styles.leftContainer}>
+              <Text style={styles.pointsLabel}>Your Total Points</Text>
+              <View style={styles.rowContainer}>
+                <Image
+                  source={require("../../assets/home/lettermarkLogo.png")}
+                  style={styles.lettermarkLogo}
+                  resizeMode="cover"
+                />
+                <Text style={styles.pointsValueText}>500</Text>
+              </View>
+            </View>
+
+            <View style={styles.rightContainer}>
+              <View
+                style={styles.redeemButton}
+                onTouchStart={() => router.push("/Main/redeem_rewards")}
+              >
+                <Text style={styles.redeemText}>🎁 Redeem Rewards</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Recycling Guide */}
+          <Text style={styles.sectionTitle}>Recycling Guide</Text>
           <ScrollView
-            contentContainerStyle={styles.scrollView}
+            horizontal
+            showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.iconScroll}
           >
-            {/* Header */}
-            <View style={styles.header}>
-              <Image
-                source={require("../../assets/home/wordmarkLogo.png")}
-                style={styles.wordmarkLogo}
-                resizeMode="contain"
-              />
-              <Ionicons
-                name={hasNewNotification ? "notifications" : "notifications-outline"}
-                size={24}
-                color="black"
-              />
-            </View>
-
-            {/* Greeting */}
-            <Text style={styles.greeting}>Hi, {firstName}</Text>
-            <Text style={styles.subGreeting}>
-              Every action counts—start recycling today!
-            </Text>
-
-            {/* Points and Rewards */}
-            <View style={styles.pointsContainer}>
-              <View style={styles.leftContainer}>
-                <Text style={styles.pointsLabel}>Your Total Points</Text>
-                <View style={styles.rowContainer}>
-                  <Image
-                    source={require("../../assets/home/lettermarkLogo.png")}
-                    style={styles.lettermarkLogo}
-                    resizeMode="cover"
-                  />
-                  <Text style={styles.pointsValueText}>500</Text>
-                </View>
-              </View>
-
-              <View style={styles.rightContainer}>
-                <View
-                  style={styles.redeemButton}
-                  onTouchStart={() => router.push("/Main/redeem_rewards")}
-                >
-                  <Text style={styles.redeemText}>🎁 Redeem Rewards</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Recycling Guide */}
-            <Text style={styles.sectionTitle}>Recycling Guide</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.iconScroll}
-            >
-              {recyclingIcons.map((item, index) => (
-                <Pressable
-                  key={index}
-                  style={[
-                    styles.iconButton,
-                    pressedIndex === index && styles.iconButtonHovered,
-                    index !== 0 && index !== recyclingIcons.length - 1
-                      ? { marginRight: 10, marginLeft: 0 }
-                      : index === 0
-                      ? { marginRight: 10 }
-                      : { marginLeft: 0 },
-                  ]}
-                  onPressIn={() => setPressedIndex(index)} // Show label on press
-                  onPress={() => router.push("/Main/recyclingGuide")}
-                >
-                  <Image source={item.source} style={styles.iconImage} />
-                  {pressedIndex === index && (
-                    <Text style={styles.iconText}>{item.name}</Text>
-                  )}
-                </Pressable>
-              ))}
-            </ScrollView>
+            {recyclingIcons.map((item, index) => (
+              <Pressable
+                key={index}
+                style={[
+                  styles.iconButton,
+                  pressedIndex === index && styles.iconButtonHovered,
+                  index !== 0 && index !== recyclingIcons.length - 1
+                    ? { marginRight: 10, marginLeft: 0 }
+                    : index === 0
+                    ? { marginRight: 10 }
+                    : { marginLeft: 0 },
+                ]}
+                onPressIn={() => setPressedIndex(index)} // Show label on press
+                onPress={() => router.push("/Main/recyclingGuide")}
+              >
+                <Image source={item.source} style={styles.iconImage} />
+                {pressedIndex === index && (
+                  <Text style={styles.iconText}>{item.name}</Text>
+                )}
+              </Pressable>
+            ))}
           </ScrollView>
-        </SafeAreaView>
+
+          {/* 🔹 Educational Content Banners */}
+          {eduImages.length > 0 &&
+            eduImages.map((img, idx) => (
+              <View key={idx} style={styles.educationalContainer}>
+                <Image
+                  source={{ uri: img }}
+                  style={styles.educationalImage}
+                  resizeMode="cover"
+                />
+              </View>
+            ))}
+        </ScrollView>
+      </SafeAreaView>
     </CustomBgColor>
   );
 };
@@ -251,6 +287,15 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     color: "white",
     fontFamily: "Poppins_600SemiBold",
+  },
+  // 🔹 Educational banner styles
+  educationalContainer: {
+    marginTop: 24,
+  },
+  educationalImage: {
+    width: "100%",
+    height: 180,
+    borderRadius: 10,
   },
 });
 

@@ -25,8 +25,7 @@ import * as FileSystem from 'expo-file-system';
 
 
 const Profile = () => {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [name, setName] = useState("");
   const [birthdate, setBirthdate] = useState("");
   const [address, setAddress] = useState("");
   const [email, setEmail] = useState("");
@@ -61,8 +60,7 @@ const Profile = () => {
         const userDoc = await getDoc(doc(db, "user", user.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
-          setFirstName(data.firstName || "");
-          setLastName(data.lastName || "");
+          setName(data.name || "");
           setBirthdate(data.birthdate || "");
           setAddress(data.address || "");
           setEmail(data.email || user.email);
@@ -70,6 +68,7 @@ const Profile = () => {
           setPoints(data.points || 0);
 
           if (data.profilePic) {
+            // Check if it's Base64 or URL
             if (data.profilePic.startsWith("data:")) {
               setProfilePic({ uri: data.profilePic });
             } else {
@@ -83,7 +82,6 @@ const Profile = () => {
     };
     fetchUserData();
   }, []);
-
 
   // Pick image from library
   const pickImage = async () => {
@@ -130,12 +128,10 @@ const Profile = () => {
         await updateDoc(userRef, { profilePic: base64 });
       } else {
         await setDoc(userRef, {
-          firstName: firstName || user.displayName || "",
-          lastName: lastName || "",
+          name: user.displayName || "",
           email: user.email,
           profilePic: base64,
           createdAt: new Date(),
-          userType: "user" // default
         });
       }
 
@@ -200,8 +196,7 @@ const Profile = () => {
       const updateData = {};
 
       if (editingSection === "General info") {
-        updateData.firstName = firstName;
-        updateData.lastName = lastName;
+        updateData.name = name;
         updateData.birthdate = birthdate;
         updateData.address = address;
       } else if (editingSection === "Contact info") {
@@ -245,7 +240,7 @@ const Profile = () => {
                   </View>
                 </TouchableOpacity>
                 <View style={styles.userInfo}>
-                  <Text style={styles.name}>{`${firstName} ${lastName}`}</Text>
+                  <Text style={styles.name}>{name}</Text>
                   <Text style={styles.points}>
                     Total Points: <Text style={styles.bold}>{points}</Text>
                   </Text>
@@ -278,17 +273,12 @@ const Profile = () => {
                   <ScrollView showsVerticalScrollIndicator={false}>
                     {editingSection === "General info" && (
                       <>
-                        <Text style={styles.label}>First Name</Text>
-                        <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} />
-                        
-                        <Text style={styles.label}>Last Name</Text>
-                        <TextInput style={styles.input} value={lastName} onChangeText={setLastName} />
-                        
+                        <Text style={styles.label}>Full Name</Text>
+                        <TextInput style={styles.input} value={name} onChangeText={setName} />
                         <Text style={styles.label}>Birthday</Text>
                         <TouchableOpacity style={styles.input} onPress={showDatePicker}>
                           <Text>{birthdate || "Select date"}</Text>
                         </TouchableOpacity>
-                        
                         <Text style={styles.label}>Address</Text>
                         <TextInput style={styles.input} value={address} onChangeText={setAddress} />
                       </>
