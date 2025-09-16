@@ -103,6 +103,7 @@ export default function MapSelector() {
           urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
           maximumZ={19}
         />
+
         {marker && <Marker coordinate={marker} />}
       </MapView>
 
