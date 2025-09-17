@@ -1,28 +1,36 @@
 import React, { useState, useRef } from "react";
-import { StyleSheet, Text, View, ScrollView, Image, Pressable, Animated } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  Image,
+  Pressable,
+  Animated,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 const MetalDetail = () => {
   const [showGuidelinesPage, setShowGuidelinesPage] = useState(false);
   const [showDos, setShowDos] = useState(true);
-
+  const router = useRouter();
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
   const dosList = [
-    "Do recycle aluminum cans and foil.",
-    "Do rinse containers to remove food residues.",
-    "Do recycle steel cans and metal lids.",
-    "Do check for local scrap metal recycling programs.",
-    "Do separate metals from non-metal recyclables."
+    "Do rinse metal cans before recycling.",
+    "Do separate aluminum, steel, and tin if required by your local recycling program.",
+    "Do remove labels if specified by recycling guidelines.",
+    "Do flatten cans to save space.",
+    "Do reuse metal containers whenever possible.",
   ];
 
   const dontsList = [
-    "Don't throw metal in regular trash.",
-    "Don't recycle metal items contaminated with chemicals or paint.",
-    "Don't mix small metal scraps with non-metal waste.",
-    "Don't burn metal waste.",
-    "Don't recycle hazardous metal items like batteries in the metal bin."
+    "Don't throw metal with food waste.",
+    "Don't recycle metal that is painted or coated if not accepted.",
+    "Don't mix metals with non-recyclables.",
+    "Don't recycle items that are not accepted by your local program.",
   ];
 
   const openGuidelines = () => {
@@ -44,109 +52,186 @@ const MetalDetail = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Top Image for Main Section */}
-        <View style={styles.topImageContainer}>
-          <Image
-            source={require('../../../assets/bin.png')} // temporary image
-            style={styles.topImage}
-            resizeMode="contain"
-          />
-        </View>
+      {/* Back button for Recycling page */}
+      {!showGuidelinesPage && (
+        <Pressable
+          style={styles.transparentBack}
+          onPress={() => router.push("/Main/Home")}
+        >
+          <Ionicons name="arrow-back" size={22} color="#fff" />
+        </Pressable>
+      )}
 
-        <View style={styles.card}>
+      {/* Top Image */}
+      <View style={styles.topImageContainer}>
+        <Image
+          source={require("../../../assets/f1.png")}
+          style={styles.topImage}
+          resizeMode="contain"
+        />
+      </View>
+
+      {/* White Card */}
+      <View style={styles.card}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
           <Text style={styles.title}>How to Recycle Metal</Text>
 
-          <Pressable style={styles.redButton}>
-            <Text style={styles.redButtonText}>Metal bin</Text>
+          <Pressable style={styles.yellowButton}>
+            <Text style={styles.yellowButtonText}>Metal container</Text>
           </Pressable>
 
           <View style={styles.listContainer}>
-            <Text style={styles.listItem}>• Separate clean metals from contaminated items.</Text>
-            <Text style={styles.listItem}>• Flatten metal cans if possible.</Text>
-            <Text style={styles.listItem}>• Donate scrap metal for reuse if suitable.</Text>
-            <Text style={styles.listItem}>• Avoid mixing with non-metal recyclables.</Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>• Check:</Text> Find the recycling symbol on the metal.
+            </Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>• Clean:</Text> Rinse off any residue.
+            </Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>• Sort:</Text> Group metals by type if needed.
+            </Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>• Dispose:</Text> Use recycling bins or centers.
+            </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. Environmental Impact{"\n"}Recycling metal reduces mining demand and energy consumption.
+            1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
+            Recycling metal reduces mining, conserves energy, and lowers pollution.
           </Text>
           <Text style={styles.benefitItem}>
-            2. Economic Efficiency{"\n"}Supports metal recycling industries and lowers production costs.
+            2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
+            It saves costs, supports metal recycling industries, and promotes a circular economy.
           </Text>
+        </ScrollView>
 
-          <Pressable
-            style={styles.viewGuidelinesButton}
-            onPress={openGuidelines}
-          >
-            <Text style={styles.viewGuidelinesText}>View Guidelines</Text>
+        {/* Open Guidelines */}
+        <Pressable style={styles.viewGuidelinesButton} onPress={openGuidelines}>
+          <Text style={styles.viewGuidelinesText}>View Guidelines</Text>
+        </Pressable>
+      </View>
+
+      {/* Guidelines Overlay */}
+      {showGuidelinesPage && (
+        <View style={styles.fullOverlay}>
+          {/* Back button that closes overlay */}
+          <Pressable style={styles.transparentBack} onPress={closeGuidelines}>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </Pressable>
-        </View>
 
-        {showGuidelinesPage && (
-          <View style={styles.fullOverlay}>
-            <Pressable style={styles.backArrow} onPress={closeGuidelines}>
-              <Ionicons name="arrow-back" size={24} color="#388E3C" />
-            </Pressable>
+          <View style={styles.topImageContainer}>
+            <Image
+              source={require("../../../assets/f1.png")}
+              style={styles.topImage}
+              resizeMode="contain"
+            />
+          </View>
 
-            {/* Top Image for Guidelines Overlay */}
-            <View style={styles.topImageContainer}>
-              <Image
-                source={require('../../../assets/g2.png')} // same temporary image
-                style={styles.topImage}
-                resizeMode="contain"
-              />
+          <Animated.View
+            style={[
+              styles.card,
+              { transform: [{ translateY: slideAnim }], marginTop: 15 },
+            ]}
+          >
+            <View style={styles.guidelinesHeader}>
+              <Text style={styles.title}>Metal Guidelines</Text>
+              <Pressable
+                style={[
+                  styles.toggleButton,
+                  showDos ? styles.activeDos : styles.activeDonts,
+                ]}
+                onPress={() => setShowDos(!showDos)}
+              >
+                <Text style={styles.toggleText}>
+                  {showDos ? "✔ Dos" : "✖ Don'ts"}
+                </Text>
+              </Pressable>
             </View>
 
-            {/* Animated Guidelines Card */}
-            <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }], marginTop: 20 }]}>
-              <View style={styles.guidelinesHeader}>
-                <Text style={styles.title}>Metal Guidelines</Text>
-                <Pressable
-                  style={[styles.toggleButton, showDos ? styles.activeDos : styles.activeDonts]}
-                  onPress={() => setShowDos(!showDos)}
-                >
-                  <Text style={styles.toggleText}>{showDos ? "✔ Dos" : "✖ Don'ts"}</Text>
-                </Pressable>
-              </View>
-
-              <View style={{ paddingHorizontal: 10, paddingBottom: 3 }}>
-                {(showDos ? dosList : dontsList).map((item, index) => (
-                  <View key={index} style={styles.listRow}>
-                    <Ionicons
-                      name={showDos ? "checkmark-circle" : "close-circle"}
-                      size={20}
-                      color={showDos ? "#388E3C" : "#D32F2F"}
-                      style={{ marginRight: 2 }}
-                    />
-                    <Text style={styles.listItem}>{item}</Text>
-                  </View>
-                ))}
-              </View>
-            </Animated.View>
-          </View>
-        )}
-      </ScrollView>
+            <View style={{ paddingHorizontal: 10, paddingBottom: 3 }}>
+              {(showDos ? dosList : dontsList).map((item, index) => (
+                <View key={index} style={styles.listRow}>
+                  <Ionicons
+                    name={showDos ? "checkmark-circle" : "close-circle"}
+                    size={20}
+                    color={showDos ? "#388E3C" : "#D32F2F"}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.listItem}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F6F6E9" },
-  scrollContent: { padding: 16 },
-  topImageContainer: { alignItems: "center", marginBottom: 16 },
-  topImage: { width: 150, height: 150 },
-  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 16, marginTop: 90 },
-  title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
-  redButton: { backgroundColor: "#D32F2F", borderRadius: 8, padding: 8, alignSelf: "flex-start", marginBottom: 12 },
-  redButtonText: { color: "#fff", fontWeight: "600" },
+
+  topImageContainer: { alignItems: "center", marginBottom: -10, marginTop: 20 },
+  topImage: { width: 280, height: 250 },
+
+  card: {
+    minHeight: "64%",
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    marginTop: 35,
+  },
+
+  title: { fontSize: 16, fontWeight: "700", marginBottom: 15, marginTop: 10, color: "#000" },
+
+  yellowButton: {
+    backgroundColor: "#ffdd6cff",
+    borderRadius: 20,
+    marginBottom: 20,
+    marginTop: -45,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignSelf: "flex-end",
+  },
+  yellowButtonText: { color: "#fff", fontWeight: "400" },
+
   listContainer: { marginBottom: 16 },
-  listItem: { fontSize: 14, lineHeight: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
-  benefitItem: { fontSize: 14, marginBottom: 8, lineHeight: 20 },
-  viewGuidelinesButton: { backgroundColor: "#008243", borderRadius: 10, padding: 12, alignItems: "center", marginTop: 12 },
+  listItem: { fontSize: 13, lineHeight: 20, marginBottom: 4, color: "#333" },
+  bold: { fontWeight: "700" },
+
+  sectionTitle: { fontSize: 15, fontWeight: "700", marginBottom: 8, color: "#000" },
+  benefitItem: { fontSize: 13, marginBottom: 8, lineHeight: 20, color: "#333" },
+
+  transparentBack: {
+    position: "absolute",
+    top: 20,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
+    zIndex: 1000,
+  },
+
+  viewGuidelinesButton: {
+    backgroundColor: "#0ba45aff",
+    borderRadius: 12,
+    padding: 14,
+    alignItems: "center",
+    marginBottom: 40,
+  },
   viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+
   fullOverlay: {
     position: "absolute",
     top: 0,
@@ -158,20 +243,9 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     padding: 16,
   },
-  backArrow: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#DFF5E1",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  listRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
+
+  listRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+
   guidelinesHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

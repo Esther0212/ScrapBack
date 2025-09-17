@@ -1,28 +1,36 @@
 import React, { useState, useRef } from "react";
-import { StyleSheet, Text, View, ScrollView, Image, Pressable, Animated } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  Image,
+  Pressable,
+  Animated,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 const GlassDetail = () => {
   const [showGuidelinesPage, setShowGuidelinesPage] = useState(false);
   const [showDos, setShowDos] = useState(true);
-
+  const router = useRouter();
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
   const dosList = [
     "Do rinse glass bottles and jars before recycling.",
-    "Do separate colored glass from clear glass if required by your local program.",
-    "Do remove lids and caps from glass containers.",
-    "Do recycle broken glass only if accepted by your local recycling facility.",
-    "Do use designated glass recycling bins."
+    "Do remove caps or lids before recycling.",
+    "Do separate colored glass from clear glass if required by local guidelines.",
+    "Do handle glass carefully to avoid breakage.",
+    "Do reuse jars and bottles when possible.",
   ];
 
   const dontsList = [
-    "Don't throw ceramics, mirrors, or light bulbs into glass recycling.",
-    "Don't include contaminated or food-soiled glass.",
-    "Don't mix different types of glass that are not accepted together.",
-    "Don't burn glass items.",
-    "Don't place glass in regular trash bins if recycling is available."
+    "Don't recycle broken glass or mirrors in regular recycling bins.",
+    "Don't mix ceramics or Pyrex with recyclable glass.",
+    "Don't put glass with food or liquid residues.",
+    "Don't recycle light bulbs or glassware not accepted locally.",
   ];
 
   const openGuidelines = () => {
@@ -44,142 +52,168 @@ const GlassDetail = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Top Image for Main Section */}
-        <View style={styles.topImageContainer}>
-          <Image
-            source={require('../../../assets/g1.png')} // replace with your glass image path
-            style={styles.topImage}
-            resizeMode="contain"
-          />
-        </View>
+      {!showGuidelinesPage && (
+        <Pressable
+          style={styles.transparentBack}
+          onPress={() => router.push("/Main/Home")}
+        >
+          <Ionicons name="arrow-back" size={22} color="#fff" />
+        </Pressable>
+      )}
 
-        <View style={styles.card}>
+      <View style={styles.topImageContainer}>
+        <Image
+          source={require("../../../assets/f1.png")}
+          style={styles.topImage}
+          resizeMode="contain"
+        />
+      </View>
+
+      <View style={styles.card}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
           <Text style={styles.title}>How to Recycle Glass</Text>
 
-          <Pressable style={styles.redButton}>
-            <Text style={styles.redButtonText}>Glass bin</Text>
+          <Pressable style={styles.yellowButton}>
+            <Text style={styles.yellowButtonText}>Glass container</Text>
           </Pressable>
 
           <View style={styles.listContainer}>
-            <Text style={styles.listItem}>• Rinse all glass containers before recycling.</Text>
-            <Text style={styles.listItem}>• Remove lids and caps.</Text>
-            <Text style={styles.listItem}>• Separate colored and clear glass if required.</Text>
-            <Text style={styles.listItem}>• Avoid mixing with non-recyclable glass.</Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>• Check:</Text> Identify glass bottles and jars.
+            </Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>• Clean:</Text> Rinse off residues.
+            </Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>• Sort:</Text> Separate colored and clear glass if required.
+            </Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>• Dispose:</Text> Use recycling bins or centers.
+            </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. Environmental Impact{"\n"}Recycling glass reduces landfill waste and saves raw materials.
+            1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
+            Recycling glass reduces raw material use, saves energy, and decreases landfill waste.
           </Text>
           <Text style={styles.benefitItem}>
-            2. Economic Efficiency{"\n"}Supports glass recycling industries and reduces energy usage in production.
+            2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
+            It saves manufacturing costs, supports glass recycling industries, and promotes sustainability.
           </Text>
+        </ScrollView>
 
-          <Pressable
-            style={styles.viewGuidelinesButton}
-            onPress={openGuidelines}
-          >
-            <Text style={styles.viewGuidelinesText}>View Guidelines</Text>
+        <Pressable style={styles.viewGuidelinesButton} onPress={openGuidelines}>
+          <Text style={styles.viewGuidelinesText}>View Guidelines</Text>
+        </Pressable>
+      </View>
+
+      {showGuidelinesPage && (
+        <View style={styles.fullOverlay}>
+          <Pressable style={styles.transparentBack} onPress={closeGuidelines}>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </Pressable>
-        </View>
 
-        {showGuidelinesPage && (
-          <View style={styles.fullOverlay}>
-            {/* Back Arrow */}
-            <Pressable style={styles.backArrow} onPress={closeGuidelines}>
-              <Ionicons name="arrow-back" size={24} color="#388E3C" />
-            </Pressable>
+          <View style={styles.topImageContainer}>
+            <Image
+              source={require("../../../assets/f1.png")}
+              style={styles.topImage}
+              resizeMode="contain"
+            />
+          </View>
 
-            {/* Top Image for Guidelines Overlay */}
-            <View style={styles.topImageContainer}>
-              <Image
-                source={require('../../../assets/g2.png')} // same image above guidelines
-                style={styles.topImage}
-                resizeMode="contain"
-              />
+          <Animated.View
+            style={[
+              styles.card,
+              { transform: [{ translateY: slideAnim }], marginTop: 15 },
+            ]}
+          >
+            <View style={styles.guidelinesHeader}>
+              <Text style={styles.title}>Glass Guidelines</Text>
+              <Pressable
+                style={[
+                  styles.toggleButton,
+                  showDos ? styles.activeDos : styles.activeDonts,
+                ]}
+                onPress={() => setShowDos(!showDos)}
+              >
+                <Text style={styles.toggleText}>
+                  {showDos ? "✔ Dos" : "✖ Don'ts"}
+                </Text>
+              </Pressable>
             </View>
 
-            {/* Animated Guidelines Card */}
-            <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }], marginTop: 20 }]}>
-              <View style={styles.guidelinesHeader}>
-                <Text style={styles.title}>Glass Guidelines</Text>
-                <Pressable
-                  style={[styles.toggleButton, showDos ? styles.activeDos : styles.activeDonts]}
-                  onPress={() => setShowDos(!showDos)}
-                >
-                  <Text style={styles.toggleText}>{showDos ? "✔ Dos" : "✖ Don'ts"}</Text>
-                </Pressable>
-              </View>
-
-              <View style={{ paddingHorizontal: 10, paddingBottom: 3 }}>
-                {(showDos ? dosList : dontsList).map((item, index) => (
-                  <View key={index} style={styles.listRow}>
-                    <Ionicons
-                      name={showDos ? "checkmark-circle" : "close-circle"}
-                      size={20}
-                      color={showDos ? "#388E3C" : "#D32F2F"}
-                      style={{ marginRight: 2 }}
-                    />
-                    <Text style={styles.listItem}>{item}</Text>
-                  </View>
-                ))}
-              </View>
-            </Animated.View>
-          </View>
-        )}
-      </ScrollView>
+            <View style={{ paddingHorizontal: 10, paddingBottom: 3 }}>
+              {(showDos ? dosList : dontsList).map((item, index) => (
+                <View key={index} style={styles.listRow}>
+                  <Ionicons
+                    name={showDos ? "checkmark-circle" : "close-circle"}
+                    size={20}
+                    color={showDos ? "#388E3C" : "#D32F2F"}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.listItem}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F6F6E9" },
-  scrollContent: { padding: 16 },
-  topImageContainer: { alignItems: "center", marginBottom: 16 },
-  topImage: { width: 150, height: 150 },
-  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 16, marginTop: 90 },
-  title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
-  redButton: { backgroundColor: "#D32F2F", borderRadius: 8, padding: 8, alignSelf: "flex-start", marginBottom: 12 },
-  redButtonText: { color: "#fff", fontWeight: "600" },
-  listContainer: { marginBottom: 16 },
-  listItem: { fontSize: 14, lineHeight: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
-  benefitItem: { fontSize: 14, marginBottom: 8, lineHeight: 20 },
-  viewGuidelinesButton: { backgroundColor: "#008243", borderRadius: 10, padding: 12, alignItems: "center", marginTop: 12 },
-  viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-
-  fullOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#F6F6E9",
-    zIndex: 999,
-    justifyContent: "flex-start",
+  topImageContainer: { alignItems: "center", marginBottom: -10, marginTop: 20 },
+  topImage: { width: 280, height: 250 },
+  card: {
+    minHeight: "64%",
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
     padding: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    marginTop: 35,
   },
-  backArrow: {
+  title: { fontSize: 16, fontWeight: "700", marginBottom: 15, marginTop: 10, color: "#000" },
+  yellowButton: {
+    backgroundColor: "#ffdd6cff",
+    borderRadius: 20,
+    marginBottom: 20,
+    marginTop: -45,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignSelf: "flex-end",
+  },
+  yellowButtonText: { color: "#fff", fontWeight: "400" },
+  listContainer: { marginBottom: 16 },
+  listItem: { fontSize: 13, lineHeight: 20, marginBottom: 4, color: "#333" },
+  bold: { fontWeight: "700" },
+  sectionTitle: { fontSize: 15, fontWeight: "700", marginBottom: 8, color: "#000" },
+  benefitItem: { fontSize: 13, marginBottom: 8, lineHeight: 20, color: "#333" },
+  transparentBack: {
+    position: "absolute",
+    top: 20,
+    left: 16,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#DFF5E1",
+    borderWidth: 2,
+    borderColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
+    backgroundColor: "transparent",
+    zIndex: 1000,
   },
-  listRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  guidelinesHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
+  viewGuidelinesButton: { backgroundColor: "#0ba45aff", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 40 },
+  viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  fullOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F6F6E9", zIndex: 999, justifyContent: "flex-start", padding: 16 },
+  listRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  guidelinesHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
   toggleButton: { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 25 },
   activeDos: { backgroundColor: "#388E3C" },
   activeDonts: { backgroundColor: "#D32F2F" },

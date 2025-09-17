@@ -47,7 +47,7 @@ const OrganicDetail = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Top Image */}
         <View style={styles.imageContainer}>
-          <Image source={require('../../../assets/bin.png')} style={styles.topImage} resizeMode="contain" />
+          <Image source={require('../../../assets/f1.png')} style={styles.topImage} resizeMode="contain" />
         </View>
 
         {/* Original Steps & Benefits */}
@@ -132,7 +132,17 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16 },
   imageContainer: { alignItems: "center", marginBottom: 16 },
   topImage: { width: 150, height: 150 },
-  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 16, marginTop: 20 },
+  card: { 
+  backgroundColor: "#fff", 
+  borderRadius: 16, 
+  padding: 16, 
+  marginBottom: 16, 
+  marginTop: 20, 
+  width: "100%",        // makes the card take 100 % of screen width
+  alignSelf: "center", // centers the card
+  height: 900,         // fixed height (change number as needed)
+},
+
   title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
   redButton: { backgroundColor: "#D32F2F", borderRadius: 8, padding: 8, alignSelf: "flex-start", marginBottom: 12 },
   redButtonText: { color: "#fff", fontWeight: "600" },
