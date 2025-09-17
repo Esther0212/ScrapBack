@@ -74,31 +74,32 @@ const ClothesDetail = () => {
           <Text style={styles.title}>How to Recycle Clothes</Text>
 
           <Pressable style={styles.yellowButton}>
-            <Text style={styles.yellowButtonText}>Clothes bin</Text>
+            <Text style={styles.yellowButtonText}>Gray container</Text>
           </Pressable>
 
           <View style={styles.listContainer}>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Sort:</Text> Separate by fabric type.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Sort:</Text> Separate by fabric type.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Clean:</Text> Wash if dirty or soiled.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Clean:</Text> Wash if dirty or soiled.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Bundle:</Text> Fold or tie clothes neatly.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Bundle:</Text> Fold or tie clothes neatly.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Donate/Recycle:</Text> Place in textile recycling or donation bins.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Donate/Recycle:</Text> Place in textile recycling or donation
+              {"\u00A0\u00A0\u00A0"} bins.
             </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
+            {"\u00A0\u00A0\u00A0"}1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
             Recycling clothes reduces landfill waste and lowers environmental pollution.
           </Text>
           <Text style={styles.benefitItem}>
-            2. <Text style={styles.bold}>Social Benefit</Text>{"\n"}
+            {"\u00A0\u00A0\u00A0"}2. <Text style={styles.bold}>Social Benefit</Text>{"\n"}
             Donated clothes help those in need and promote a circular economy.
           </Text>
         </ScrollView>
@@ -165,7 +166,7 @@ const ClothesDetail = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F6F6E9" },
-  topImageContainer: { alignItems: "center", marginBottom: -10, marginTop: 20 },
+  topImageContainer: { alignItems: "center", marginBottom: -30, marginTop: 20 },
   topImage: { width: 280, height: 250 },
   card: {
     minHeight: "64%",
@@ -181,7 +182,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 16, fontWeight: "700", marginBottom: 15, marginTop: 10, color: "#000" },
   yellowButton: {
-    backgroundColor: "#ffdd6cff",
+    backgroundColor: "#aca8a7ff",
     borderRadius: 20,
     marginBottom: 20,
     marginTop: -45,
@@ -197,7 +198,7 @@ const styles = StyleSheet.create({
   benefitItem: { fontSize: 13, marginBottom: 8, lineHeight: 20, color: "#333" },
   transparentBack: {
     position: "absolute",
-    top: 20,
+    top: 50,
     left: 16,
     width: 40,
     height: 40,
@@ -209,7 +210,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     zIndex: 1000,
   },
-  viewGuidelinesButton: { backgroundColor: "#0ba45aff", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 40 },
+  viewGuidelinesButton: { backgroundColor: "#0ba45aff", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 25 },
   viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   fullOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F6F6E9", zIndex: 999, justifyContent: "flex-start", padding: 16 },
   listRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },

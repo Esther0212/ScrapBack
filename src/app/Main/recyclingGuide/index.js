@@ -94,27 +94,27 @@ const PlasticDetail = () => {
 
           <View style={styles.listContainer}>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Check:</Text> Find the recycling symbol (1–7) on the plastic.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0\u00A0"}• Check:</Text> Find the recycling symbol (1–7) on the plastic.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Clean:</Text> Rinse off food or liquids.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0\u00A0"}• Clean:</Text> Rinse off food or liquids.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Sort:</Text> Group by type if needed.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0\u00A0"}• Sort:</Text> Group by type if needed.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Dispose:</Text> Use recycling bins or centers.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0\u00A0"}• Dispose:</Text> Use recycling bins or centers.
             </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
-            Recycling plastic reduces pollution, conserves resources, and lowers greenhouse gas emissions.
+           {"\u00A0\u00A0"} 1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
+            {"\u00A0\u00A0\u00A0\u00A0\u00A0"}Recycling plastic reduces pollution, conserves {"\u00A0\u00A0\u00A0\u00A0"} resources, and lowers greenhouse gas emissions.
           </Text>
           <Text style={styles.benefitItem}>
-            2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
-            It saves costs, creates jobs in recycling industries, and supports a circular economy.
+            {"\u00A0\u00A0"} 2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
+           {"\u00A0\u00A0\u00A0\u00A0\u00A0"} It saves costs, creates jobs in recycling industries, and supports a circular economy.
           </Text>
         </ScrollView>
 
@@ -196,7 +196,7 @@ const PlasticDetail = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F6F6E9" },
 
-  topImageContainer: { alignItems: "center", marginBottom: -10, marginTop: 20 },
+  topImageContainer: { alignItems: "center", marginBottom: -30, marginTop: 20 },
   topImage: { width: 280, height: 250 },
 
   card: {
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
 
   transparentBack: {
     position: "absolute",
-    top: 20,
+    top: 50,
     left: 16,
     width: 40,
     height: 40,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 20,
   },
   viewGuidelinesText: {
     color: "#fff",

@@ -1,28 +1,39 @@
 import React, { useState, useRef } from "react";
-import { StyleSheet, Text, View, ScrollView, Image, Pressable, Animated } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  Image,
+  Pressable,
+  Animated,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 
 const OrganicDetail = () => {
+  const navigation = useNavigation();
   const [showGuidelinesPage, setShowGuidelinesPage] = useState(false);
   const [showDos, setShowDos] = useState(true);
+  const router = useRouter();
 
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
   const dosList = [
-    "Do separate fruit and vegetable scraps for composting.",
-    "Do use a compost bin or pit for organic waste.",
-    "Do include coffee grounds, tea leaves, and eggshells.",
-    "Do chop large items to speed up decomposition.",
-    "Do turn or mix compost regularly to aerate it."
+    "Do compost fruit and vegetable scraps.",
+    "Do separate garden waste from regular trash.",
+    "Do use biodegradable bags for organic waste.",
+    "Do keep organic waste dry when possible.",
+    "Do turn compost piles regularly for better decomposition.",
   ];
 
   const dontsList = [
-    "Don't include meat, fish, or dairy in compost.",
-    "Don't add oily or greasy food waste.",
-    "Don't include plastic, metal, or glass items.",
-    "Don't let compost become overly wet or smelly.",
-    "Don't mix organic waste with regular trash."
+    "Don't throw plastics or metals in organic waste.",
+    "Don't mix cooked food with garden waste if not composting.",
+    "Don't include toxic substances or chemicals.",
+    "Don't let organic waste rot in open trash for too long.",
   ];
 
   const openGuidelines = () => {
@@ -44,139 +55,210 @@ const OrganicDetail = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Top Image */}
-        <View style={styles.imageContainer}>
-          <Image source={require('../../../assets/f1.png')} style={styles.topImage} resizeMode="contain" />
-        </View>
+      {/* Overlay back button */}
+      <Pressable
+        style={styles.transparentBack}
+        onPress={() => router.push("/Main/Home")}
+      >
+        <Ionicons name="arrow-back" size={22} color="#fff" />
+      </Pressable>
 
-        {/* Original Steps & Benefits */}
-        <View style={styles.card}>
-          <Text style={styles.title}>How to Recycle Organic Waste</Text>
+      <Pressable
+        style={styles.transparentBack}
+        onPress={closeGuidelines}
+      >
+        <Ionicons name="arrow-back" size={22} color="#fff" />
+      </Pressable>
 
-          <Pressable style={styles.redButton}>
-            <Text style={styles.redButtonText}>Compost bin</Text>
+      {/* Top Image */}
+      <View style={styles.topImageContainer}>
+        <Image
+          source={require("../../../assets/f1.png")}
+          style={styles.topImage}
+          resizeMode="contain"
+        />
+      </View>
+
+      {/* White Card */}
+      <View style={styles.card}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+          <Text style={styles.title}>How to Recycle Organic</Text>
+
+          <Pressable style={styles.greenButton}>
+            <Text style={styles.greenButtonText}>Brown container</Text>
           </Pressable>
 
           <View style={styles.listContainer}>
-            <Text style={styles.listItem}>• Separate fruit and vegetable scraps.</Text>
-            <Text style={styles.listItem}>• Chop large items for faster decomposition.</Text>
-            <Text style={styles.listItem}>• Use a designated compost bin or pit.</Text>
-            <Text style={styles.listItem}>• Mix or turn compost regularly.</Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Separate:</Text> Keep organic waste separate from other trash.
+            </Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Compost:</Text> Turn fruit, vegetable, and garden waste into compost.
+            </Text>
+            <Text style={styles.listItem}>
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Dispose:</Text> Use the green organic bin for collection.
+            </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. Environmental Impact{"\n"}Organic recycling reduces landfill waste and produces nutrient-rich compost.
+            {"\u00A0\u00A0\u00A0"}1. <Text style={styles.bold}>Soil Improvement</Text>{"\n"}
+            Composting organic  waste enriches soil and reduces landfill usage.
           </Text>
           <Text style={styles.benefitItem}>
-            2. Economic Efficiency{"\n"}Compost can be used as fertilizer, reducing the need for chemical fertilizers.
+            {"\u00A0\u00A0\u00A0"}2. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
+            Proper handling reduces greenhouse gas emissions and prevents contamination.
           </Text>
+        </ScrollView>
 
+        {/* Open Guidelines */}
+        <Pressable style={styles.viewGuidelinesButton} onPress={openGuidelines}>
+          <Text style={styles.viewGuidelinesText}>View Guidelines</Text>
+        </Pressable>
+      </View>
+
+      {/* Guidelines Overlay */}
+      {showGuidelinesPage && (
+        <View style={styles.fullOverlay}>
           <Pressable
-            style={styles.viewGuidelinesButton}
-            onPress={openGuidelines}
+            style={styles.transparentBack}
+            onPress={closeGuidelines}
           >
-            <Text style={styles.viewGuidelinesText}>View Guidelines</Text>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </Pressable>
-        </View>
 
-        {/* Guidelines Overlay */}
-        {showGuidelinesPage && (
-          <View style={styles.fullOverlay}>
-            {/* Back Arrow */}
-            <Pressable style={styles.backArrow} onPress={closeGuidelines}>
-              <Ionicons name="arrow-back" size={24} color="#388E3C" />
-            </Pressable>
+          <View style={styles.topImageContainer}>
+            <Image
+              source={require("../../../assets/f1.png")}
+              style={styles.topImage}
+              resizeMode="contain"
+            />
+          </View>
 
-            {/* Centered Overlay Image */}
-            <View style={styles.imageContainer}>
-              <Image source={require('../../../assets/g2.png')} style={styles.topImage} resizeMode="contain" />
+          <Animated.View
+            style={[
+              styles.card,
+              { transform: [{ translateY: slideAnim }], marginTop: 15 },
+            ]}
+          >
+            <View style={styles.guidelinesHeader}>
+              <Text style={styles.title}>Organic Guidelines</Text>
+              <Pressable
+                style={[
+                  styles.toggleButton,
+                  showDos ? styles.activeDos : styles.activeDonts,
+                ]}
+                onPress={() => setShowDos(!showDos)}
+              >
+                <Text style={styles.toggleText}>
+                  {showDos ? "✔ Dos" : "✖ Don'ts"}
+                </Text>
+              </Pressable>
             </View>
 
-            {/* Animated Guidelines Card */}
-            <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }], marginTop: 20 }]}>
-              <View style={styles.guidelinesHeader}>
-                <Text style={styles.title}>Organic Guidelines</Text>
-                <Pressable
-                  style={[styles.toggleButton, showDos ? styles.activeDos : styles.activeDonts]}
-                  onPress={() => setShowDos(!showDos)}
-                >
-                  <Text style={styles.toggleText}>{showDos ? "✔ Dos" : "✖ Don'ts"}</Text>
-                </Pressable>
-              </View>
-
-              <View style={{ paddingHorizontal: 10, paddingBottom: 3 }}>
-                {(showDos ? dosList : dontsList).map((item, index) => (
-                  <View key={index} style={styles.listRow}>
-                    <Ionicons
-                      name={showDos ? "checkmark-circle" : "close-circle"}
-                      size={20}
-                      color={showDos ? "#388E3C" : "#D32F2F"}
-                      style={{ marginRight: 2 }}
-                    />
-                    <Text style={styles.listItem}>{item}</Text>
-                  </View>
-                ))}
-              </View>
-            </Animated.View>
-          </View>
-        )}
-      </ScrollView>
+            <View style={{ paddingHorizontal: 10, paddingBottom: 3 }}>
+              {(showDos ? dosList : dontsList).map((item, index) => (
+                <View key={index} style={styles.listRow}>
+                  <Ionicons
+                    name={showDos ? "checkmark-circle" : "close-circle"}
+                    size={20}
+                    color={showDos ? "#388E3C" : "#D32F2F"}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.listItem}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F6F6E9" },
-  scrollContent: { padding: 16 },
-  imageContainer: { alignItems: "center", marginBottom: 16 },
-  topImage: { width: 150, height: 150 },
-  card: { 
-  backgroundColor: "#fff", 
-  borderRadius: 16, 
-  padding: 16, 
-  marginBottom: 16, 
-  marginTop: 20, 
-  width: "100%",        // makes the card take 100 % of screen width
-  alignSelf: "center", // centers the card
-  height: 900,         // fixed height (change number as needed)
-},
+  container: { flex: 1, backgroundColor: "#F6F6E9" }, // light green for organic
 
-  title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
-  redButton: { backgroundColor: "#D32F2F", borderRadius: 8, padding: 8, alignSelf: "flex-start", marginBottom: 12 },
-  redButtonText: { color: "#fff", fontWeight: "600" },
+  topImageContainer: { alignItems: "center", marginBottom: -30, marginTop: 20 },
+  topImage: { width: 280, height: 250 },
+
+  card: {
+    minHeight: "64%",
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    marginTop: 35,
+  },
+
+  title: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 15,
+    marginTop: 10,
+    color: "#000",
+  },
+
+  greenButton: {
+    backgroundColor: "#8d5620ff",
+    borderRadius: 20,
+    marginBottom: 20,
+    marginTop: -45,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignSelf: "flex-end",
+  },
+  greenButtonText: { color: "#fff", fontWeight: "400" },
+
   listContainer: { marginBottom: 16 },
-  listItem: { fontSize: 14, lineHeight: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
-  benefitItem: { fontSize: 14, marginBottom: 8, lineHeight: 20 },
-  viewGuidelinesButton: { backgroundColor: "#008243", borderRadius: 10, padding: 12, alignItems: "center", marginTop: 12 },
+  listItem: { fontSize: 13, lineHeight: 20, marginBottom: 4, color: "#333" },
+  bold: { fontWeight: "700" },
+
+  sectionTitle: { fontSize: 15, fontWeight: "700", marginBottom: 8, color: "#000" },
+  benefitItem: { fontSize: 13, marginBottom: 8, lineHeight: 20, color: "#333" },
+
+  transparentBack: {
+    position: "absolute",
+    top: 50,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
+    zIndex: 1000,
+  },
+
+  viewGuidelinesButton: {
+    backgroundColor: "#0ba45aff",
+    borderRadius: 12,
+    padding: 14,
+    alignItems: "center",
+    marginBottom: 20,
+  },
   viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+
   fullOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#F6F6E9",
+    backgroundColor: "#E6F5E6",
     zIndex: 999,
     justifyContent: "flex-start",
     padding: 16,
   },
-  backArrow: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#DFF5E1",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  listRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
+
+  listRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+
   guidelinesHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -79,26 +79,26 @@ const CartonDetail = () => {
 
           <View style={styles.listContainer}>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Check:</Text> Identify carton type.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Check:</Text> Identify carton type.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Clean:</Text> Rinse food or drink residues.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Clean:</Text> Rinse food or drink residues.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Flatten:</Text> Compress cartons to save space.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Flatten:</Text> Compress cartons to save space.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Dispose:</Text> Place in designated recycling bins.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Dispose:</Text> Place in designated recycling bins.
             </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
+            {"\u00A0\u00A0\u00A0"}1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
             Recycling cartons saves trees, reduces landfill waste, and lowers energy use.
           </Text>
           <Text style={styles.benefitItem}>
-            2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
+            {"\u00A0\u00A0\u00A0"}2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
             It allows reuse of fibers for paper products, saving raw materials.
           </Text>
         </ScrollView>
@@ -165,7 +165,7 @@ const CartonDetail = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F6F6E9" },
-  topImageContainer: { alignItems: "center", marginBottom: -10, marginTop: 20 },
+  topImageContainer: { alignItems: "center", marginBottom: -30, marginTop: 20 },
   topImage: { width: 280, height: 250 },
   card: {
     minHeight: "64%",
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 16, fontWeight: "700", marginBottom: 15, marginTop: 10, color: "#000" },
   yellowButton: {
-    backgroundColor: "#ffdd6cff",
+    backgroundColor: "#74c3f7ff",
     borderRadius: 20,
     marginBottom: 20,
     marginTop: -45,
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   benefitItem: { fontSize: 13, marginBottom: 8, lineHeight: 20, color: "#333" },
   transparentBack: {
     position: "absolute",
-    top: 20,
+    top: 50,
     left: 16,
     width: 40,
     height: 40,
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     zIndex: 1000,
   },
-  viewGuidelinesButton: { backgroundColor: "#0ba45aff", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 40 },
+  viewGuidelinesButton: { backgroundColor: "#0ba45aff", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 25 },
   viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   fullOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F6F6E9", zIndex: 999, justifyContent: "flex-start", padding: 16 },
   listRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },

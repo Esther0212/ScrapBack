@@ -77,32 +77,32 @@ const MetalDetail = () => {
           <Text style={styles.title}>How to Recycle Metal</Text>
 
           <Pressable style={styles.yellowButton}>
-            <Text style={styles.yellowButtonText}>Metal container</Text>
+            <Text style={styles.yellowButtonText}>Blue container</Text>
           </Pressable>
 
           <View style={styles.listContainer}>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Check:</Text> Find the recycling symbol on the metal.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Check:</Text> Find the recycling symbol on the metal.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Clean:</Text> Rinse off any residue.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Clean:</Text> Rinse off any residue.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Sort:</Text> Group metals by type if needed.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Sort:</Text> Group metals by type if needed.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Dispose:</Text> Use recycling bins or centers.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Dispose:</Text> Use recycling bins or centers.
             </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
-            Recycling metal reduces mining, conserves energy, and lowers pollution.
+            {"\u00A0\u00A0\u00A0"}1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
+            {"\u00A0\u00A0"}Recycling metal reduces mining, conserves energy, and lowers pollution.
           </Text>
           <Text style={styles.benefitItem}>
-            2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
-            It saves costs, supports metal recycling industries, and promotes a circular economy.
+            {"\u00A0\u00A0\u00A0"}2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
+            {"\u00A0\u00A0"}It saves costs, supports metal recycling industries, and promotes a circular economy.
           </Text>
         </ScrollView>
 
@@ -172,7 +172,7 @@ const MetalDetail = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F6F6E9" },
 
-  topImageContainer: { alignItems: "center", marginBottom: -10, marginTop: 20 },
+  topImageContainer: { alignItems: "center", marginBottom: -30, marginTop: 20 },
   topImage: { width: 280, height: 250 },
 
   card: {
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: "700", marginBottom: 15, marginTop: 10, color: "#000" },
 
   yellowButton: {
-    backgroundColor: "#ffdd6cff",
+    backgroundColor: "#41a1e5ff",
     borderRadius: 20,
     marginBottom: 20,
     marginTop: -45,
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
 
   transparentBack: {
     position: "absolute",
-    top: 20,
+    top: 50,
     left: 16,
     width: 40,
     height: 40,
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 25,
   },
   viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 

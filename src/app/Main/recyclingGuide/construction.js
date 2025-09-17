@@ -79,23 +79,23 @@ const ConstructionDetail = () => {
 
           <View style={styles.listContainer}>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Prepare:</Text> Separate materials by type.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Prepare:</Text> Separate materials by type.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Break down:</Text> Reduce large pieces for transport.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Break down:</Text> Reduce large pieces for transport.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>• Dispose:</Text> Take to proper recycling centers.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"}• Dispose:</Text> Take to proper recycling centers.
             </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-            1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
+            {"\u00A0\u00A0\u00A0"}1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
             Reduces landfill space, prevents pollution, and promotes reuse of materials.
           </Text>
           <Text style={styles.benefitItem}>
-            2. <Text style={styles.bold}>Resource Recovery</Text>{"\n"}
+            {"\u00A0\u00A0\u00A0"}2. <Text style={styles.bold}>Resource Recovery</Text>{"\n"}
             Recycled construction waste can be reused in new building projects, saving costs.
           </Text>
         </ScrollView>
@@ -162,7 +162,7 @@ const ConstructionDetail = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F6F6E9" },
-  topImageContainer: { alignItems: "center", marginBottom: -10, marginTop: 20 },
+  topImageContainer: { alignItems: "center", marginBottom: -30, marginTop: 20 },
   topImage: { width: 280, height: 250 },
   card: {
     minHeight: "64%",
@@ -177,16 +177,7 @@ const styles = StyleSheet.create({
     marginTop: 35,
   },
   title: { fontSize: 16, fontWeight: "700", marginBottom: 15, marginTop: 10, color: "#000" },
-  yellowButton: {
-    backgroundColor: "#ffdd6cff",
-    borderRadius: 20,
-    marginBottom: 20,
-    marginTop: -45,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    alignSelf: "flex-end",
-  },
-  yellowButtonText: { color: "#fff", fontWeight: "400" },
+ 
   listContainer: { marginBottom: 16 },
   listItem: { fontSize: 13, lineHeight: 20, marginBottom: 4, color: "#333" },
   bold: { fontWeight: "700" },
@@ -194,7 +185,7 @@ const styles = StyleSheet.create({
   benefitItem: { fontSize: 13, marginBottom: 8, lineHeight: 20, color: "#333" },
   transparentBack: {
     position: "absolute",
-    top: 20,
+    top: 50,
     left: 16,
     width: 40,
     height: 40,
@@ -206,7 +197,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     zIndex: 1000,
   },
-  viewGuidelinesButton: { backgroundColor: "#0ba45aff", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 40 },
+  viewGuidelinesButton: { backgroundColor: "#0ba45aff", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 25},
   viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   fullOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F6F6E9", zIndex: 999, justifyContent: "flex-start", padding: 16 },
   listRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
