@@ -10,11 +10,13 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  SafeAreaView,
 } from "react-native";
 import MapView, { Marker, UrlTile } from "react-native-maps";
 import * as Location from "expo-location";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 export default function PickupRequestForm() {
@@ -30,7 +32,7 @@ export default function PickupRequestForm() {
 
   const [showDateOnlyPicker, setShowDateOnlyPicker] = useState(false);
   const [showTimeOnlyPicker, setShowTimeOnlyPicker] = useState(false);
-const router = useRouter();
+  const router = useRouter();
 
   const [date, setDate] = useState(new Date());
 
@@ -40,15 +42,41 @@ const router = useRouter();
     );
   };
 
-  const fetchAddressName = async (coords) => {
-    const [address] = await Location.reverseGeocodeAsync(coords);
-    if (address) {
-      const name = `${address.name || ""} ${address.street || ""}, ${
-        address.city || ""
-      }`.trim();
-      setAddressName(name);
+const fetchAddressName = async (coords) => {
+  try {
+    // Always try Google Geocoding API first
+    const resp = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.latitude},${coords.longitude}&key=YOUR_API_KEY`
+    );
+    const data = await resp.json();
+
+    let formatted = "";
+    if (data.results && data.results.length > 0) {
+      formatted = data.results[0].formatted_address;
     }
-  };
+
+    // If Google failed, fallback to expo-location
+    if (!formatted) {
+      const [address] = await Location.reverseGeocodeAsync(coords);
+      if (address) {
+        const parts = [
+          address.name,
+          address.street,
+          address.district,
+          address.city,
+          address.region,
+          address.country,
+        ].filter(Boolean);
+        formatted = parts.join(", ");
+      }
+    }
+
+    setAddressName(formatted || "Unknown location");
+  } catch (err) {
+    console.error("Geocoding failed:", err);
+    setAddressName("Unknown location");
+  }
+};
 
   useEffect(() => {
     (async () => {
@@ -119,109 +147,143 @@ const router = useRouter();
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.label}>Type of recyclable</Text>
-      <View style={styles.card}>
-        <Text style={styles.selectLabel}>Select all that applies</Text>
-        {["Plastic", "Paper", "Metal", "Glass"].map((type) => (
-          <TouchableOpacity
-            key={type}
-            onPress={() => toggleType(type)}
-            style={[
-              styles.option,
-              selectedTypes.includes(type) && styles.optionSelected,
-            ]}
-          >
-            <Text
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F7F6D4" }}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="chevron-back" size={22} />
+          <Text style={styles.backButtonText}>Request Pickup</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.label}>Type of recyclable</Text>
+        <View style={styles.card}>
+          <Text style={styles.selectLabel}>Select all that applies</Text>
+          {["Plastic", "Paper", "Metal", "Glass"].map((type) => (
+            <TouchableOpacity
+              key={type}
+              onPress={() => toggleType(type)}
               style={[
-                styles.optionText,
-                selectedTypes.includes(type) && styles.optionTextSelected,
+                styles.option,
+                selectedTypes.includes(type) && styles.optionSelected,
               ]}
             >
-              {type}
+              <Text
+                style={[
+                  styles.optionText,
+                  selectedTypes.includes(type) && styles.optionTextSelected,
+                ]}
+              >
+                {type}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Estimated weight (kg)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Value"
+          keyboardType="numeric"
+          value={weight}
+          onChangeText={setWeight}
+        />
+
+        <TouchableOpacity
+          style={styles.infoBox}
+          onPress={() => setShowDateOnlyPicker(true)}
+        >
+          <View style={styles.iconWrapper}>
+            <MaterialIcons name="date-range" size={30} color="green" />
+          </View>
+          <View style={styles.infoTextContainer}>
+            <Text style={styles.infoTitle}>Pickup Date & Time</Text>
+            <Text style={styles.infoSub}>
+              {pickupDateTime || "Select Date & Time"}
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          </View>
+        </TouchableOpacity>
 
-      <Text style={styles.label}>Estimated weight (kg)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Value"
-        keyboardType="numeric"
-        value={weight}
-        onChangeText={setWeight}
-      />
+        <TouchableOpacity
+          style={styles.infoBox}
+          onPress={() => setModalVisible(true)}
+        >
+          <View style={styles.iconWrapper}>
+            <FontAwesome name="map-marker" size={32} color="red" />
+          </View>
+          <View style={styles.infoTextContainer}>
+            <Text style={styles.infoTitle}>Pickup Address</Text>
+            <Text style={styles.infoSub}>
+              {pickupAddress || "Select Location on Map"}
+            </Text>
+          </View>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.infoBox}
-        onPress={() => setShowDateOnlyPicker(true)}
-      >
-        <MaterialIcons name="date-range" size={24} color="green" />
-        <View style={styles.infoTextContainer}>
-          <Text style={styles.infoTitle}>Pickup Date & Time</Text>
-          <Text style={styles.infoSub}>
-            {pickupDateTime || "Select Date & Time"}
-          </Text>
-        </View>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.requestButton}
+          onPress={() => {
+            // Do validation here if needed
+            Alert.alert(
+              "Request Submitted",
+              "Your pickup request has been sent."
+            );
+            router.push("/Main/requestPickup"); // This will navigate back to the index/root screen
+          }}
+        >
+          <FontAwesome name="truck" size={30} color="#fff" />
+          <Text style={styles.requestButtonText}>Request Pickup</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.infoBox}
-        onPress={() => setModalVisible(true)}
-      >
-        <FontAwesome name="map-marker" size={26} color="red" />
-        <View style={styles.infoTextContainer}>
-          <Text style={styles.infoTitle}>Pickup Address</Text>
-          <Text style={styles.infoSub}>
-            {pickupAddress || "Select Location on Map"}
-          </Text>
-        </View>
-      </TouchableOpacity>
+        {showDateOnlyPicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            display={Platform.OS === "ios" ? "spinner" : "default"}
+            onChange={onChangeDate}
+          />
+        )}
 
- <TouchableOpacity
-  style={styles.requestButton}
-  onPress={() => {
-    // Do validation here if needed
-    Alert.alert("Request Submitted", "Your pickup request has been sent.");
-    router.push("/Main/requestPickup"); // This will navigate back to the index/root screen
-  }}
->
-  <FontAwesome name="truck" size={18} color="#fff" />
-  <Text style={styles.requestButtonText}>Request Pickup</Text>
-</TouchableOpacity>
+        {showTimeOnlyPicker && (
+          <DateTimePicker
+            value={date}
+            mode="time"
+            is24Hour={false}
+            display={Platform.OS === "ios" ? "spinner" : "default"}
+            onChange={onChangeDate}
+          />
+        )}
 
-      {showDateOnlyPicker && (
-        <DateTimePicker
-          value={date}
-          mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={onChangeDate}
-        />
-      )}
+        {/* Map Modal */}
+        <Modal visible={modalVisible} animationType="slide">
+          <View style={{ flex: 1 }}>
+            {/* Floating header with back + search */}
+            <View style={styles.mapHeaderOverlay}>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={styles.backBtnOverlay}
+              >
+                <Ionicons name="chevron-back" size={24} color="#000" />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.searchOverlay}
+                placeholder="Search"
+                value={addressName}
+                onChangeText={setAddressName}
+              />
+            </View>
 
-      {showTimeOnlyPicker && (
-        <DateTimePicker
-          value={date}
-          mode="time"
-          is24Hour={false}
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={onChangeDate}
-        />
-      )}
-
-      {/* Map Modal */}
-      <Modal visible={modalVisible} animationType="slide">
-        <View style={{ flex: 1 }}>
-          <Text style={styles.modalHeader}>Select Pickup Location</Text>
-          {loadingLocation ? (
-            <ActivityIndicator style={{ marginTop: 20 }} size="large" />
-          ) : (
-            <>
+            {loadingLocation ? (
+              <ActivityIndicator style={{ marginTop: 20 }} size="large" />
+            ) : (
               <MapView
                 style={{ flex: 1 }}
                 initialRegion={initialRegion}
-                onPress={(e) => setMarkerCoords(e.nativeEvent.coordinate)}
+                onPress={(e) => {
+                  const coords = e.nativeEvent.coordinate;
+                  setMarkerCoords(coords);
+                  fetchAddressName(coords); // ✅ improved geocoding
+                }}
               >
                 <UrlTile
                   urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
@@ -234,171 +296,338 @@ const router = useRouter();
                     onDragEnd={(e) => {
                       const coords = e.nativeEvent.coordinate;
                       setMarkerCoords(coords);
-                      fetchAddressName(coords);
+                      fetchAddressName(coords); // ✅ improved geocoding
                     }}
-                  />
+                  >
+                    <FontAwesome name="map-marker" size={38} color="red" />
+                  </Marker>
                 )}
               </MapView>
-              <TextInput
-                style={styles.addressInput}
-                value={addressName}
-                onChangeText={setAddressName}
-                placeholder="Fetching address..."
-                multiline
-              />
-            </>
-          )}
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.confirmBtn}
-              onPress={confirmLocation}
-            >
-              <Text style={styles.confirmBtnText}>Confirm</Text>
-            </TouchableOpacity>
+            )}
+
+            {/* Floating footer buttons */}
+            <View style={styles.footerOverlay}>
+              <TouchableOpacity
+                style={styles.cancelBtnOverlay}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.footerText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmBtnOverlay}
+                onPress={confirmLocation}
+              >
+                <Text style={styles.footerText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    paddingTop: 40, 
-    backgroundColor: "#F0F0C0",
+    paddingTop: 40, // was 40, now pushed further down
+    backgroundColor: "#F7F6D4", // page background from screenshot
     flexGrow: 1,
   },
+
+  /* Labels */
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
+    color: "#3a3a3a",
     marginBottom: 8,
-    marginTop: 12,
+    marginTop: 6,
   },
+
+  /* Recyclable card w/ green header */
   card: {
-    backgroundColor: "#E2F2D6",
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    overflow: "hidden",
     marginBottom: 24,
+    // subtle shadow
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.06,
+        shadowOffset: { width: 0, height: 6 },
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   selectLabel: {
-    color: "#4C8055",
-    fontWeight: "600",
-    marginBottom: 12,
+    backgroundColor: "#7DBF61", // green header band
+    color: "#fff",
+    fontWeight: "700",
     textAlign: "center",
+    paddingVertical: 12,
+    fontSize: 15,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    overflow: "hidden",
   },
+
+  /* Option rows */
   option: {
-    paddingVertical: 10,
+    paddingVertical: 14,
     alignItems: "center",
-    borderRadius: 8,
-    marginBottom: 8,
+    justifyContent: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+    backgroundColor: "#fff",
   },
   optionSelected: {
-    backgroundColor: "#DFF6DD",
+    backgroundColor: "#F2FAF1", // subtle selected tint
   },
   optionText: {
     fontSize: 16,
+    color: "#333",
   },
   optionTextSelected: {
-    fontWeight: "bold",
-    color: "#3B7437",
+    fontWeight: "600",
+    color: "#2F6C31",
   },
+
+  /* weight input */
   input: {
     backgroundColor: "#fff",
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderRadius: 12,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
-    marginBottom: 24,
+    fontSize: 15,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#EFEFEF",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.02,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
+
+  /* date/address info boxes */
   infoBox: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
-    padding: 16,
+    padding: 14,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#EFEFEF",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.03,
+        shadowOffset: { width: 0, height: 6 },
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  iconWrapper: {
+    width: 36, // fixed width to align text consistently
+    alignItems: "center",
   },
   infoTextContainer: {
     marginLeft: 12,
     flex: 1,
   },
   infoTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
-    marginBottom: 2,
+    color: "#333",
   },
   infoSub: {
-    color: "#555",
+    color: "#6b6b6b",
     fontSize: 13,
+    marginTop: 4,
   },
+
+  /* Request button (truck + text) */
   requestButton: {
     flexDirection: "row",
-    backgroundColor: "#117D2E",
+    backgroundColor: "#0E9247", // brighter green like screenshot
     paddingVertical: 16,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    gap: 8,
-    marginTop: 24,
+    marginTop: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.12,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 18,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   requestButtonText: {
     color: "#fff",
-    fontWeight: "bold",
+    fontWeight: "700",
     fontSize: 16,
+    marginLeft: 10, // spacing between icon and text
   },
+
+  /* Modal / map */
   modalHeader: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 16,
+    fontWeight: "700",
     padding: 16,
-    backgroundColor: "#f0f0f0",
     textAlign: "center",
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
   modalFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     padding: 16,
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#fff",
   },
   cancelBtn: {
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#ccc",
+    borderRadius: 10,
+    backgroundColor: "#fff",
     flex: 1,
     marginRight: 8,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   confirmBtn: {
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#117D2E",
+    borderRadius: 10,
+    backgroundColor: "#0E9247",
     flex: 1,
     marginLeft: 8,
     alignItems: "center",
   },
   cancelBtnText: {
     color: "#333",
-    fontWeight: "bold",
+    fontWeight: "700",
   },
   confirmBtnText: {
     color: "#fff",
-    fontWeight: "bold",
+    fontWeight: "700",
   },
+
+  /* address input in modal */
   addressInput: {
     marginTop: 12,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "500",
     textAlign: "center",
-    padding: 10,
-    borderColor: "#ccc",
+    padding: 12,
+    borderColor: "#eee",
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: "#fff",
+    marginHorizontal: 16,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  backButtonText: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginLeft: 6,
+  },
+  mapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: "#f2f2f2",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === "ios" ? 8 : 6,
+    marginLeft: 10,
+    fontSize: 15,
+  },
+  mapHeaderOverlay: {
+    position: "absolute",
+    top: 40, // adjust if header overlaps status bar
+    left: 10,
+    right: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  backBtnOverlay: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.8)", // subtle round bg
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchOverlay: {
+    flex: 1,
+    marginLeft: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === "ios" ? 8 : 6,
+    fontSize: 15,
+  },
+
+  footerOverlay: {
+    position: "absolute",
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    zIndex: 10,
+  },
+  cancelBtnOverlay: {
+    flex: 1,
+    marginRight: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.6)", // dark translucent
+    alignItems: "center",
+  },
+  confirmBtnOverlay: {
+    flex: 1,
+    marginLeft: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: "#7EBF62", // green confirm
+    alignItems: "center",
+  },
+  footerText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
   },
 });

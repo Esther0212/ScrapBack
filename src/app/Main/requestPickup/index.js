@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ScrollView,
 } from "react-native";
 import * as Animatable from "react-native-animatable";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,25 +24,33 @@ const dummyData = [
     id: "2",
     status: "Requested",
     statusColor: "#2da9ef",
-    recyclables: "Plastic, Metal, Glass",
-    weight: "2.5 kg",
-    datetime: "7 Sept, 13:00",
-    address: "123 Green Street, Brooklyn",
+    recyclables: "Paper, Glass",
+    weight: "1.2 kg",
+    datetime: "9 Sept, 10:30",
+    address: "456 Eco Avenue, Queens",
   },
   {
     id: "3",
     status: "Pending",
     statusColor: "#f4c430",
-    recyclables: "Plastic, Metal, Glass",
-    weight: "2.5 kg",
-    datetime: "7 Sept, 13:00",
-    address: "123 Green Street, Brooklyn",
+    recyclables: "Plastic, Metal",
+    weight: "3.0 kg",
+    datetime: "10 Sept, 09:15",
+    address: "789 Reuse Blvd, Manhattan",
+  },
+  {
+    id: "4",
+    status: "Completed",
+    statusColor: "#2fa64f",
+    recyclables: "Glass, Paper",
+    weight: "4.5 kg",
+    datetime: "5 Sept, 14:00",
+    address: "321 Green Lane, Bronx",
   },
 ];
 
 const RequestPickup = () => {
   const router = useRouter();
-  const [showStatus, setShowStatus] = useState(true);
 
   const renderCard = (item) => (
     <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
@@ -78,32 +85,25 @@ const RequestPickup = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Request for Pickup</Text>
+       {/* Static "Status" label bar */}
+      <View style={styles.statusBar}>
+        <Text style={styles.statusBarText}>Status</Text>
+      </View>
+
+      {/* Directly show FlatList, no dropdown */}
+      <FlatList
+        data={dummyData}
+        renderItem={({ item }) => renderCard(item)}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 150 }}
+      />
 
       <TouchableOpacity
-        style={styles.statusToggle}
-        onPress={() => setShowStatus(!showStatus)}
+        style={styles.fab}
+        onPress={() => router.push("Main/requestPickup/PickupRequestForm")}
       >
-        <Text style={styles.statusToggleText}>Status</Text>
-        <Ionicons
-          name={showStatus ? "chevron-up" : "chevron-down"}
-          size={20}
-          color="#fff"
-        />
+        <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
-
-      {showStatus && (
-        <FlatList
-          data={dummyData}
-          renderItem={({ item }) => renderCard(item)}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 150 }}
-        />
-      )}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.fab} onPress={() => router.push("Main/requestPickup/PickupRequestForm")}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };
@@ -113,7 +113,7 @@ export default RequestPickup;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f6c8",
+    backgroundColor: "#F8F6C8",
     paddingTop: 60,
     paddingHorizontal: 16,
   },
@@ -123,19 +123,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: "#333",
   },
-  statusToggle: {
+  statusBar: {
     backgroundColor: "#7ac47f",
-    padding: 12,
-    borderRadius: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    padding: 14,
+    borderRadius: 12,
     marginBottom: 16,
   },
-  statusToggleText: {
-    fontWeight: "600",
-    fontSize: 16,
+  statusBarText: {
+    fontWeight: "700",
+    fontSize: 15,
     color: "#fff",
+    textAlign: "center",
   },
   card: {
     backgroundColor: "#fff",
@@ -199,14 +197,20 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
-  
   fab: {
+    position: "absolute",
+    bottom: 24,
+    right: 24,
     backgroundColor: "#2fa64f",
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -28,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
 });
