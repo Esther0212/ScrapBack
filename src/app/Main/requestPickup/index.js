@@ -5,10 +5,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  SafeAreaView,
 } from "react-native";
 import * as Animatable from "react-native-animatable";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import CustomBgColor from "../../../components/customBgColor";
 
 const dummyData = [
   {
@@ -83,45 +85,37 @@ const RequestPickup = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Request for Pickup</Text>
-       {/* Static "Status" label bar */}
-      <View style={styles.statusBar}>
-        <Text style={styles.statusBarText}>Status</Text>
-      </View>
+    <CustomBgColor>
+      <SafeAreaView style={styles.safeArea}>
+        <FlatList
+          data={dummyData}
+          renderItem={({ item }) => renderCard(item)}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 16,}}
+          ListHeaderComponent={
+            <View style={styles.statusBar}>
+              <Text style={styles.statusBarText}>Status</Text>
+            </View>
+          }
+        />
 
-      {/* Directly show FlatList, no dropdown */}
-      <FlatList
-        data={dummyData}
-        renderItem={({ item }) => renderCard(item)}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 150 }}
-      />
-
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push("Main/requestPickup/PickupRequestForm")}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
-    </View>
+        {/* Floating Action Button */}
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => router.push("Main/requestPickup/PickupRequestForm")}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+      </SafeAreaView>
+    </CustomBgColor>
   );
 };
 
 export default RequestPickup;
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#F8F6C8",
-    paddingTop: 60,
-    paddingHorizontal: 16,
-  },
-  header: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 12,
-    color: "#333",
   },
   statusBar: {
     backgroundColor: "#7ac47f",
@@ -138,7 +132,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     marginBottom: 16,
     shadowColor: "#000",
     shadowOpacity: 0.1,
