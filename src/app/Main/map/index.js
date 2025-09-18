@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import MapView, { UrlTile, Marker, Callout } from "react-native-maps";
 import CustomBgColor from "../../../components/customBgColor";
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 // Firebase
 import { db } from "../../../../firebase";
@@ -191,6 +192,7 @@ export default function MapSelector() {
           onPress={() => openGoogleMaps(item.lat, item.lng, item.name)}
         >
           <Text style={styles.directionButtonText}>Show Directions</Text>
+          <MaterialIcons name="directions" size={28} color="white" />
         </TouchableOpacity>
       </View>
     );
@@ -396,6 +398,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 6,
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
   },
-  directionButtonText: { color: "white", fontWeight: "bold", fontSize: 14 },
+  directionButtonText: { color: "white", fontWeight: "bold", fontSize: 16, paddingVertical: 8 },
 });
