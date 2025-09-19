@@ -451,11 +451,10 @@ const styles = StyleSheet.create({
     marginTop: 28,
   },
   loginButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "600",
     letterSpacing: 0.5,
-    fontFamily: 'Poppins_700Bold',
   },
   signUpButton: {
     borderWidth: 1.5,
@@ -469,8 +468,7 @@ const styles = StyleSheet.create({
   signUpButtonText: {
     color: '#008243',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "600",
     letterSpacing: 0.5,
-    fontFamily: 'Poppins_700Bold',
   },
 });

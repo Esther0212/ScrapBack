@@ -1,37 +1,45 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useRouter } from "expo-router";
+import CustomBgColor from "../../../components/customBgColor";
 
 export default function RedeemRewardsQR() {
   const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Redeem Rewards QR Code</Text>
-      <View style={styles.qrContainer}>
-        <Text style={styles.description}>
-          Generate your QR code for staff to scan and deduct points for your reward.
-        </Text>
+    <CustomBgColor>
+      <View style={styles.container}>
+        <Text style={styles.header}>Redeem Rewards QR Code</Text>
+        <View style={styles.qrContainer}>
+          <Text style={styles.description}>
+            Generate your QR code for staff to scan and deduct points for your
+            reward.
+          </Text>
 
-        <Image
-          source={require("../../../assets/scanner/sample-qr.png")}
-          style={styles.qrImage}
-        />
+          <Image
+            source={require("../../../assets/scanner/sample-qr.png")}
+            style={styles.qrImage}
+          />
 
-        <Text style={styles.expiryText}>This QR code will expire in 2:35 minutes</Text>
+          <Text style={styles.expiryText}>
+            This QR code will expire in 2:35 minutes
+          </Text>
 
-        <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
-          <Text style={styles.closeButtonText}>CLOSE</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.closeButtonText}>CLOSE</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </CustomBgColor>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF3D3",
     padding: 20,
     justifyContent: "center",
     alignItems: "center",

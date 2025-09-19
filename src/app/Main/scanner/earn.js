@@ -1,11 +1,13 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useRouter } from "expo-router";
+import CustomBgColor from "../../../components/customBgColor";
 
 export default function EarnPointsQR() {
   const router = useRouter();
 
   return (
+    <CustomBgColor> 
     <View style={styles.container}>
       <Text style={styles.header}>Earn Points QR Code</Text>
       <View style={styles.qrContainer}>
@@ -25,13 +27,13 @@ export default function EarnPointsQR() {
         </TouchableOpacity>
       </View>
     </View>
+    </CustomBgColor>  
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF3D3",
     padding: 20,
     justifyContent: "center",
     alignItems: "center",

@@ -1,37 +1,40 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
+import CustomBgColor from "../../../components/customBgColor";
 
 export default function Scanner() {
   const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.subtitle}>
-        Generate a QR code to earn points for accumulation or redeem rewards by deducting points.
-      </Text>
+    <CustomBgColor>
+      <View style={styles.container}>
+        <Text style={styles.subtitle}>
+          Generate a QR code to earn points for accumulation or redeem rewards
+          by deducting points.
+        </Text>
 
-      <TouchableOpacity
-        style={[styles.button, styles.buttonGreen]}
-        onPress={() => router.push("/Main/scanner/earn")}
-      >
-        <Text style={styles.buttonText}>Generate QR to Earn Points</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.buttonGreen]}
+          onPress={() => router.push("/Main/scanner/earn")}
+        >
+          <Text style={styles.buttonText}>Generate QR to Earn Points</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.button, styles.buttonDarkGreen]}
-        onPress={() => router.push("/Main/scanner/redeem")}
-      >
-        <Text style={styles.buttonText}>Generate QR to Redeem Rewards</Text>
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity
+          style={[styles.button, styles.buttonDarkGreen]}
+          onPress={() => router.push("/Main/scanner/redeem")}
+        >
+          <Text style={styles.buttonText}>Generate QR to Redeem Rewards</Text>
+        </TouchableOpacity>
+      </View>
+    </CustomBgColor>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF3D3",
     padding: 20,
     justifyContent: "center",
     alignItems: "center", // horizontally center content
