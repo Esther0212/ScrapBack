@@ -21,7 +21,6 @@ export default function profileLayout() {
           title: "Profile",
           headerShown: true,
           headerBackVisible: false,
-          headerStyle: { backgroundColor: "#B6D799" }, // special only for index
           headerRight: () => (
             <TouchableOpacity
               onPress={() => router.push("/Main/profile/settings")}
