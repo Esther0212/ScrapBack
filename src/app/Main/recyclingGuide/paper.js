@@ -10,31 +10,27 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 
-
-const PlasticDetail = () => {
-  const navigation = useNavigation();
+const PaperDetail = () => {
   const [showGuidelinesPage, setShowGuidelinesPage] = useState(false);
   const [showDos, setShowDos] = useState(true);
   const router = useRouter();
-
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
   const dosList = [
-    "Do rinse plastic bottles before recycling.",
-    "Do separate plastics by type if required by your local recycling program.",
-    "Do remove caps and labels if specified by recycling guidelines.",
-    "Do crush bottles to save space.",
-    "Do reuse plastic containers whenever possible.",
+    "Do remove staples and bindings before recycling.",
+    "Do separate paper types: cardboard, office paper, newspapers.",
+    "Do flatten boxes to save space.",
+    "Do reuse paper whenever possible.",
+    "Do keep paper clean and dry before recycling.",
   ];
 
   const dontsList = [
-    "Don't throw plastic bags in regular recycling bins.",
-    "Don't mix plastics with food waste.",
-    "Don't recycle dirty or contaminated plastics.",
-    "Don't recycle plastics that are not accepted by your local program.",
+    "Don't recycle greasy or soiled paper (e.g., pizza boxes).",
+    "Don't mix paper with food waste.",
+    "Don't recycle laminated or coated paper if not accepted.",
+    "Don't recycle tissues, napkins, or paper towels.",
   ];
 
   const openGuidelines = () => {
@@ -56,23 +52,15 @@ const PlasticDetail = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-   {/* Overlay back button */}
-<Pressable
-  style={styles.transparentBack}
-  onPress={() => router.push("/Main/Home")} // navigate directly to Home page
->
-  <Ionicons name="arrow-back" size={22} color="#fff" />
-</Pressable>
-
-<Pressable
-  style={styles.transparentBack}
-  onPress={closeGuidelines} // closes overlay to reveal Recycling section
->
-  <Ionicons name="arrow-back" size={22} color="#fff" />
-</Pressable>
-
-
-
+      {/* Back button for Recycling page */}
+      {!showGuidelinesPage && (
+        <Pressable
+          style={styles.transparentBack}
+          onPress={() => router.push("/Main/Home")}
+        >
+          <Ionicons name="arrow-back" size={22} color="#fff" />
+        </Pressable>
+      )}
 
       {/* Top Image */}
       <View style={styles.topImageContainer}>
@@ -86,35 +74,35 @@ const PlasticDetail = () => {
       {/* White Card */}
       <View style={styles.card}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
-          <Text style={styles.title}>How to Recycle Plastic</Text>
+          <Text style={styles.title}>How to Recycle Paper</Text>
 
           <Pressable style={styles.yellowButton}>
-            <Text style={styles.yellowButtonText}>Yellow container</Text>
+            <Text style={styles.yellowButtonText}>Blue container</Text>
           </Pressable>
 
           <View style={styles.listContainer}>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0\u00A0"}• Check:</Text> Find the recycling symbol (1–7) on the plastic.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"} • Check:</Text> Identify the type of paper.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0\u00A0"}• Clean:</Text> Rinse off food or liquids.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"} • Clean:</Text> Remove food residues or contaminants.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0\u00A0"}• Sort:</Text> Group by type if needed.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"} • Sort:</Text> Separate cardboard, office paper, newspapers.
             </Text>
             <Text style={styles.listItem}>
-              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0\u00A0"}• Dispose:</Text> Use recycling bins or centers.
+              <Text style={styles.bold}>{"\u00A0\u00A0\u00A0"} • Dispose:</Text> Use recycling bins or centers.
             </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Benefit</Text>
           <Text style={styles.benefitItem}>
-           {"\u00A0\u00A0"} 1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
-            {"\u00A0\u00A0\u00A0\u00A0\u00A0"}Recycling plastic reduces pollution, conserves {"\u00A0\u00A0\u00A0\u00A0"} resources, and lowers greenhouse gas emissions.
+            {"\u00A0\u00A0\u00A0"}1. <Text style={styles.bold}>Environmental Impact</Text>{"\n"}
+           {"\u00A0\u00A0"} Recycling paper saves trees, reduces landfill waste, and lowers energy consumption.
           </Text>
           <Text style={styles.benefitItem}>
-            {"\u00A0\u00A0"} 2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
-           {"\u00A0\u00A0\u00A0\u00A0\u00A0"} It saves costs, creates jobs in recycling industries, and supports a circular economy.
+            {"\u00A0\u00A0\u00A0"}2. <Text style={styles.bold}>Economic Efficiency</Text>{"\n"}
+            {"\u00A0\u00A0"}  It reduces production costs, supports the paper recycling industry, and promotes sustainability.
           </Text>
         </ScrollView>
 
@@ -127,22 +115,10 @@ const PlasticDetail = () => {
       {/* Guidelines Overlay */}
       {showGuidelinesPage && (
         <View style={styles.fullOverlay}>
-          {/* Back button that ONLY closes the overlay */}
-          {!showGuidelinesPage ? (
-  <Pressable
-    style={styles.transparentBack}
-    onPress={() => router.push("/Main/Home")} // Recycling page back button
-  >
-    <Ionicons name="arrow-back" size={22} color="#fff" />
-  </Pressable>
-) : (
-  <Pressable
-    style={styles.transparentBack}
-    onPress={closeGuidelines} // Guidelines overlay back button
-  >
-    <Ionicons name="arrow-back" size={22} color="#fff" />
-  </Pressable>
-)}
+          {/* Back button that closes overlay */}
+          <Pressable style={styles.transparentBack} onPress={closeGuidelines}>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
+          </Pressable>
 
           <View style={styles.topImageContainer}>
             <Image
@@ -159,7 +135,7 @@ const PlasticDetail = () => {
             ]}
           >
             <View style={styles.guidelinesHeader}>
-              <Text style={styles.title}>Plastic Guidelines</Text>
+              <Text style={styles.title}>Paper Guidelines</Text>
               <Pressable
                 style={[
                   styles.toggleButton,
@@ -202,8 +178,8 @@ const styles = StyleSheet.create({
   card: {
     minHeight: "64%",
     backgroundColor: "#fff",
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     padding: 16,
     shadowColor: "#000",
     shadowOpacity: 0.1,
@@ -212,16 +188,10 @@ const styles = StyleSheet.create({
     marginTop: 35,
   },
 
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 15,
-    marginTop: 10,
-    color: "#000",
-  },
+  title: { fontSize: 16, fontWeight: "700", marginBottom: 15, marginTop: 10, color: "#000" },
 
   yellowButton: {
-    backgroundColor: "#ffdd6cff",
+    backgroundColor: "#41a1e5ff",
     borderRadius: 20,
     marginBottom: 20,
     marginTop: -45,
@@ -229,23 +199,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignSelf: "flex-end",
   },
-  yellowButtonText: { color: "#ffffffff", fontWeight: "400" },
+  yellowButtonText: { color: "#fff", fontWeight: "400" },
 
   listContainer: { marginBottom: 16 },
-  listItem: {
-    fontSize: 13,
-    lineHeight: 20,
-    marginBottom: 4,
-    color: "#333",
-  },
+  listItem: { fontSize: 13, lineHeight: 20, marginBottom: 4, color: "#333" },
   bold: { fontWeight: "700" },
 
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 8,
-    color: "#000",
-  },
+  sectionTitle: { fontSize: 15, fontWeight: "700", marginBottom: 8, color: "#000" },
   benefitItem: { fontSize: 13, marginBottom: 8, lineHeight: 20, color: "#333" },
 
   transparentBack: {
@@ -268,13 +228,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 25,
   },
-  viewGuidelinesText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
-  },
+  viewGuidelinesText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 
   fullOverlay: {
     position: "absolute",
@@ -296,14 +252,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 16,
   },
-  toggleButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 25,
-  },
+  toggleButton: { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 25 },
   activeDos: { backgroundColor: "#388E3C" },
   activeDonts: { backgroundColor: "#D32F2F" },
   toggleText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });
 
-export default PlasticDetail;
+export default PaperDetail;
