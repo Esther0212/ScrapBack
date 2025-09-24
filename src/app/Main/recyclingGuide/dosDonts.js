@@ -67,7 +67,7 @@ const DosDonts = () => {
     return (
       <CustomBgColor bgColor={showDos ? "#90C67C" : "#E08282"}>
         <SafeAreaView style={styles.center}>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, styles.justifiedText]}>
             No recycling guide found for {type}
           </Text>
         </SafeAreaView>
@@ -111,13 +111,17 @@ const DosDonts = () => {
                 ? guide.dos?.map((d, i) => (
                     <View key={i} style={styles.iconRow}>
                       <Feather name="check" size={24} color="#90C67C" />
-                      <Text style={styles.guidelineText}>{d.doContent}</Text>
+                      <Text style={[styles.guidelineText, styles.justifiedText]}>
+                        {d.doContent}
+                      </Text>
                     </View>
                   ))
                 : guide.donts?.map((d, i) => (
                     <View key={i} style={styles.iconRow}>
                       <Feather name="x" size={24} color="#E08282" />
-                      <Text style={styles.guidelineText}>{d.dontContent}</Text>
+                      <Text style={[styles.guidelineText, styles.justifiedText]}>
+                        {d.dontContent}
+                      </Text>
                     </View>
                   ))}
             </View>
@@ -132,7 +136,12 @@ const styles = StyleSheet.create({
   safeAreaView: { flex: 1 },
   scrollContent: { flexGrow: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { fontFamily: "Poppins_400Regular", fontSize: 14, color: "#333" },
+  emptyText: {
+    fontFamily: "Poppins_400Regular",
+    fontSize: 14,
+    color: "#fff",
+  },
+  justifiedText: { textAlign: "justify" },
   imageWrapper: { alignItems: "center", padding: 20 },
   scaledImage: {
     width: width * 0.9,
@@ -145,8 +154,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+    padding: 20, // padding inside the box
   },
   headerContainer: {
     flexDirection: "row",
@@ -162,15 +170,15 @@ const styles = StyleSheet.create({
   contentSection: { marginTop: 20 },
   iconRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   guidelineText: {
     fontFamily: "Poppins_400Regular",
     fontSize: 15,
     color: "#333",
-    flexShrink: 1,
+    flex: 1, // ensures text wraps within available space
   },
   toggleContainer: {
     width: 90,

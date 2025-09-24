@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Dimensions,
   Image,
-  ScrollView,
   Pressable,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
@@ -29,7 +29,7 @@ const StepsBenefits = () => {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.center}>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, styles.justifiedText]}>
             No recycling guide found for {type}
           </Text>
         </SafeAreaView>
@@ -57,10 +57,12 @@ const StepsBenefits = () => {
 
           <View style={styles.box}>
             <View style={styles.headerContainer}>
-              <Text style={styles.title}>How to Recycle {type}</Text>
+              <Text style={[styles.title, styles.justifiedText]}>
+                How to Recycle {type}
+              </Text>
               {guide.containerLabel && (
                 <View style={styles.containerLabel}>
-                  <Text style={styles.containerLabelText}>
+                  <Text style={[styles.containerLabelText, styles.justifiedText]}>
                     {guide.containerLabel}
                   </Text>
                 </View>
@@ -71,29 +73,35 @@ const StepsBenefits = () => {
             <View style={styles.steps}>
               {guide.steps && guide.steps.length > 0 ? (
                 guide.steps.map((s, i) => (
-                  <Text key={i} style={styles.step}>
+                  <Text key={i} style={[styles.step, styles.justifiedText]}>
                     <Text style={styles.bold}>{s.stepTitle}: </Text>
                     {s.stepContent}
                   </Text>
                 ))
               ) : (
-                <Text style={styles.emptyText}>No steps available.</Text>
+                <Text style={[styles.emptyText, styles.justifiedText]}>
+                  No steps available.
+                </Text>
               )}
             </View>
 
             {/* Benefits */}
-            <Text style={styles.sectionTitle}>Benefits</Text>
+            <Text style={[styles.sectionTitle, styles.justifiedText]}>Benefits</Text>
             {guide.benefits && guide.benefits.length > 0 ? (
               guide.benefits.map((b, i) => (
-                <View key={i}>
-                  <Text style={styles.benefitTitle}>
+                <View key={i} style={{ marginBottom: 10 }}>
+                  <Text style={[styles.benefitTitle, styles.justifiedText]}>
                     {i + 1}. {b.benefitTitle}
                   </Text>
-                  <Text style={styles.benefitText}>{b.benefitContent}</Text>
+                  <Text style={[styles.benefitText, styles.justifiedText]}>
+                    {b.benefitContent}
+                  </Text>
                 </View>
               ))
             ) : (
-              <Text style={styles.emptyText}>No benefits available.</Text>
+              <Text style={[styles.emptyText, styles.justifiedText]}>
+                No benefits available.
+              </Text>
             )}
 
             <Pressable
@@ -102,7 +110,7 @@ const StepsBenefits = () => {
                 router.push(`/Main/recyclingGuide/dosDonts?type=${type}`)
               }
             >
-              <Text style={styles.ctaText}>View Dos & Don'ts</Text>
+              <Text style={[styles.ctaText, styles.justifiedText]}>View Dos & Don'ts</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -115,7 +123,12 @@ const styles = StyleSheet.create({
   safeAreaView: { flex: 1 },
   scrollContent: { flexGrow: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { fontFamily: "Poppins_400Regular", fontSize: 14, color: "#333" },
+  emptyText: {
+    fontFamily: "Poppins_400Regular",
+    fontSize: 14,
+    color: "#333",
+  },
+  justifiedText: { textAlign: "justify" }, // This ensures text is justified
   imageWrapper: { alignItems: "center", padding: 20 },
   scaledImage: {
     width: width * 0.9,
@@ -128,8 +141,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+    padding: 20, // Text will respect this padding
   },
   headerContainer: {
     flexDirection: "row",
@@ -149,7 +161,7 @@ const styles = StyleSheet.create({
   bold: { fontFamily: "Poppins_700Bold" },
   sectionTitle: { fontSize: 18, fontFamily: "Poppins_700Bold", marginBottom: 12 },
   benefitTitle: { fontSize: 15, fontFamily: "Poppins_700Bold", marginTop: 8, marginBottom: 4 },
-  benefitText: { fontSize: 14, fontFamily: "Poppins_400Regular", color: "#555", marginBottom: 10 },
+  benefitText: { fontSize: 14, fontFamily: "Poppins_400Regular", color: "#555" },
   ctaButton: {
     backgroundColor: "#008243",
     paddingVertical: 14,
