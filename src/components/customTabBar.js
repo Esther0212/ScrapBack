@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   },
   scannerWrapper: {
     position: "absolute",
-    top: -35, // lifts scanner above icons
+    top: -15, // lifts scanner above icons
     zIndex: 10,
   },
   scannerCircle: {

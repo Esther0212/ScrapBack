@@ -2,19 +2,21 @@ import React from "react";
 import { SafeAreaView, StyleSheet } from "react-native";
 import { usePathname } from "expo-router";
 
-const CustomBgColor = ({ children }) => {
+const CustomBgColor = ({ children, bgColor }) => {
   const pathname = usePathname();
 
   // Default background
-  let bgColor = "#F0F1C5";
+  let defaultBgColor = "#F0F1C5";
 
-  // ✅ Only profile index page uses #B6D799
+  // Only profile page overrides default
   if (pathname === "/Main/profile" || pathname === "/Main/profile/") {
-    bgColor = "#B6D799";
+    defaultBgColor = "#B6D799";
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: bgColor || defaultBgColor }]}
+    >
       {children}
     </SafeAreaView>
   );
