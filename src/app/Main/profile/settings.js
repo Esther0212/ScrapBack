@@ -40,22 +40,9 @@ const Settings = () => {
             icon={<Ionicons name="lock-closed-outline" size={22} color="#333" />}
             label="Password"
           />
-        </View>
-
-        {/* Content & Display Section */}
-        <Text style={styles.sectionTitle}>Content & Display</Text>
-        <View style={styles.card}>
           <SettingsItem
             icon={<Ionicons name="notifications-outline" size={22} color="#333" />}
             label="Notifications"
-          />
-          <SettingsItem
-            icon={<Ionicons name="moon-outline" size={22} color="#333" />}
-            label="Display"
-          />
-          <SettingsItem
-            icon={<Ionicons name="text-outline" size={22} color="#333" />}
-            label="Language"
           />
         </View>
 
@@ -63,16 +50,12 @@ const Settings = () => {
         <Text style={styles.sectionTitle}>Support & About</Text>
         <View style={styles.card}>
           <SettingsItem
-            icon={<Ionicons name="flag-outline" size={22} color="#333" />}
-            label="Report a problem"
-          />
-          <SettingsItem
             icon={<Ionicons name="help-circle-outline" size={22} color="#333" />}
-            label="Support"
+            label="Contact Support"
           />
           <SettingsItem
             icon={<Ionicons name="information-circle-outline" size={22} color="#333" />}
-            label="Terms and policies"
+            label="About PACAFACO"
           />
         </View>
 
