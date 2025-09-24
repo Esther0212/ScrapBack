@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,25 +7,106 @@ import {
   TextInput,
   Alert,
   ScrollView,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, setDoc, doc } from "firebase/firestore";
+import { setDoc, doc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
+import { Menu, Provider as PaperProvider } from "react-native-paper";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
+import axios from "axios";
 
 const Signup = () => {
+  const { width } = Dimensions.get("window");
+
+  // Basic info
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");
-  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+
+  // Gender dropdown
+  const [gender, setGender] = useState("");
+  const [genderMenuVisible, setGenderMenuVisible] = useState(false);
+
+  // Date picker
+  const [dob, setDob] = useState(null);
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+
+  // Address
+  const [street, setStreet] = useState("");
+  const [region, setRegion] = useState(null);
+  const [province, setProvince] = useState(null);
+  const [city, setCity] = useState(null);
+  const [barangay, setBarangay] = useState(null);
+  const [postalCode, setPostalCode] = useState("9000"); // auto-set
+
+  // Address dropdown data
+  const [regions, setRegions] = useState([]);
+  const [provinces, setProvinces] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [barangays, setBarangays] = useState([]);
+  const [barangayMenu, setBarangayMenu] = useState(false);
+
+  // Preload API data to reduce lag (done at component mount)
+  useEffect(() => {
+    const preloadAddressData = async () => {
+      try {
+        const regionRes = await axios.get(
+          "https://psgc.gitlab.io/api/regions/"
+        );
+        setRegions(regionRes.data);
+
+        // Default selections
+        const northernMindanao = regionRes.data.find(
+          (r) => r.name === "Northern Mindanao"
+        );
+        setRegion(northernMindanao);
+
+        if (northernMindanao) {
+          const provinceRes = await axios.get(
+            `https://psgc.gitlab.io/api/regions/${northernMindanao.code}/provinces/`
+          );
+          setProvinces(provinceRes.data);
+
+          const misamis = provinceRes.data.find(
+            (p) => p.name === "Misamis Oriental"
+          );
+          setProvince(misamis);
+
+          if (misamis) {
+            const cityRes = await axios.get(
+              `https://psgc.gitlab.io/api/provinces/${misamis.code}/cities-municipalities/`
+            );
+            setCities(cityRes.data);
+
+            const cagayanCity = cityRes.data.find(
+              (c) => c.name === "City of Cagayan De Oro"
+            );
+            setCity(cagayanCity);
+
+            if (cagayanCity) {
+              const barangayRes = await axios.get(
+                `https://psgc.gitlab.io/api/cities-municipalities/${cagayanCity.code}/barangays/`
+              );
+              setBarangays(barangayRes.data);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error preloading address data:", err);
+      }
+    };
+    preloadAddressData();
+  }, []);
 
   const handleSignup = async () => {
     if (
@@ -34,8 +115,14 @@ const Signup = () => {
       !email ||
       !password ||
       !contact ||
-      !address ||
-      !confirmPassword
+      !confirmPassword ||
+      !gender ||
+      !dob ||
+      !street ||
+      !region ||
+      !province ||
+      !city ||
+      !barangay
     ) {
       Alert.alert("Please fill in all fields");
       return;
@@ -47,7 +134,11 @@ const Signup = () => {
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const uid = userCredential.user.uid;
 
       await setDoc(doc(db, "user", uid), {
@@ -55,176 +146,307 @@ const Signup = () => {
         lastName,
         email,
         contact,
-        address,
-        createdAt: new Date()
+        gender,
+        dob,
+        userType: "user", // ✅ added here
+        address: {
+          street,
+          region: region.name,
+          province: province.name,
+          city: city.name,
+          barangay: barangay.name,
+          postalCode,
+        },
+        createdAt: new Date(),
       });
 
       Alert.alert("Account created successfully!");
-      router.push("/"); // redirect to homepage or login
+      router.push("/");
     } catch (error) {
       Alert.alert("Signup Error", error.message);
     }
   };
 
   return (
-    <CustomBgColor>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.container}>
-            <Text style={styles.title}>Sign up to earn points!</Text>
-            <Text style={styles.subtitle}>Create your ScrapBack account now</Text>
+    <PaperProvider>
+      <CustomBgColor>
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView contentContainerStyle={styles.scrollContainer}>
+            <View style={styles.container}>
+              <Text style={styles.title}>Sign up to earn points!</Text>
+              <Text style={styles.subtitle}>
+                Create your ScrapBack account now
+              </Text>
 
-            {/* Name Row */}
-            <View style={styles.rowContainer}>
-              <View style={[styles.inputContainer, styles.halfInput]}>
-                <Text style={styles.label}>First Name</Text>
-                <TextInput
-                  placeholder="First name"
+              {/* First Name & Last Name side by side */}
+              <View style={styles.row}>
+                <InputField
+                  label="First Name"
                   value={firstName}
-                  onChangeText={setFirstName}
-                  placeholderTextColor="#777"
-                  style={styles.input}
+                  setValue={setFirstName}
+                  containerStyle={{ flex: 1, marginRight: 8 }}
                 />
-              </View>
-              <View style={[styles.inputContainer, styles.halfInput, { marginLeft: 12 }]}>
-                <Text style={styles.label}>Last Name</Text>
-                <TextInput
-                  placeholder="Last name"
+                <InputField
+                  label="Last Name"
                   value={lastName}
-                  onChangeText={setLastName}
-                  placeholderTextColor="#777"
-                  style={styles.input}
+                  setValue={setLastName}
+                  containerStyle={{ flex: 1, marginLeft: 8 }}
                 />
               </View>
-            </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                placeholder="Your email"
+              <InputField
+                label="Email"
                 value={email}
-                onChangeText={setEmail}
-                placeholderTextColor="#777"
-                style={styles.input}
+                setValue={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Contact Number</Text>
-              <TextInput
-                placeholder="Your contact number"
+              <InputField
+                label="Contact Number"
                 value={contact}
-                onChangeText={setContact}
-                placeholderTextColor="#777"
-                style={styles.input}
+                setValue={setContact}
                 keyboardType="phone-pad"
               />
-            </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Address</Text>
-              <TextInput
-                placeholder="Your address"
-                value={address}
-                onChangeText={setAddress}
-                placeholderTextColor="#777"
-                style={styles.input}
+              <PasswordField
+                label="Password"
+                value={password}
+                setValue={setPassword}
+                visible={passwordVisible}
+                setVisible={setPasswordVisible}
               />
-            </View>
+              <PasswordField
+                label="Confirm Password"
+                value={confirmPassword}
+                setValue={setConfirmPassword}
+                visible={confirmPasswordVisible}
+                setVisible={setConfirmPasswordVisible}
+              />
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Create a password</Text>
-              <View style={styles.passwordWrapper}>
-                <TextInput
-                  placeholder="Password"
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholderTextColor="#777"
-                  style={styles.input}
-                  secureTextEntry={!passwordVisible}
-                />
+              {/* Gender Dropdown */}
+              <DropdownField
+                label="Gender"
+                visible={genderMenuVisible}
+                setVisible={setGenderMenuVisible}
+                selected={gender}
+                setSelected={setGender}
+                options={["Male", "Female", "Other"]}
+              />
+
+              {/* Date of Birth */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Date of Birth</Text>
                 <TouchableOpacity
-                  style={styles.eyeIcon}
-                  onPress={() => setPasswordVisible(!passwordVisible)}
-                >
-                  <Ionicons
-                    name={passwordVisible ? "eye-off" : "eye"}
-                    size={20}
-                    color="#555"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirm password</Text>
-              <View style={styles.passwordWrapper}>
-                <TextInput
-                  placeholder="Confirm password"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  placeholderTextColor="#777"
                   style={styles.input}
-                  secureTextEntry={!confirmPasswordVisible}
-                />
-                <TouchableOpacity
-                  style={styles.eyeIcon}
-                  onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+                  onPress={() => setDatePickerVisible(true)}
                 >
-                  <Ionicons
-                    name={confirmPasswordVisible ? "eye-off" : "eye"}
-                    size={20}
-                    color="#555"
-                  />
+                  <Text
+                    style={{ color: dob ? "#3A2E2E" : "#777", fontSize: 16 }}
+                  >
+                    {dob ? new Date(dob).toLocaleDateString() : "Select Date"}
+                  </Text>
                 </TouchableOpacity>
+                <DateTimePickerModal
+                  isVisible={datePickerVisible}
+                  mode="date"
+                  onConfirm={(date) => {
+                    setDob(date.toISOString());
+                    setDatePickerVisible(false);
+                  }}
+                  onCancel={() => setDatePickerVisible(false)}
+                />
               </View>
+
+              {/* Address */}
+              <Text style={styles.label}>Address</Text>
+
+              <InputField
+                label="Street, Building, House No., etc."
+                value={street}
+                setValue={setStreet}
+                subLabel
+              />
+
+              <DropdownField
+                label="Region"
+                visible={false}
+                setVisible={() => {}}
+                selected={region ? region.name : ""}
+                setSelected={() => {}}
+                options={regions}
+                optionKey="name"
+                readOnly
+                subLabel
+              />
+              <DropdownField
+                label="Province"
+                visible={false}
+                setVisible={() => {}}
+                selected={province ? province.name : ""}
+                setSelected={() => {}}
+                options={provinces}
+                optionKey="name"
+                readOnly
+                subLabel
+              />
+              <DropdownField
+                label="City"
+                visible={false}
+                setVisible={() => {}}
+                selected={city ? city.name : ""}
+                setSelected={() => {}}
+                options={cities}
+                optionKey="name"
+                readOnly
+                subLabel
+              />
+
+              <DropdownField
+                label="Barangay"
+                visible={barangayMenu}
+                setVisible={setBarangayMenu}
+                selected={barangay ? barangay.name : ""}
+                setSelected={setBarangay}
+                options={barangays}
+                optionKey="name"
+                subLabel
+              />
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.subLabel}>Postal Code</Text>
+                <TextInput
+                  value={postalCode}
+                  editable={false}
+                  style={styles.input}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.signupButton}
+                activeOpacity={0.85}
+                onPress={handleSignup}
+              >
+                <Text style={styles.signupButtonText}>Sign Up</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.loginLink}
+                onPress={() => router.push("/login")}
+              >
+                <Text style={styles.loginText}>
+                  Already have an account?{" "}
+                  <Text style={styles.loginTextBold}>Log in</Text>
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.signupButton}
-              activeOpacity={0.85}
-              onPress={handleSignup}
-            >
-              <Text style={styles.signupButtonText}>Sign Up</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.loginLink}
-              onPress={() => router.push("/login")}
-            >
-              <Text style={styles.loginText}>
-                Already have an account?{" "}
-                <Text style={styles.loginTextBold}>Log in</Text>
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </CustomBgColor>
+          </ScrollView>
+        </SafeAreaView>
+      </CustomBgColor>
+    </PaperProvider>
   );
 };
 
+// InputField
+const InputField = ({
+  label,
+  value,
+  setValue,
+  keyboardType,
+  containerStyle,
+  subLabel,
+  ...props
+}) => (
+  <View style={[styles.inputContainer, containerStyle]}>
+    <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
+    <TextInput
+      placeholder={label}
+      value={value}
+      onChangeText={setValue}
+      style={styles.input}
+      placeholderTextColor="#777"
+      keyboardType={keyboardType || "default"}
+      {...props}
+    />
+  </View>
+);
+
+// PasswordField
+const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
+  <View style={styles.inputContainer}>
+    <Text style={styles.label}>{label}</Text>
+    <View style={styles.passwordWrapper}>
+      <TextInput
+        placeholder={label}
+        value={value}
+        onChangeText={setValue}
+        style={styles.input}
+        placeholderTextColor="#777"
+        secureTextEntry={!visible}
+      />
+      <TouchableOpacity
+        style={styles.eyeIcon}
+        onPress={() => setVisible(!visible)}
+      >
+        <Ionicons name={visible ? "eye-off" : "eye"} size={20} color="#555" />
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+// DropdownField
+const DropdownField = ({
+  label,
+  visible,
+  setVisible,
+  selected,
+  setSelected,
+  options,
+  optionKey,
+  readOnly = false,
+  subLabel,
+}) => (
+  <View style={styles.inputContainer}>
+    <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
+    <Menu
+      visible={visible && !readOnly}
+      onDismiss={() => setVisible(false)}
+      anchor={
+        <TouchableOpacity
+          style={[styles.input, { alignItems: "flex-start" }]}
+          onPress={() => !readOnly && setVisible(true)}
+        >
+          <Text style={{ color: selected ? "#3A2E2E" : "#777", fontSize: 16 }}>
+            {selected || `Select ${label}`}
+          </Text>
+        </TouchableOpacity>
+      }
+      contentStyle={styles.menuContent}
+    >
+      {options.map((o) => (
+        <Menu.Item
+          key={optionKey ? o.code : o}
+          onPress={() => {
+            setSelected(o);
+            setVisible(false);
+          }}
+          title={optionKey ? o[optionKey] : o}
+        />
+      ))}
+    </Menu>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: "center",
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: "center",
-  },
+  safeArea: { flex: 1 },
+  scrollContainer: { flexGrow: 1, justifyContent: "center" },
+  container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
   title: {
     fontSize: 30,
     fontWeight: "800",
     color: "#3A2E2E",
     textAlign: "center",
     marginBottom: 8,
+    marginTop: 20,
   },
   subtitle: {
     fontSize: 16,
@@ -232,41 +454,34 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 40,
   },
-  rowContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  halfInput: {
-    flex: 1,
-  },
-  inputContainer: {
-    marginBottom: 22,
-  },
+  row: { flexDirection: "row" },
+  inputContainer: { marginBottom: 16 },
   label: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "700",
     color: "#3A2E2E",
     marginBottom: 6,
   },
+  subLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#71695B",
+    marginBottom: 6,
+  },
   input: {
     backgroundColor: "#F1E3D3",
-    borderRadius: 16,
-    paddingVertical: 16,
+    borderRadius: 10,
+    paddingVertical: 14,
     paddingHorizontal: 18,
     fontSize: 16,
     color: "#3A2E2E",
     borderWidth: 1,
     borderColor: "#E0D4C3",
+    width: "100%",
   },
-  passwordWrapper: {
-    position: "relative",
-  },
-  eyeIcon: {
-    position: "absolute",
-    right: 16,
-    top: 14,
-    padding: 4,
-  },
+  passwordWrapper: { position: "relative" },
+  eyeIcon: { position: "absolute", right: 16, top: 14, padding: 4 },
+  menuContent: { backgroundColor: "#F1E3D3", borderRadius: 12 },
   signupButton: {
     backgroundColor: "#008243",
     paddingVertical: 18,
@@ -285,18 +500,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 0.5,
   },
-  loginLink: {
-    marginTop: 26,
-    alignItems: "center",
-  },
-  loginText: {
-    fontSize: 14,
-    color: "#3A2E2E",
-  },
-  loginTextBold: {
-    fontWeight: "700",
-    textDecorationLine: "underline",
-  },
+  loginLink: { marginTop: 26, alignItems: "center", marginBottom: 30 },
+  loginText: { fontSize: 14, color: "#3A2E2E" },
+  loginTextBold: { fontWeight: "700", textDecorationLine: "underline" },
 });
 
 export default Signup;
