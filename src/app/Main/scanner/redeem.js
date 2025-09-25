@@ -10,6 +10,7 @@ import QRCode from "react-native-qrcode-svg";
 import { useRouter } from "expo-router";
 import { auth, db } from "../../../../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import CustomBgColor from "../../../components/customBgColor";
 
 export default function RedeemRewardsQR() {
   const router = useRouter();
@@ -86,37 +87,17 @@ export default function RedeemRewardsQR() {
       <Text style={styles.header}>Redeem Rewards QR Code</Text>
       <View style={styles.qrContainer}>
         <Text style={styles.description}>
-          Staff can scan this QR to deduct your points for rewards.
+          Generate your QR code for staff to scan and deduct points for your reward.
         </Text>
 
-        {userData && timeLeft > 0 ? (
-          <QRCode
-            value={JSON.stringify({
-              uid: user.uid,
-              email: user.email,
-              name: `${userData.firstName || ""} ${userData.lastName || ""}`,
-              exp: expiryTimestamp,
-            })}
-            size={180}
-          />
-        ) : (
-          <Text style={styles.expiredMessage}>
-            {timeLeft === 0
-              ? "⚠️ QR code expired."
-              : "No Firestore data found."}
-          </Text>
-        )}
+        <Image
+          source={require("../../../assets/scanner/sample-qr.png")}
+          style={styles.qrImage}
+        />
 
-        {timeLeft > 0 && (
-          <Text style={styles.expiryText}>
-            This QR code will expire in {minutes}:{seconds}
-          </Text>
-        )}
+        <Text style={styles.expiryText}>This QR code will expire in 2:35 minutes</Text>
 
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
           <Text style={styles.closeButtonText}>CLOSE</Text>
         </TouchableOpacity>
       </View>
@@ -127,7 +108,6 @@ export default function RedeemRewardsQR() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF3D3",
     padding: 20,
     justifyContent: "center",
     alignItems: "center",

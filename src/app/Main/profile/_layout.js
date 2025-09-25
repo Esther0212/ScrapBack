@@ -3,11 +3,12 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 
-export default function ScannerLayout() {
+export default function profileLayout() {
   const router = useRouter();
 
   return (
     <Stack
+      // Default for ALL profile screens
       screenOptions={{
         headerStyle: { backgroundColor: "#F0F1C5" },
         headerTitleAlign: "center",
@@ -17,16 +18,24 @@ export default function ScannerLayout() {
       <Stack.Screen
         name="index"
         options={{
-          title: "QR Code Generation",
+          title: "Profile",
           headerShown: true,
+          headerBackVisible: false,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push("/Main/profile/settings")}
+            >
+              <Ionicons name="menu" size={24} color="black" />
+            </TouchableOpacity>
+          ),
         }}
       />
       <Stack.Screen
-        name="earn"
+        name="settings"
         options={{
-          title: "QR Code For Earning Points",
+          title: "Settings and Privacy",
           headerShown: true,
-          headerBackVisible: false, // hide the default back
+          headerBackVisible: false,
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()}>
               <Ionicons name="chevron-back-outline" size={24} color="black" />
@@ -35,11 +44,11 @@ export default function ScannerLayout() {
         }}
       />
       <Stack.Screen
-        name="redeem"
+        name="accountInfo"
         options={{
-          title: "QR Code For Redeeming Rewards",
+          title: "Account Information",
           headerShown: true,
-          headerBackVisible: false, // hide the default back
+          headerBackVisible: false,
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()}>
               <Ionicons name="chevron-back-outline" size={24} color="black" />

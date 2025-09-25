@@ -15,6 +15,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../../../firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { useRouter } from "expo-router";
+import { useUser } from "../../context/userContext";
 
 const { width } = Dimensions.get("window");
 const router = useRouter();
@@ -29,11 +30,14 @@ const recyclingIcons = [
   { name: "Organic", source: require("../../assets/home/organic.png") },
   { name: "Batteries", source: require("../../assets/home/batteries.png") },
   { name: "Carton", source: require("../../assets/home/carton.png") },
-  { name: "Construction", source: require("../../assets/home/constriction.png") },
+  {
+    name: "Construction",
+    source: require("../../assets/home/constriction.png"),
+  },
 ];
 
 const Home = () => {
-  const [firstName, setFirstName] = useState("");
+  const { userData } = useUser(); // context
   const [hasNewNotification, setHasNewNotification] = useState(false);
   const [pressedIndex, setPressedIndex] = useState(null);
   const [eduImages, setEduImages] = useState([]); // 🔹 Array for educational images
@@ -64,7 +68,9 @@ const Home = () => {
   useEffect(() => {
     const fetchEducationalContent = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "educationalContent"));
+        const querySnapshot = await getDocs(
+          collection(db, "educationalContent")
+        );
         const images = [];
 
         querySnapshot.forEach((doc) => {
@@ -98,14 +104,18 @@ const Home = () => {
               resizeMode="contain"
             />
             <Ionicons
-              name={hasNewNotification ? "notifications" : "notifications-outline"}
+              name={
+                hasNewNotification ? "notifications" : "notifications-outline"
+              }
               size={24}
               color="black"
             />
           </View>
 
           {/* Greeting */}
-          <Text style={styles.greeting}>Hi, {firstName}</Text>
+          <Text style={styles.greeting}>
+            Hi, {userData?.firstName || "Guest"}
+          </Text>
           <Text style={styles.subGreeting}>
             Every action counts—start recycling today!
           </Text>
@@ -129,7 +139,13 @@ const Home = () => {
                 style={styles.redeemButton}
                 onTouchStart={() => router.push("/Main/redeem_rewards")}
               >
-                <Text style={styles.redeemText}>🎁 Redeem Rewards</Text>
+                <Ionicons
+                  name="gift-outline"
+                  size={20}
+                  color="white"
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.redeemText}>Redeem Rewards</Text>
               </View>
             </View>
           </View>
@@ -154,8 +170,8 @@ const Home = () => {
                     ? { marginRight: 10 }
                     : { marginLeft: 0 },
                 ]}
-                onPressIn={() => setPressedIndex(index)} // Show label on press
-                onPress={() => router.push("/Main/recyclingGuide")}
+                onPress={() => router.replace(`/Main/recyclingGuide/stepsBenefits?type=${item.name}`)}
+
               >
                 <Image source={item.source} style={styles.iconImage} />
                 {pressedIndex === index && (
@@ -251,6 +267,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row", // 🔹 put icon and text side by side
+    paddingVertical: 8,
+  },
+  redeemText: {
+    color: "white",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 14,
   },
   redeemText: {
     color: "white",
