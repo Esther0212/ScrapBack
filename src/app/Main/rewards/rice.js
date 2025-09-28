@@ -1,5 +1,5 @@
 // src/app/Main/rewards/rice.js
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../../components/customBgColor";
@@ -15,37 +16,36 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 
-const { width } = Dimensions.get("window");
+// ✅ Firestore imports
+import { db } from "../../../../firebase";
+import { collection, getDocs } from "firebase/firestore";
 
-const offers = [
-  {
-    id: 1,
-    title: "1 Kilo Rice",
-    points: 100,
-    image: require("../../../assets/redeem/dog.png"),
-  },
-  {
-    id: 2,
-    title: "5 Kilos Rice",
-    points: 450,
-    image: require("../../../assets/redeem/rice.png"),
-  },
-  {
-    id: 3,
-    title: "1 Kilo Rice",
-    points: 100,
-    image: require("../../../assets/redeem/tut.jpg"),
-  },
-  {
-    id: 4,
-    title: "5 Kilos Rice",
-    points: 450,
-    image: require("../../../assets/redeem/tut.jpg"),
-  },
-];
+const { width } = Dimensions.get("window");
 
 const Rice = () => {
   const router = useRouter();
+  const [offers, setOffers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // ✅ Fetch rewards from Firestore
+  useEffect(() => {
+    const fetchRewards = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "reward"));
+        const sackRewards = querySnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((r) => r.category === "sack"); // only rice sack
+
+        setOffers(sackRewards);
+      } catch (err) {
+        console.error("Error fetching rewards:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRewards();
+  }, []);
 
   return (
     <CustomBgColor>
@@ -60,43 +60,50 @@ const Rice = () => {
         </View>
 
         {/* Content */}
-        <ScrollView contentContainerStyle={styles.scrollView}>
-          <View style={styles.cardContainer}>
-            {offers.map((offer) => (
-              <TouchableOpacity
-                key={offer.id}
-                style={styles.card}
-                activeOpacity={0.85}
-                onPress={() => {
-                  router.push({
-                    pathname: "/Main/rewards/rice_description",
-                    params: { id: offer.id },
-                  });
-                }}
-              >
-                {/* Image with Gradient Overlay */}
-                <View style={styles.imageWrapper}>
-                  <Image source={offer.image} style={styles.image} />
-                  <LinearGradient
-                    colors={["rgba(0,0,0,0.3)", "transparent"]}
-                    style={styles.imageOverlay}
-                  />
-                  {/* Points Badge */}
-                  <View style={styles.pointsBadge}>
+        {loading ? (
+          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 30 }} />
+        ) : (
+          <ScrollView contentContainerStyle={styles.scrollView}>
+            <View style={styles.cardContainer}>
+              {offers.map((offer) => (
+                <TouchableOpacity
+                  key={offer.id}
+                  style={styles.card}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    router.push({
+                      pathname: "/Main/rewards/rice_description",
+                      params: { id: offer.id },
+                    });
+                  }}
+                >
+                  {/* Image with Gradient Overlay */}
+                  <View style={styles.imageWrapper}>
                     <Image
-                      source={require("../../../assets/home/lettermarkLogo.png")}
-                      style={styles.logoIcon}
+                      source={{ uri: offer.image }} // ✅ dynamic from Firestore
+                      style={styles.image}
                     />
-                    <Text style={styles.pointsText}>{offer.points} pts</Text>
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.3)", "transparent"]}
+                      style={styles.imageOverlay}
+                    />
+                    {/* Points Badge */}
+                    <View style={styles.pointsBadge}>
+                      <Image
+                        source={require("../../../assets/home/lettermarkLogo.png")}
+                        style={styles.logoIcon}
+                      />
+                      <Text style={styles.pointsText}>{offer.points} pts</Text>
+                    </View>
                   </View>
-                </View>
 
-                {/* Title */}
-                <Text style={styles.cardTitle}>{offer.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
+                  {/* Title */}
+                  <Text style={styles.cardTitle}>{offer.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        )}
       </SafeAreaView>
     </CustomBgColor>
   );
@@ -104,10 +111,9 @@ const Rice = () => {
 
 export default Rice;
 
+// ✅ same styles as before...
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -128,7 +134,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   card: {
-    width: width * 0.46, // mas dako
+    width: width * 0.46,
     borderRadius: 20,
     marginBottom: 18,
     backgroundColor: "#FFFFFF",
@@ -139,12 +145,10 @@ const styles = StyleSheet.create({
     elevation: 4,
     overflow: "hidden",
   },
-  imageWrapper: {
-    position: "relative",
-  },
+  imageWrapper: { position: "relative" },
   image: {
     width: "100%",
-    height: width * 0.38, // mas taas ang image
+    height: width * 0.38,
     resizeMode: "cover",
   },
   imageOverlay: {
@@ -156,14 +160,14 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
-cardTitle: {
-  fontSize: 15,
-  fontFamily: "Poppins_700Bold", // changed from 600SemiBold
-  color: "#1B5E20",
-  paddingVertical: 10,
-  textAlign: "center",
-  fontWeight: "bold", // optional, reinforces boldness
-},
+  cardTitle: {
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    color: "#1B5E20",
+    paddingVertical: 10,
+    textAlign: "center",
+    fontWeight: "bold",
+  },
   pointsBadge: {
     position: "absolute",
     top: 12,

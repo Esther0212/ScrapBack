@@ -1,5 +1,5 @@
 // src/app/Main/rewards/gcash.js
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../../components/customBgColor";
@@ -15,17 +16,36 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 
-const { width } = Dimensions.get("window");
+// ✅ Firestore
+import { db } from "../../../../firebase";
+import { collection, getDocs } from "firebase/firestore";
 
-const offers = [
-  { id: 1, title: "₱50 GCash", points: 100, image: require("../../../assets/redeem/gcash.png") },
-  { id: 2, title: "₱100 GCash", points: 200, image: require("../../../assets/redeem/gcash.png") },
-  { id: 3, title: "₱200 GCash", points: 400, image: require("../../../assets/redeem/gcash.png") },
-  { id: 4, title: "₱500 GCash", points: 1000, image: require("../../../assets/redeem/gcash.png") },
-];
+const { width } = Dimensions.get("window");
 
 const Gcash = () => {
   const router = useRouter();
+  const [offers, setOffers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // ✅ Fetch rewards with category = "gcash"
+  useEffect(() => {
+    const fetchRewards = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "reward"));
+        const gcashRewards = querySnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((r) => r.category === "gcash");
+
+        setOffers(gcashRewards);
+      } catch (err) {
+        console.error("Error fetching GCash rewards:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRewards();
+  }, []);
 
   return (
     <CustomBgColor>
@@ -40,43 +60,49 @@ const Gcash = () => {
         </View>
 
         {/* Content */}
-        <ScrollView contentContainerStyle={styles.scrollView}>
-          <View style={styles.cardContainer}>
-            {offers.map((offer) => (
-              <TouchableOpacity
-                key={offer.id}
-                style={styles.card}
-                activeOpacity={0.85}
-                onPress={() =>
-                  router.push({
-                    pathname: "/Main/rewards/gcash_description",
-                    params: { id: offer.id },
-                  })
-                }
-              >
-                {/* Image with Gradient Overlay */}
-                <View style={styles.imageWrapper}>
-                  <Image source={offer.image} style={styles.image} />
-                  <LinearGradient
-                    colors={["rgba(0,0,0,0.3)", "transparent"]}
-                    style={styles.imageOverlay}
-                  />
-                  {/* Points Badge */}
-                  <View style={styles.pointsBadge}>
-                    <Image
-                      source={require("../../../assets/home/lettermarkLogo.png")}
-                      style={styles.logoIcon}
+        {loading ? (
+          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 30 }} />
+        ) : (
+          <ScrollView contentContainerStyle={styles.scrollView}>
+            <View style={styles.cardContainer}>
+              {offers.map((offer) => (
+                <TouchableOpacity
+                  key={offer.id}
+                  style={styles.card}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/Main/rewards/gcash_description",
+                      params: { id: offer.id },
+                    })
+                  }
+                >
+                  {/* Image with Gradient Overlay */}
+                  <View style={styles.imageWrapper}>
+                    {offer.image && (
+                      <Image source={{ uri: offer.image }} style={styles.image} />
+                    )}
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.3)", "transparent"]}
+                      style={styles.imageOverlay}
                     />
-                    <Text style={styles.pointsText}>{offer.points} pts</Text>
+                    {/* Points Badge */}
+                    <View style={styles.pointsBadge}>
+                      <Image
+                        source={require("../../../assets/home/lettermarkLogo.png")}
+                        style={styles.logoIcon}
+                      />
+                      <Text style={styles.pointsText}>{offer.points} pts</Text>
+                    </View>
                   </View>
-                </View>
 
-                {/* Title */}
-                <Text style={styles.cardTitle}>{offer.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
+                  {/* Title */}
+                  <Text style={styles.cardTitle}>{offer.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        )}
       </SafeAreaView>
     </CustomBgColor>
   );

@@ -1,4 +1,5 @@
-import React from "react";
+// src/app/Main/rewards/rice_description.js
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -6,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,45 +15,54 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import CustomBgColor from "../../../components/customBgColor";
 
-const rewardDescriptions = {
-  1: {
-    title: "1 Kilo Rice",
-    image: require("../../../assets/redeem/rice.png"),
-    description:
-      "This reward allows you to redeem 1 kilo of rice in exchange for 45 ScrapBack points. Points are earned by submitting recyclable waste like plastic bottles, paper, and glass at designated collection points.",
-    howTo:
-      "1. Go to any designated PACAFACO collection point.\n" +
-      "2. Show your QR code from the ScrapBack app to the staff.\n" +
-      "3. Staff will scan your QR and validate your points.\n" +
-      "4. Choose your reward and confirm redemption.\n" +
-      "5. Once approved, receive your reward on the spot or be notified for scheduled claiming.\n\n" +
-      "Note: Ensure you meet the minimum points required for the specific reward before attempting to redeem.",
-  },
-  2: {
-    title: "5 Kilos Rice",
-    image: require("../../../assets/redeem/dog.png"),
-    description:
-      "This reward allows you to redeem 5 kilos of rice in exchange for 200 ScrapBack points. Points are earned by submitting recyclable waste like plastic bottles, paper, and glass at designated collection points.",
-    howTo:
-      "1. Go to any designated PACAFACO collection point.\n" +
-      "2. Show your QR code from the ScrapBack app to the staff.\n" +
-      "3. Staff will scan your QR and validate your points.\n" +
-      "4. Choose your reward and confirm redemption.\n" +
-      "5. Once approved, receive your reward on the spot or be notified for scheduled claiming.\n\n" +
-      "Note: Ensure you meet the minimum points required for the specific reward before attempting to redeem.",
-  },
-};
+// Firestore
+import { db } from "../../../../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 const Description = () => {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const reward = rewardDescriptions[id];
+  const { id } = useLocalSearchParams(); // document id from rice.js
+  const [reward, setReward] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReward = async () => {
+      try {
+        const docRef = doc(db, "reward", id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setReward({ id: docSnap.id, ...docSnap.data() });
+        } else {
+          setReward(null);
+        }
+      } catch (err) {
+        console.error("Error fetching reward:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchReward();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <CustomBgColor>
+        <SafeAreaView style={styles.safeArea}>
+          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 40 }} />
+        </SafeAreaView>
+      </CustomBgColor>
+    );
+  }
 
   if (!reward) {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <Text style={styles.notFoundText}>No description found for this reward.</Text>
+          <Text style={styles.notFoundText}>
+            No description found for this reward.
+          </Text>
         </SafeAreaView>
       </CustomBgColor>
     );
@@ -62,7 +73,7 @@ const Description = () => {
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/Main/rewards/rice")}>
+          <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{reward.title}</Text>
@@ -70,24 +81,23 @@ const Description = () => {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Image with gradient background */}
-          <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
-            <Image source={reward.image} style={styles.image} />
+          {/* Image */}
+          <LinearGradient
+            colors={["#E8F5E9", "#FFFFFF"]}
+            style={styles.imageWrapper}
+          >
+            {reward.image ? (
+              <Image source={{ uri: reward.image }} style={styles.image} />
+            ) : null}
           </LinearGradient>
 
           {/* Card Content */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.text}>
-              <Text style={styles.bold}>ABOUT ScrapBack{"\n"}</Text>
-              ScrapBack is a digital recycling rewards system developed for PACAFACO residents. It encourages proper waste disposal by converting recyclable materials into reward points which users can redeem for goods like rice, mobile load, or vouchers.
-            </Text>
-
-            <Text style={styles.sectionTitle}>About this Reward</Text>
             <Text style={styles.text}>{reward.description}</Text>
 
-            <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
-            <Text style={styles.text}>{reward.howTo}</Text>
+            <Text style={styles.sectionTitle}>Points Required</Text>
+            <Text style={styles.text}>{reward.points} pts</Text>
 
             {/* CTA Button */}
             <TouchableOpacity
@@ -164,9 +174,6 @@ const styles = StyleSheet.create({
     color: "#444",
     lineHeight: 22,
     marginBottom: 12,
-  },
-  bold: {
-    fontFamily: "Poppins_700Bold",
   },
   ctaButtonSolid: {
     backgroundColor: "#008243",

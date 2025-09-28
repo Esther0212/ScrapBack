@@ -1,5 +1,5 @@
 // src/app/Main/rewards/gcash_description.js
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,44 +16,47 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import CustomBgColor from "../../../components/customBgColor";
 
-// Reward descriptions for GCash
-const rewardDescriptions = {
-  1: {
-    title: "₱50 GCash",
-    points: 100,
-    image: require("../../../assets/redeem/gcash.png"),
-    description:
-      "Exchange your ScrapBack points for real cash! With just 10 points, you’ll receive ₱10 straight to your GCash wallet — no hassle, no waiting too long.",
-  },
-  2: {
-    title: "₱100 GCash",
-    points: 200,
-    image: require("../../../assets/redeem/gcash.png"),
-    description:
-      "Exchange your ScrapBack points for real cash! With just 10 points, you’ll receive ₱10 straight to your GCash wallet — no hassle, no waiting too long.",
-  },
-  3: {
-    title: "₱200 GCash",
-    points: 400,
-    image: require("../../../assets/redeem/gcash.png"),
-    description:
-      "Exchange your ScrapBack points for real cash! With just 10 points, you’ll receive ₱10 straight to your GCash wallet — no hassle, no waiting too long.",
-  },
-  4: {
-    title: "₱500 GCash",
-    points: 1000,
-    image: require("../../../assets/redeem/gcash.png"),
-    description:
-      "Exchange your ScrapBack points for real cash! With just 10 points, you’ll receive ₱10 straight to your GCash wallet — no hassle, no waiting too long.",
-  },
-};
+// ✅ Firestore
+import { db } from "../../../../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 const GcashDescription = () => {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams(); // Firestore document id
+  const [reward, setReward] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const reward = rewardDescriptions[id];
+  useEffect(() => {
+    const fetchReward = async () => {
+      try {
+        const docRef = doc(db, "reward", id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setReward({ id: docSnap.id, ...docSnap.data() });
+        } else {
+          setReward(null);
+        }
+      } catch (err) {
+        console.error("Error fetching reward:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchReward();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <CustomBgColor>
+        <SafeAreaView style={styles.safeArea}>
+          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 40 }} />
+        </SafeAreaView>
+      </CustomBgColor>
+    );
+  }
 
   if (!reward) {
     return (
@@ -69,7 +73,7 @@ const GcashDescription = () => {
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/Main/rewards/gcash")}>
+          <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{reward.title}</Text>
@@ -79,7 +83,9 @@ const GcashDescription = () => {
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Image with gradient background */}
           <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
-            <Image source={reward.image} style={styles.image} />
+            {reward.image && (
+              <Image source={{ uri: reward.image }} style={styles.image} />
+            )}
           </LinearGradient>
 
           {/* Card Content */}
@@ -87,11 +93,17 @@ const GcashDescription = () => {
             <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.text}>
               <Text style={styles.bold}>ABOUT ScrapBack{"\n"}</Text>
-              ScrapBack is a digital recycling rewards system developed for PACAFACO residents and contributors. It encourages proper waste disposal by converting recyclable materials into reward points which users can redeem for goods like rice, mobile load, or vouchers.
+              ScrapBack is a digital recycling rewards system developed for PACAFACO
+              residents. It encourages proper waste disposal by converting recyclable
+              materials into reward points which users can redeem for goods like rice,
+              mobile load, or GCash.
             </Text>
 
             <Text style={styles.sectionTitle}>About this Reward</Text>
             <Text style={styles.text}>{reward.description}</Text>
+
+            <Text style={styles.sectionTitle}>Points Required</Text>
+            <Text style={styles.text}>{reward.points} pts</Text>
 
             <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
             <Text style={styles.text}>
@@ -101,7 +113,7 @@ const GcashDescription = () => {
               4. Choose your reward and confirm redemption.{"\n"}
               5. Once approved, receive your reward on the spot or be notified for scheduled claiming.{"\n\n"}
               <Text style={styles.bold}>
-                Note: Ensure you meet the minimum points required for the specific reward before attempting to redeem.
+                Note: Ensure you meet the minimum points required before attempting to redeem.
               </Text>
             </Text>
 
