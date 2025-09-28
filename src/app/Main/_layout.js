@@ -3,7 +3,7 @@ import { Tabs } from "expo-router";
 import CustomBgColor from "../../components/customBgColor";
 import CustomTabBar from "../../components/customTabBar";
 
-const Layout = () => {
+export default function MainLayout() {
   return (
     <CustomBgColor>
       <Tabs
@@ -13,11 +13,9 @@ const Layout = () => {
         <Tabs.Screen name="index" options={{ title: "Home" }} />
         <Tabs.Screen name="map" options={{ title: "Map" }} />
         <Tabs.Screen name="scanner" options={{ title: "QR Generation" }} />
-        <Tabs.Screen name="requestPickup" options={{ title: "RequestPickup" }} />
+        <Tabs.Screen name="requestPickup" options={{ title: "Request Pickup" }} />
         <Tabs.Screen name="profile" options={{ title: "Profile" }} />
       </Tabs>
     </CustomBgColor>
   );
-};
-
-export default Layout;
+}

@@ -10,6 +10,7 @@ import {
   Image,
   Alert,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,15 +21,15 @@ import { Menu, Provider as PaperProvider } from "react-native-paper";
 import axios from "axios";
 import { useUser } from "../../../context/userContext";
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../../../../firebase";
+import { db, storage } from "../../../../firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const { width } = Dimensions.get("window");
 
 const AccountInfo = () => {
-  const { userData, setUserData } = useUser(); // context
+  const { userData, setUserData } = useUser();
   const [editMode, setEditMode] = useState(false);
 
-  // Editable fields
   const [profilePic, setProfilePic] = useState(userData?.profilePic || null);
   const [firstName, setFirstName] = useState(userData?.firstName || "");
   const [lastName, setLastName] = useState(userData?.lastName || "");
@@ -45,10 +46,9 @@ const AccountInfo = () => {
   const [barangays, setBarangays] = useState([]);
   const [barangayMenuVisible, setBarangayMenuVisible] = useState(false);
 
-  // Modal state
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  // Load barangays from API
   useEffect(() => {
     const fetchBarangays = async () => {
       try {
@@ -63,7 +63,6 @@ const AccountInfo = () => {
     fetchBarangays();
   }, []);
 
-  // Pick profile picture
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -78,39 +77,56 @@ const AccountInfo = () => {
     }
   };
 
-  // Remove profile picture
-  const removeImage = () => {
-    setProfilePic(null);
-
-    if (userData?.uid) {
-      const userRef = doc(db, "user", userData.uid);
-      updateDoc(userRef, { profilePic: "" });
-
-      setUserData({
-        ...userData,
-        profilePic: "",
-      });
+  const uploadImageToStorage = async (uri, uid) => {
+    try {
+      setUploading(true);
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const imageRef = ref(storage, `profilePictures/${uid}.jpg`);
+      await uploadBytes(imageRef, blob);
+      const downloadURL = await getDownloadURL(imageRef);
+      setUploading(false);
+      return downloadURL;
+    } catch (err) {
+      setUploading(false);
+      console.error("Error uploading image:", err);
+      return null;
     }
+  };
 
+  const removeImage = async () => {
+    if (!userData?.uid) return;
+    const userRef = doc(db, "user", userData.uid);
+
+    // ✅ set profilePic to null instead of ""
+    await updateDoc(userRef, { profilePic: null });
+
+    setUserData({ ...userData, profilePic: null });
+    setProfilePic(null);
     setProfileModalVisible(false);
   };
 
-  // Format DOB
   const formatDOB = (dobValue) => {
     if (!dobValue) return "";
     const date = new Date(dobValue);
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${month}/${day}/${year}`;
+    return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
   };
 
-  // Save updates
   const handleSave = async () => {
     try {
       if (!userData?.uid) return;
 
-      // Default address values if missing
+      let finalProfilePic = profilePic;
+
+      // if new local image, upload to Firebase Storage
+      if (profilePic && profilePic.startsWith("file://")) {
+        const uploadedUrl = await uploadImageToStorage(
+          profilePic,
+          userData.uid
+        );
+        if (uploadedUrl) finalProfilePic = uploadedUrl;
+      }
+
       const updatedAddress = {
         street,
         region: userData?.address?.region || "Northern Mindanao",
@@ -122,7 +138,7 @@ const AccountInfo = () => {
 
       const userRef = doc(db, "user", userData.uid);
       await updateDoc(userRef, {
-        profilePic,
+        profilePic: finalProfilePic || null,
         firstName,
         lastName,
         email,
@@ -132,10 +148,9 @@ const AccountInfo = () => {
         address: updatedAddress,
       });
 
-      // Update context
       setUserData({
         ...userData,
-        profilePic,
+        profilePic: finalProfilePic || "",
         firstName,
         lastName,
         email,
@@ -153,7 +168,6 @@ const AccountInfo = () => {
     }
   };
 
-  // Cancel edits
   const handleCancel = () => {
     setProfilePic(userData?.profilePic || null);
     setFirstName(userData?.firstName || "");
@@ -175,7 +189,6 @@ const AccountInfo = () => {
         <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
-              {/* Profile Image */}
               <View style={styles.imageWrapper}>
                 <TouchableOpacity
                   onPress={() => editMode && setProfileModalVisible(true)}
@@ -193,14 +206,13 @@ const AccountInfo = () => {
                   <TouchableOpacity
                     style={styles.editIconWrapper}
                     onPress={() => setProfileModalVisible(true)}
-                    activeOpacity={0.7}
                   >
                     <Ionicons name="pencil" size={20} color="#fff" />
                   </TouchableOpacity>
                 )}
               </View>
 
-              {/* Modal for profile picture */}
+              {/* Profile Modal */}
               <Modal
                 visible={profileModalVisible}
                 transparent
@@ -233,7 +245,15 @@ const AccountInfo = () => {
                 </TouchableOpacity>
               </Modal>
 
-              {/* First & Last Name */}
+              {uploading && (
+                <ActivityIndicator
+                  size="large"
+                  color="#008243"
+                  style={{ marginBottom: 10 }}
+                />
+              )}
+
+              {/* Fields */}
               <View style={styles.row}>
                 <InputField
                   label="First Name"
@@ -250,8 +270,6 @@ const AccountInfo = () => {
                   containerStyle={{ flex: 1, marginLeft: 8 }}
                 />
               </View>
-
-              {/* Email & Contact */}
               <InputField
                 label="Email"
                 value={email}
@@ -282,7 +300,7 @@ const AccountInfo = () => {
                 <TouchableOpacity
                   style={styles.input}
                   onPress={() => editMode && setShowDatePicker(true)}
-                  disabled={!editMode} // disables all touch
+                  disabled={!editMode}
                 >
                   <Text
                     style={{
@@ -309,7 +327,7 @@ const AccountInfo = () => {
               {/* Address */}
               <Text style={styles.label}>Address</Text>
               <InputField
-                label="Street, Building, House No., etc."
+                label="Street"
                 value={street}
                 setValue={setStreet}
                 editable={editMode}
@@ -333,8 +351,6 @@ const AccountInfo = () => {
                 editable={false}
                 subLabel
               />
-
-              {/* Barangay */}
               <DropdownField
                 label="Barangay"
                 visible={barangayMenuVisible}
@@ -346,8 +362,6 @@ const AccountInfo = () => {
                 editable={editMode}
                 subLabel
               />
-
-              {/* Postal Code */}
               <InputField
                 label="Postal Code"
                 value={userData?.address?.postalCode || "9000"}
@@ -366,14 +380,12 @@ const AccountInfo = () => {
                   <TouchableOpacity
                     style={[styles.cancelButton, { flex: 0.48 }]}
                     onPress={handleCancel}
-                    activeOpacity={0.85}
                   >
                     <Text style={styles.cancelText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.saveButton, { flex: 0.48 }]}
                     onPress={handleSave}
-                    activeOpacity={0.85}
                   >
                     <Text style={styles.saveText}>Save Changes</Text>
                   </TouchableOpacity>
@@ -382,7 +394,6 @@ const AccountInfo = () => {
                 <TouchableOpacity
                   style={styles.editButton}
                   onPress={() => setEditMode(true)}
-                  activeOpacity={0.85}
                 >
                   <Ionicons name="pencil" size={20} color="#fff" />
                   <Text style={styles.editButtonText}>Edit Profile</Text>
@@ -396,7 +407,7 @@ const AccountInfo = () => {
   );
 };
 
-// Input Field
+// InputField
 const InputField = ({
   label,
   value,
@@ -416,7 +427,7 @@ const InputField = ({
   </View>
 );
 
-// Dropdown Field
+// DropdownField
 const DropdownField = ({
   label,
   visible,
@@ -437,8 +448,7 @@ const DropdownField = ({
         <TouchableOpacity
           style={[styles.input, { alignItems: "flex-start" }]}
           onPress={editable ? () => setVisible(true) : null}
-          activeOpacity={editable ? 0.7 : 1} // disables opacity change
-          disabled={!editable} // disables touch entirely
+          disabled={!editable}
         >
           <Text style={{ color: editable ? "#3A2E2E" : "#777", fontSize: 16 }}>
             {selected || `Select ${label}`}
@@ -486,27 +496,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#008243",
     borderRadius: 20,
     padding: 6,
-    justifyContent: "center",
-    alignItems: "center",
     borderWidth: 2,
     borderColor: "#fff",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "transparent",
     justifyContent: "flex-start",
-    paddingTop: width / 4 + 80,
     alignItems: "center",
+    paddingTop: width / 4 + 80,
   },
   modalContent: {
     width: 220,
     backgroundColor: "#fff",
     borderRadius: 12,
     paddingVertical: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 4,
     elevation: 5,
   },
   modalButton: { paddingVertical: 12, paddingHorizontal: 20 },

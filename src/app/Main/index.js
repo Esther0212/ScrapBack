@@ -20,27 +20,12 @@ import { useUser } from "../../context/userContext";
 const { width } = Dimensions.get("window");
 const router = useRouter();
 
-const recyclingIcons = [
-  { name: "Plastic", source: require("../../assets/home/plastic.png") },
-  { name: "Paper", source: require("../../assets/home/paper.png") },
-  { name: "Metal", source: require("../../assets/home/metal.png") },
-  { name: "Glass", source: require("../../assets/home/glass.png") },
-  { name: "eWaste", source: require("../../assets/home/eWaste.png") },
-  { name: "Clothes", source: require("../../assets/home/clothes.png") },
-  { name: "Organic", source: require("../../assets/home/organic.png") },
-  { name: "Batteries", source: require("../../assets/home/batteries.png") },
-  { name: "Carton", source: require("../../assets/home/carton.png") },
-  {
-    name: "Construction",
-    source: require("../../assets/home/constriction.png"),
-  },
-];
-
 const Home = () => {
   const { userData } = useUser(); // context
   const [hasNewNotification, setHasNewNotification] = useState(false);
   const [pressedIndex, setPressedIndex] = useState(null);
   const [eduImages, setEduImages] = useState([]); // 🔹 Array for educational images
+  const [recyclingTypes, setRecyclingTypes] = useState([]);
 
   useEffect(() => {
     const loadFirstName = async () => {
@@ -158,25 +143,21 @@ const Home = () => {
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.iconScroll}
           >
-            {recyclingIcons.map((item, index) => (
+            {recyclingTypes.map((type, index) => (
               <Pressable
                 key={index}
                 style={[
-                  styles.iconButton,
-                  pressedIndex === index && styles.iconButtonHovered,
-                  index !== 0 && index !== recyclingIcons.length - 1
-                    ? { marginRight: 10, marginLeft: 0 }
-                    : index === 0
-                    ? { marginRight: 10 }
-                    : { marginLeft: 0 },
+                  styles.typeButton,
+                  pressedIndex === index && styles.typeButtonPressed,
+                  index !== 0 ? { marginLeft: 10 } : { marginLeft: 0 },
                 ]}
-                onPress={() => router.replace(`/Main/recyclingGuide/stepsBenefits?type=${item.name}`)}
-
+                onPress={() =>
+                  router.replace(
+                    `/Main/recyclingGuide/stepsBenefits?type=${type}`
+                  )
+                }
               >
-                <Image source={item.source} style={styles.iconImage} />
-                {pressedIndex === index && (
-                  <Text style={styles.iconText}>{item.name}</Text>
-                )}
+                <Text style={styles.typeButtonText}>{type}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -289,27 +270,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  iconButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    height: 50,
-    borderRadius: 10,
+  typeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: "#008243",
-    elevation: 2,
+    borderRadius: 10,
     justifyContent: "center",
+    alignItems: "center",
   },
-  iconButtonHovered: {
-    paddingHorizontal: 15,
+  typeButtonPressed: {
+    backgroundColor: "#005f1a",
   },
-  iconImage: {
-    width: 40,
-    height: 40,
-  },
-  iconText: {
-    marginLeft: 8,
+  typeButtonText: {
     color: "white",
-    fontFamily: "Poppins_600SemiBold",
+    fontWeight: "600",
   },
   // 🔹 Educational banner styles
   educationalContainer: {
