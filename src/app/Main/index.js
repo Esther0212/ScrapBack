@@ -17,7 +17,6 @@ import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useUser } from "../../context/userContext";
 
-
 const { width } = Dimensions.get("window");
 const router = useRouter();
 
@@ -114,7 +113,9 @@ const Home = () => {
           </View>
 
           {/* Greeting */}
-          <Text style={styles.greeting}>Hi, {userData?.firstName || "Guest"}</Text>
+          <Text style={styles.greeting}>
+            Hi, {userData?.firstName || "Guest"}
+          </Text>
           <Text style={styles.subGreeting}>
             Every action counts—start recycling today!
           </Text>
@@ -169,8 +170,8 @@ const Home = () => {
                     ? { marginRight: 10 }
                     : { marginLeft: 0 },
                 ]}
-                onPressIn={() => setPressedIndex(index)} // Show label on press
-                onPress={() => router.push("/Main/recyclingGuide")}
+                onPress={() => router.replace(`/Main/recyclingGuide/stepsBenefits?type=${item.name}`)}
+
               >
                 <Image source={item.source} style={styles.iconImage} />
                 {pressedIndex === index && (

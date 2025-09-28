@@ -7,6 +7,7 @@ import { useFonts as useCustomFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect } from "react";
 import { UserProvider } from "../context/userContext";
+import { EducationalProvider } from "../context/educationalContext";
 
 SplashScreen.preventAutoHideAsync(); // keep splash until fonts are loaded
 
@@ -59,9 +60,11 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <UserProvider>
+      <EducationalProvider>
         <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
           <Slot />
         </View>
+        </EducationalProvider>
       </UserProvider>
     </SafeAreaProvider>
   );

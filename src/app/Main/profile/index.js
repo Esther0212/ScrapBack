@@ -15,9 +15,13 @@ import { useUser } from "../../../context/userContext";
 const { height, width } = Dimensions.get("window");
 
 const Profile = () => {
-  const { userData, setUserData } = useUser(); // context
+  const { userData } = useUser(); // ✅ Get userData from context
   const [activeTab, setActiveTab] = useState("points"); // "points" | "rewards"
-  const iconSize = Math.min(width * 0.07, 28); // 7% of width but max 28
+
+  // ✅ Decide profile image source
+  const profileImageSource = userData?.profilePic
+    ? { uri: userData.profilePic } // Firestore image URL
+    : require("../../../assets/profile/defaultUser.png"); // fallback
 
   return (
     <CustomBgColor>
@@ -27,18 +31,17 @@ const Profile = () => {
           <View style={styles.box}>
             {/* Profile image floating half in, half out */}
             <View style={styles.imageWrapper}>
-              <Image
-                source={require("../../../assets/profile/defaultUser.png")}
-                style={styles.profileImage}
-              />
+              <Image source={profileImageSource} style={styles.profileImage} />
             </View>
 
             {/* User Info */}
             <View style={styles.infoContainer}>
               <Text style={styles.nameText}>
-                {userData?.firstName} {userData?.lastName}
+                {userData?.firstName || "Guest"} {userData?.lastName || ""}
               </Text>
-              <Text style={styles.emailText}>{userData?.email}</Text>
+              <Text style={styles.emailText}>
+                {userData?.email || "Not signed in"}
+              </Text>
             </View>
 
             {/* Tab Section */}
@@ -58,7 +61,7 @@ const Profile = () => {
                     styles.tabIcon,
                     {
                       tintColor: activeTab === "points" ? "#008243" : "#ADADAD",
-                    }, // ensure color consistency
+                    },
                   ]}
                   resizeMode="contain"
                 />
@@ -71,7 +74,7 @@ const Profile = () => {
               >
                 <Ionicons
                   name="gift-sharp"
-                  size={styles.tabIcon.width} // same size as points
+                  size={styles.tabIcon.width}
                   color={activeTab === "rewards" ? "#008243" : "#ADADAD"}
                 />
               </TouchableOpacity>
@@ -136,25 +139,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F1C5",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    minHeight: height * 0.75, // responsive 3/4 screen height
+    minHeight: height * 0.75,
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
     elevation: 3,
     alignItems: "center",
-    paddingTop: width / 8, // leave space for half of profile image
+    paddingTop: width / 8,
   },
   imageWrapper: {
     position: "absolute",
-    top: -width / 8, // move up by half of image height
+    top: -width / 8,
     alignItems: "center",
     justifyContent: "center",
   },
   profileImage: {
     width: width / 4,
     height: width / 4,
-    borderRadius: width / 8, // make it circular
+    borderRadius: width / 8,
     resizeMode: "cover",
   },
   infoContainer: {
@@ -173,7 +176,7 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     marginTop: 20,
-    marginBottom: 8, // space before underline
+    marginBottom: 8,
     width: "100%",
   },
   tab: {
@@ -182,13 +185,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tabIcon: {
-    width: width * 0.07, // responsive size (7% of screen width)
+    width: width * 0.07,
     height: width * 0.07,
   },
   tabUnderlineContainer: {
     flexDirection: "row",
-    paddingHorizontal: 20, // padding from left & right edges
-    marginBottom: 10, // space below line
+    paddingHorizontal: 20,
+    marginBottom: 10,
   },
   tabUnderline: {
     flex: 1,
