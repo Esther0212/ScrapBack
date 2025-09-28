@@ -34,7 +34,7 @@ const Rice = () => {
         const querySnapshot = await getDocs(collection(db, "reward"));
         const sackRewards = querySnapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((r) => r.category === "sack"); // only rice sack
+          .filter((r) => r.category === "sack"); 
 
         setOffers(sackRewards);
       } catch (err) {
@@ -61,7 +61,11 @@ const Rice = () => {
 
         {/* Content */}
         {loading ? (
-          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 30 }} />
+          <ActivityIndicator
+            size="large"
+            color="#2E7D32"
+            style={{ marginTop: 30 }}
+          />
         ) : (
           <ScrollView contentContainerStyle={styles.scrollView}>
             <View style={styles.cardContainer}>
@@ -79,10 +83,12 @@ const Rice = () => {
                 >
                   {/* Image with Gradient Overlay */}
                   <View style={styles.imageWrapper}>
-                    <Image
-                      source={{ uri: offer.image }} // ✅ dynamic from Firestore
-                      style={styles.image}
-                    />
+                    {offer.image && (
+                      <Image
+                        source={{ uri: offer.image }} 
+                        style={styles.image}
+                      />
+                    )}
                     <LinearGradient
                       colors={["rgba(0,0,0,0.3)", "transparent"]}
                       style={styles.imageOverlay}
@@ -111,7 +117,7 @@ const Rice = () => {
 
 export default Rice;
 
-// ✅ same styles as before...
+// ✅ Styles
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   header: {

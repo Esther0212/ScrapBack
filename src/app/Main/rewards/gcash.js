@@ -27,14 +27,13 @@ const Gcash = () => {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch rewards with category = "gcash"
   useEffect(() => {
     const fetchRewards = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "reward"));
         const gcashRewards = querySnapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((r) => r.category === "gcash");
+          .filter((r) => r.category === "gcash"); 
 
         setOffers(gcashRewards);
       } catch (err) {
@@ -73,7 +72,7 @@ const Gcash = () => {
                   onPress={() =>
                     router.push({
                       pathname: "/Main/rewards/gcash_description",
-                      params: { id: offer.id },
+                      params: { id: offer.id }, 
                     })
                   }
                 >

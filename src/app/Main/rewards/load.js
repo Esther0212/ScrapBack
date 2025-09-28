@@ -34,7 +34,7 @@ const Load = () => {
         const querySnapshot = await getDocs(collection(db, "reward"));
         const loadRewards = querySnapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((r) => r.category === "load"); // only load category
+          .filter((r) => r.category === "load");
 
         setOffers(loadRewards);
       } catch (err) {

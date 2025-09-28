@@ -27,6 +27,7 @@ const GcashDescription = () => {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
 
+  // ✅ Fetch reward by ID from Firestore
   useEffect(() => {
     const fetchReward = async () => {
       try {

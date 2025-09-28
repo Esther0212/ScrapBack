@@ -22,7 +22,7 @@ import { doc, getDoc } from "firebase/firestore";
 
 const LoadDescription = () => {
   const router = useRouter();
-  const { id } = useLocalSearchParams(); // Firestore document id
+  const { id } = useLocalSearchParams(); 
   const [reward, setReward] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);

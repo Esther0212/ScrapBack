@@ -1,4 +1,3 @@
-// src/app/Main/rewards/rice_description.js
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -19,9 +18,9 @@ import CustomBgColor from "../../../components/customBgColor";
 import { db } from "../../../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 
-const Description = () => {
+const LoadDescription = () => {
   const router = useRouter();
-  const { id } = useLocalSearchParams(); // document id from rice.js
+  const { id } = useLocalSearchParams();
   const [reward, setReward] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,9 +59,7 @@ const Description = () => {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <Text style={styles.notFoundText}>
-            No description found for this reward.
-          </Text>
+          <Text style={styles.notFoundText}>No description found for this reward.</Text>
         </SafeAreaView>
       </CustomBgColor>
     );
@@ -82,16 +79,11 @@ const Description = () => {
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Image */}
-          <LinearGradient
-            colors={["#E8F5E9", "#FFFFFF"]}
-            style={styles.imageWrapper}
-          >
-            {reward.image ? (
-              <Image source={{ uri: reward.image }} style={styles.image} />
-            ) : null}
+          <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
+            {reward.image ? <Image source={{ uri: reward.image }} style={styles.image} /> : null}
           </LinearGradient>
 
-          {/* Card Content */}
+          {/* Card */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.text}>{reward.description}</Text>
@@ -99,7 +91,6 @@ const Description = () => {
             <Text style={styles.sectionTitle}>Points Required</Text>
             <Text style={styles.text}>{reward.points} pts</Text>
 
-            {/* CTA Button */}
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => router.push("Main/map/MapSelector")}
@@ -114,7 +105,7 @@ const Description = () => {
   );
 };
 
-export default Description;
+export default LoadDescription;
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
@@ -125,15 +116,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: "Poppins_700Bold",
-  },
-  scrollContainer: {
-    padding: 16,
-    alignItems: "center",
-    paddingBottom: 40,
-  },
+  headerTitle: { fontSize: 20, fontFamily: "Poppins_700Bold" },
+  scrollContainer: { padding: 16, alignItems: "center", paddingBottom: 40 },
   imageWrapper: {
     width: "100%",
     borderRadius: 16,
@@ -145,11 +129,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  image: {
-    width: "100%",
-    height: 220,
-    resizeMode: "contain",
-  },
+  image: { width: "100%", height: 220, resizeMode: "contain" },
   card: {
     backgroundColor: "white",
     borderRadius: 18,
@@ -187,11 +167,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  ctaText: {
-    color: "white",
-    fontSize: 16,
-    fontFamily: "Poppins_700Bold",
-  },
+  ctaText: { color: "white", fontSize: 16, fontFamily: "Poppins_700Bold" },
   notFoundText: {
     fontSize: 16,
     fontFamily: "Poppins_600SemiBold",
