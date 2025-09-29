@@ -21,16 +21,49 @@ const Profile = () => {
   const { userData } = useUser();
   const [activeTab, setActiveTab] = useState("points");
   const [logs, setLogs] = useState([]);
-  const [rewards, setRewards] = useState([]); // ✅ rewards state
+  const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingRewards, setLoadingRewards] = useState(true);
 
-  // ✅ Profile image source
   const profileImageSource = userData?.profilePic
     ? { uri: userData.profilePic }
     : require("../../../assets/profile/defaultUser.png");
 
-  // ✅ Fetch contribution logs
+  // Helper: group by date
+  const groupLogsByDate = (logs) => {
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    return logs.reduce((groups, log) => {
+      if (!log.createdAt?.seconds) return groups;
+
+      const logDate = new Date(log.createdAt.seconds * 1000);
+      const logDateStr = logDate.toDateString();
+      const todayStr = today.toDateString();
+      const yesterdayStr = yesterday.toDateString();
+
+      let groupKey;
+      if (logDateStr === todayStr) {
+        groupKey = "Today";
+      } else if (logDateStr === yesterdayStr) {
+        groupKey = "Yesterday";
+      } else {
+        groupKey = logDate.toLocaleDateString("en-US", {
+          weekday: "short",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+      }
+
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(log);
+      return groups;
+    }, {});
+  };
+
+  // Fetch contribution logs
   useEffect(() => {
     const fetchLogs = async () => {
       if (!userData?.uid) return;
@@ -57,7 +90,7 @@ const Profile = () => {
     fetchLogs();
   }, [userData?.uid]);
 
-  // ✅ Fetch redemption logs
+  // Fetch redemption logs
   useEffect(() => {
     const fetchRewards = async () => {
       if (!userData?.uid) return;
@@ -83,6 +116,58 @@ const Profile = () => {
 
     fetchRewards();
   }, [userData?.uid]);
+
+  // Render grouped list
+  const renderGroupedList = (groupedData, type = "points") => (
+    <FlatList
+      data={Object.entries(groupedData)}
+      keyExtractor={([date]) => date}
+      contentContainerStyle={{ paddingBottom: 40 }}
+      renderItem={({ item }) => {
+        const [date, items] = item;
+        return (
+          <View style={{ marginBottom: 20 }}>
+            {/* Date Header */}
+            <Text style={styles.dateHeader}>{date}</Text>
+
+            {/* Items under this date */}
+            {items.map((log) => (
+              <View key={log.id} style={styles.logCard}>
+                {type === "points" ? (
+                  <>
+                    <Text style={styles.pointsText}>
+                      + {log.points || 0} points
+                    </Text>
+                    <Text style={styles.categoryText}>
+                      {log.category || "Uncategorized"}
+                    </Text>
+                    {log.weight && (
+                      <Text style={styles.detailText}>{log.weight} kg</Text>
+                    )}
+                    {log.school && (
+                      <Text style={styles.detailText}>{log.school}</Text>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.pointsText}>
+                      - {log.points || 0} points
+                    </Text>
+                    <Text style={styles.categoryText}>
+                      {log.rewardCategory || "Unknown Reward"}
+                    </Text>
+                    {log.school && (
+                      <Text style={styles.detailText}>{log.school}</Text>
+                    )}
+                  </>
+                )}
+              </View>
+            ))}
+          </View>
+        );
+      }}
+    />
+  );
 
   return (
     <CustomBgColor>
@@ -143,13 +228,19 @@ const Profile = () => {
               <View
                 style={[
                   styles.tabUnderline,
-                  { backgroundColor: activeTab === "points" ? "#008243" : "#ADADAD" },
+                  {
+                    backgroundColor:
+                      activeTab === "points" ? "#008243" : "#ADADAD",
+                  },
                 ]}
               />
               <View
                 style={[
                   styles.tabUnderline,
-                  { backgroundColor: activeTab === "rewards" ? "#008243" : "#ADADAD" },
+                  {
+                    backgroundColor:
+                      activeTab === "rewards" ? "#008243" : "#ADADAD",
+                  },
                 ]}
               />
             </View>
@@ -160,31 +251,7 @@ const Profile = () => {
                 loading ? (
                   <Text>Loading logs...</Text>
                 ) : logs.length > 0 ? (
-                  <FlatList
-                    data={logs}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={{ paddingBottom: 40 }}
-                    renderItem={({ item }) => (
-                      <View style={styles.logItem}>
-                        {/* Category Title */}
-                        <Text style={styles.logCategory}>
-                          {item.category || "Uncategorized"}
-                        </Text>
-
-                        {/* Points */}
-                        <Text style={styles.logPoints}>
-                          +{item.points || 0} pts
-                        </Text>
-
-                        {/* Date */}
-                        <Text style={styles.logDate}>
-                          {item.createdAt?.seconds
-                            ? new Date(item.createdAt.seconds * 1000).toLocaleDateString()
-                            : "No date"}
-                        </Text>
-                      </View>
-                    )}
-                  />
+                  renderGroupedList(groupLogsByDate(logs), "points")
                 ) : (
                   <>
                     <Text style={styles.titleText}>No earned points yet</Text>
@@ -196,31 +263,7 @@ const Profile = () => {
               ) : loadingRewards ? (
                 <Text>Loading rewards...</Text>
               ) : rewards.length > 0 ? (
-                <FlatList
-                  data={rewards}
-                  keyExtractor={(item) => item.id}
-                  contentContainerStyle={{ paddingBottom: 40 }}
-                  renderItem={({ item }) => (
-                    <View style={styles.logItem}>
-                      {/* Reward Name */}
-                      <Text style={styles.logCategory}>
-                        {item.rewardCategory || "Unknown Reward"}
-                      </Text>
-
-                      {/* Points spent */}
-                      <Text style={styles.logPoints}>
-                        -{item.points || 0} pts
-                      </Text>
-
-                      {/* Date */}
-                      <Text style={styles.logDate}>
-                        {item.createdAt?.seconds
-                          ? new Date(item.createdAt.seconds * 1000).toLocaleDateString()
-                          : "No date"}
-                      </Text>
-                    </View>
-                  )}
-                />
+                renderGroupedList(groupLogsByDate(rewards), "rewards")
               ) : (
                 <>
                   <Text style={styles.titleText}>No redeemed rewards yet</Text>
@@ -243,7 +286,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    justifyContent: "flex-end", // Box always at bottom
+    justifyContent: "flex-end",
   },
   box: {
     backgroundColor: "#F0F1C5",
@@ -313,26 +356,6 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: 20,
   },
-  logItem: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  logPoints: {
-    fontSize: 14,
-    fontFamily: "Poppins_500Medium",
-    color: "#008243",
-  },
-  logDate: {
-    fontSize: 12,
-    fontFamily: "Poppins_400Regular",
-    color: "#777",
-  },
   titleText: {
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
@@ -345,10 +368,37 @@ const styles = StyleSheet.create({
     color: "#555",
     textAlign: "center",
   },
-  logCategory: {
+  logCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 30,
+    marginBottom: 14,
+    borderWidth: 1, // ✅ green border
+    borderColor: "#3cd38aff", // ✅ green edge
+  },
+
+  pointsText: {
     fontSize: 16,
-    fontFamily: "Poppins_700Bold", // bold for emphasis
+    fontFamily: "Poppins_700Bold",
+    color: "#008243",
     marginBottom: 6,
+  },
+  categoryText: {
+    fontSize: 14,
+    fontFamily: "Poppins_600SemiBold",
+    marginBottom: 4,
+    color: "#333",
+  },
+  detailText: {
+    fontSize: 13,
+    fontFamily: "Poppins_400Regular",
+    color: "#555",
+  },
+  dateHeader: {
+    fontSize: 14,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#444",
+    marginBottom: 8,
   },
 });
 
