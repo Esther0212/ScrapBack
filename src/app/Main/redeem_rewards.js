@@ -18,32 +18,34 @@ import CustomBgColor from "../../components/customBgColor";
 
 const { width } = Dimensions.get("window");
 
-const rewards = [
-  {
-    id: 1,
-    name: "Rice Sack",
-    subtitle: "Redeemable Onsite",
-    icon: require("../../assets/redeem/rice.png"),
-    route: "/Main/rewards/rice",
-  },
-  {
-    id: 2,
-    name: "Load",
-    subtitle: "Redeemable Onsite/Online",
-    icon: require("../../assets/redeem/load.png"),
-    route: "/Main/rewards/load",
-  },
-  {
-    id: 3,
-    name: "GCash",
-    subtitle: "Redeemable Online",
-    icon: require("../../assets/redeem/gcash.png"),
-    route: "/Main/rewards/gcash",
-  },
+const categories = [
+  { id: 1, name: "Rice Sack", key: "sack", icon: require("../../assets/redeem/rice.png") },
+  { id: 2, name: "Load", key: "load", icon: require("../../assets/redeem/load.png") },
+  { id: 3, name: "GCash", key: "gcash", icon: require("../../assets/redeem/gcash.png") },
 ];
 
 const RedeemRewards = () => {
   const router = useRouter();
+  const [rewards, setRewards] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchRewards = async (categoryKey) => {
+    setLoading(true);
+    try {
+      const rewardsRef = collection(db, "reward");
+      const q = query(rewardsRef, where("category", "==", categoryKey));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setRewards(data);
+    } catch (err) {
+      console.error("Error fetching rewards:", err);
+    }
+    setLoading(false);
+  };
+
+  const handleCategoryPress = (categoryKey) => {
+    fetchRewards(categoryKey);
+  };
 
   return (
     <CustomBgColor>
@@ -85,6 +87,7 @@ const RedeemRewards = () => {
               points:
             </Text>
 
+            {/* Category Cards */}
             <View style={styles.cardContainer}>
               {rewards.map((item) => {
                 const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -136,6 +139,43 @@ const RedeemRewards = () => {
                 );
               })}
             </View>
+
+            {/* Rewards List */}
+            {loading ? (
+              <Text style={{ marginTop: 20 }}>Loading...</Text>
+            ) : rewards.length === 0 ? (
+              <Text style={{ marginTop: 20, fontStyle: "italic" }}>No rewards found.</Text>
+            ) : (
+              <View style={{ marginTop: 20, width: "100%" }}>
+                {rewards.map((reward) => (
+                  <View
+                    key={reward.id}
+                    style={{
+                      flexDirection: "row",
+                      backgroundColor: "#B6D799",
+                      borderRadius: 12,
+                      padding: 16,
+                      marginBottom: 12,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Image
+                      source={
+                        reward.image?.startsWith("http")
+                          ? { uri: reward.image }
+                          : require("../../assets/redeem/placeholder.jpg") // fallback
+                      }
+                      style={{ width: 60, height: 60, borderRadius: 8, marginRight: 16 }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: "bold", fontSize: 16 }}>{reward.title}</Text>
+                      <Text>Points: {reward.points}</Text>
+                      {reward.description ? <Text>{reward.description}</Text> : null}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
