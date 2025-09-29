@@ -5,51 +5,54 @@ import {
   View,
   TouchableOpacity,
   TextInput,
-  Alert,
   ScrollView,
+  Alert,
   Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { setDoc, doc } from "firebase/firestore";
-import { auth, db } from "../../firebase";
-import CustomBgColor from "../components/customBgColor";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
+import { setDoc, doc, getDoc } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { auth, db } from "../../../../firebase";
+import CustomBgColor from "../../../components/customBgColor";
 import { Menu, Provider as PaperProvider } from "react-native-paper";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import axios from "axios";
+import { router } from "expo-router";
 
-const Signup = () => {
-  const { width } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
-  // Basic info
+const SwitchAccount = () => {
+  const [showSignup, setShowSignup] = useState(false);
+
+  // Shared state for Login
   const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [contact, setContact] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [errors, setErrors] = useState({ email: "", password: "" });
 
-  // Gender dropdown
+  // Signup-specific states
+  const [lastName, setLastName] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+  const [contact, setContact] = useState("");
   const [gender, setGender] = useState("");
   const [genderMenuVisible, setGenderMenuVisible] = useState(false);
-
-  // Date picker
   const [dob, setDob] = useState(null);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-
-  // Address
   const [street, setStreet] = useState("");
   const [region, setRegion] = useState(null);
   const [province, setProvince] = useState(null);
   const [city, setCity] = useState(null);
   const [barangay, setBarangay] = useState(null);
-  const [postalCode, setPostalCode] = useState("9000"); // auto-set
+  const [postalCode, setPostalCode] = useState("9000");
 
-  // Address dropdown data
   const [regions, setRegions] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [cities, setCities] = useState([]);
@@ -167,18 +170,87 @@ const Signup = () => {
     }
   };
 
+  const validateEmail = (email) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  };
+
+  const handleLogin = async () => {
+    let tempErrors = { email: "", password: "" };
+    let isValid = true;
+
+    if (!email) {
+      tempErrors.email = "Email is required";
+      isValid = false;
+    } else if (!validateEmail(email)) {
+      tempErrors.email = "Enter a valid email address";
+      isValid = false;
+    }
+
+    if (!password) {
+      tempErrors.password = "Password is required";
+      isValid = false;
+    }
+
+    setErrors(tempErrors);
+
+    if (!isValid) return;
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        const firstName = userData.firstName || "";
+        await AsyncStorage.setItem("firstName", firstName);
+      }
+
+      // ✅ Remember Me logic
+      if (rememberMe) {
+        await AsyncStorage.setItem("savedEmail", email);
+        await AsyncStorage.setItem("savedPassword", password);
+      } else {
+        await AsyncStorage.removeItem("savedEmail");
+        await AsyncStorage.removeItem("savedPassword");
+      }
+
+      Alert.alert("Login Success", "You have successfully logged in!");
+      router.replace("/Main");
+    } catch (error) {
+      let message = "Login failed. Please try again.";
+
+      if (error.code === "auth/invalid-email") {
+        message = "Invalid email address.";
+      } else if (error.code === "auth/user-not-found") {
+        message = "User not found.";
+      } else if (error.code === "auth/wrong-password") {
+        message = "Incorrect password.";
+      }
+
+      Alert.alert("Login Error", message);
+    }
+  };
+
+  // 🔹 UI
   return (
     <PaperProvider>
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <ScrollView contentContainerStyle={styles.scrollContainer}>
-            <View style={styles.container}>
+          {showSignup ? (
+            // 🔹 Signup form
+            <ScrollView contentContainerStyle={styles.scrollContainer}>
               <Text style={styles.title}>Sign up to earn points!</Text>
               <Text style={styles.subtitle}>
                 Create your ScrapBack account now
               </Text>
-
-              {/* First Name & Last Name side by side */}
               <View style={styles.row}>
                 <InputField
                   label="First Name"
@@ -320,26 +392,73 @@ const Signup = () => {
                   style={styles.input}
                 />
               </View>
-
               <TouchableOpacity
-                style={styles.signupButton}
-                activeOpacity={0.85}
+                style={styles.loginButton}
                 onPress={handleSignup}
               >
-                <Text style={styles.signupButtonText}>Sign Up</Text>
+                <Text style={styles.loginButtonText}>Sign Up</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
-                style={styles.loginLink}
-                onPress={() => router.push("/login")}
+                style={styles.signupLink}
+                onPress={() => setShowSignup(false)}
               >
-                <Text style={styles.loginText}>
+                <Text style={styles.signupText}>
                   Already have an account?{" "}
-                  <Text style={styles.loginTextBold}>Log in</Text>
+                  <Text style={styles.signupTextBold}>Log in</Text>
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          ) : (
+            // 🔹 Login form
+            <View style={styles.container}>
+              <Text style={styles.title}>Welcome Back</Text>
+              <Text style={styles.subtitle}>Login to your account</Text>
+              <InputField
+                label="Email"
+                value={email}
+                setValue={setEmail}
+                keyboardType="email-address"
+              />
+              <PasswordField
+                label="Password"
+                value={password}
+                setValue={setPassword}
+                visible={passwordVisible}
+                setVisible={setPasswordVisible}
+              />
+              <View style={styles.row}>
+                <TouchableOpacity
+                  style={styles.rememberMe}
+                  onPress={() => setRememberMe(!rememberMe)}
+                >
+                  <Ionicons
+                    name={rememberMe ? "checkmark-circle" : "ellipse-outline"}
+                    size={20}
+                    color={rememberMe ? "#008243" : "#555"}
+                  />
+                  <Text style={styles.rememberText}>Remember me</Text>
+                </TouchableOpacity>
+                <TouchableOpacity>
+                  <Text style={styles.forgotText}>Forgot password?</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.loginButton}
+                onPress={handleLogin}
+              >
+                <Text style={styles.loginButtonText}>Log in</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.signupLink}
+                onPress={() => setShowSignup(true)}
+              >
+                <Text style={styles.signupText}>
+                  Don't have an account?{" "}
+                  <Text style={styles.signupTextBold}>Sign up</Text>
                 </Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
+          )}
         </SafeAreaView>
       </CustomBgColor>
     </PaperProvider>
@@ -436,9 +555,10 @@ const DropdownField = ({
   </View>
 );
 
+// 🔹 Styles
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  scrollContainer: { flexGrow: 1, justifyContent: "center" },
+  scrollContainer: { flexGrow: 1, paddingHorizontal: 24 },
   container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
   title: {
     fontSize: 30,
@@ -446,7 +566,6 @@ const styles = StyleSheet.create({
     color: "#3A2E2E",
     textAlign: "center",
     marginBottom: 8,
-    marginTop: 20,
   },
   subtitle: {
     fontSize: 16,
@@ -454,20 +573,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 40,
   },
-  row: { flexDirection: "row" },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
   inputContainer: { marginBottom: 16 },
-  label: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#3A2E2E",
-    marginBottom: 6,
-  },
-  subLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#71695B",
-    marginBottom: 6,
-  },
+  label: { fontSize: 17, fontWeight: "700", color: "#3A2E2E", marginBottom: 6 },
   input: {
     backgroundColor: "#F1E3D3",
     borderRadius: 10,
@@ -481,28 +594,25 @@ const styles = StyleSheet.create({
   },
   passwordWrapper: { position: "relative" },
   eyeIcon: { position: "absolute", right: 16, top: 14, padding: 4 },
-  menuContent: { backgroundColor: "#F1E3D3", borderRadius: 12 },
-  signupButton: {
+  rememberMe: { flexDirection: "row", alignItems: "center" },
+  rememberText: { marginLeft: 6, fontSize: 14, color: "#3A2E2E" },
+  forgotText: {
+    fontSize: 14,
+    color: "#3A2E2E",
+    textDecorationLine: "underline",
+  },
+  loginButton: {
     backgroundColor: "#008243",
     paddingVertical: 18,
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 4,
-    elevation: 3,
-    marginTop: 12,
+    marginTop: 20,
   },
-  signupButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-  loginLink: { marginTop: 26, alignItems: "center", marginBottom: 30 },
-  loginText: { fontSize: 14, color: "#3A2E2E" },
-  loginTextBold: { fontWeight: "700", textDecorationLine: "underline" },
+  loginButtonText: { color: "#FFF", fontSize: 18, fontWeight: "600" },
+  signupLink: { marginTop: 24, alignItems: "center" },
+  signupText: { fontSize: 14, color: "#3A2E2E" },
+  signupTextBold: { fontWeight: "700", textDecorationLine: "underline" },
+  menuContent: { backgroundColor: "#F1E3D3", borderRadius: 12 },
 });
 
-export default Signup;
+export default SwitchAccount;

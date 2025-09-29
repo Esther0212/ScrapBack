@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,49 +6,127 @@ import {
   TouchableOpacity,
   StyleSheet,
   Keyboard,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import * as Location from 'expo-location';
-import MapView, { UrlTile, Marker } from "react-native-maps";
+  FlatList,
+  Linking,
+  SafeAreaView,
+} from "react-native";
+import { useRouter } from "expo-router";
+import * as Location from "expo-location";
+import MapView, { UrlTile, Marker, Callout } from "react-native-maps";
+import CustomBgColor from "../../../components/customBgColor";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+
+// Firebase
+import { db } from "../../../../firebase";
+import { collection, onSnapshot } from "firebase/firestore";
+
+// Custom marker
+import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
+
+// 🔹 Convert 24-hour to 12-hour format
+const formatTime12h = (time24) => {
+  if (!time24) return "";
+  const [hourStr, minute] = time24.split(":");
+  let hour = parseInt(hourStr, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12 || 12;
+  return `${hour}:${minute} ${ampm}`;
+};
+
+// 🔹 Convert date to full form
+const formatFullDate = (dateStr) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const options = { year: "numeric", month: "long", day: "numeric" };
+  return date.toLocaleDateString(undefined, options);
+};
+
+// 🔹 Status component
+const StatusBadge = ({ status }) => {
+  const isOpen = status === "Open";
+  return (
+    <View
+      style={[
+        styles.statusBadge,
+        {
+          backgroundColor: isOpen ? "#B9F8CF" : "#FFC9C9",
+        },
+      ]}
+    >
+      <Text
+        style={{
+          color: isOpen ? "#016630" : "#9F0712",
+          fontWeight: "bold",
+        }}
+      >
+        {status}
+      </Text>
+    </View>
+  );
+};
 
 export default function MapSelector() {
   const router = useRouter();
   const mapRef = useRef(null);
-  const [searchText, setSearchText] = useState('');
-  const [selectedView, setSelectedView] = useState('map');
+  const [searchText, setSearchText] = useState("");
+  const [selectedView, setSelectedView] = useState("map");
   const [region, setRegion] = useState({
     latitude: 8.4542,
     longitude: 124.6319,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
   });
-  const [marker, setMarker] = useState({
-    latitude: 8.4542,
-    longitude: 124.6319,
-  });
+  const [marker, setMarker] = useState(null);
 
+  const [points, setPoints] = useState([]);
+  const [schedules, setSchedules] = useState([]);
+
+  // 🔥 Load Firestore points + schedules
+  useEffect(() => {
+    const unsubPoints = onSnapshot(
+      collection(db, "collectionPoint"),
+      (snap) => {
+        setPoints(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      }
+    );
+
+    const unsubSchedules = onSnapshot(
+      collection(db, "collectionSchedule"),
+      (snap) => {
+        setSchedules(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      }
+    );
+
+    return () => {
+      unsubPoints();
+      unsubSchedules();
+    };
+  }, []);
+
+  // 📍 Get user location
   useEffect(() => {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
+        if (status !== "granted") return;
 
         const location = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = location.coords;
         const newRegion = {
           latitude,
           longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
         };
         setRegion(newRegion);
         setMarker({ latitude, longitude });
       } catch (error) {
-        console.warn('Location error. Showing default region.');
+        console.warn("Location error. Showing default region.");
       }
     })();
   }, []);
 
+  // 🔍 Search bar
   const handleSearch = async () => {
     if (!searchText) return;
 
@@ -59,8 +137,8 @@ export default function MapSelector() {
         const newRegion = {
           latitude,
           longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
         };
         setRegion(newRegion);
         setMarker({ latitude, longitude });
@@ -68,165 +146,299 @@ export default function MapSelector() {
         Keyboard.dismiss();
       }
     } catch (error) {
-      console.error('Search failed:', error);
+      console.error("Search failed:", error);
     }
   };
 
-  return (
-    <View style={styles.container}>
-      {selectedView === 'map' ? (
-        <MapView
-          style={{ flex: 1 }}
-          initialRegion={region}
-          ref={mapRef}
-          onLongPress={e => setMarker(e.nativeEvent.coordinate)}
+  // Sort schedules by time AM → PM
+  const sortSchedules = (scheds) => {
+    return scheds
+      .slice()
+      .sort(
+        (a, b) =>
+          parseInt(a.collectionTime.replace(":", ""), 10) -
+          parseInt(b.collectionTime.replace(":", ""), 10)
+      );
+  };
+
+  // 🔗 Open Google Maps directions
+  const openGoogleMaps = (lat, lng, label) => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+    Linking.openURL(url);
+  };
+
+  // 📋 Render list item
+  const renderListItem = ({ item }) => {
+    let pointSchedules = schedules.filter((s) => s.pointId === item.id);
+    pointSchedules = sortSchedules(pointSchedules);
+
+    return (
+      <View style={styles.listCard}>
+        <Text style={styles.listTitle}>{item.name}</Text>
+        <Text style={styles.listAddress}>{item.address}</Text>
+        {pointSchedules.length > 0 ? (
+          pointSchedules.map((s) => (
+            <View key={s.id} style={styles.scheduleRow}>
+              <Text style={styles.scheduleText}>
+                {formatFullDate(s.collectionDate)},{" "}
+                {formatTime12h(s.collectionTime)} -{" "}
+              </Text>
+              <StatusBadge status={s.status} />
+            </View>
+          ))
+        ) : (
+          <Text style={styles.noSchedule}>No schedules</Text>
+        )}
+        <TouchableOpacity
+          style={styles.directionButton}
+          onPress={() => openGoogleMaps(item.lat, item.lng, item.name)}
         >
-          <UrlTile
-            urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-            maximumZ={19}
-          />
-
-          {marker && <Marker coordinate={marker} />}
-        </MapView>
-      ) : (
-        <View style={styles.blankListView}>
-          <Text style={styles.blankText}>[ Drop-off stations here ]</Text>
-        </View>
-      )}
-
-      {/* Top Overlay: Search */}
-      <View style={styles.topOverlay}>
-        <View style={styles.searchBox}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search location..."
-            value={searchText}
-            onChangeText={setSearchText}
-            onSubmitEditing={handleSearch}
-          />
-        </View>
+          <Text style={styles.directionButtonText}>Show Directions</Text>
+          <MaterialIcons name="directions" size={28} color="white" />
+        </TouchableOpacity>
       </View>
+    );
+  };
 
-      {/* Toggle: Drop-off stations */}
-      <View style={styles.toggleContainer}>
-        <View style={styles.toggleButtons}>
-          <TouchableOpacity
-            style={[styles.toggleOption, selectedView === 'map' && styles.toggleSelected]}
-            onPress={() => setSelectedView('map')}
-          >
-            <Text
-              style={[styles.toggleOptionText, selectedView === 'map' && styles.toggleOptionTextSelected]}
-            >
-              Map
-            </Text>
-          </TouchableOpacity>
+  return (
+    <CustomBgColor>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          paddingTop: 25, // was 40, now pushed further down
+          flexGrow: 1,
+        }}
+      >
+        <View style={styles.container}>
+          {/* Top Overlay: Search */}
+          <View style={styles.topOverlay}>
+            <View style={styles.searchBox}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search location..."
+                value={searchText}
+                onChangeText={setSearchText}
+                onSubmitEditing={handleSearch}
+              />
+            </View>
+          </View>
 
-          <TouchableOpacity
-            style={[styles.toggleOption, selectedView === 'list' && styles.toggleSelected]}
-            onPress={() => setSelectedView('list')}
-          >
-            <Text
-              style={[styles.toggleOptionText, selectedView === 'list' && styles.toggleOptionTextSelected]}
+          {/* Toggle buttons + Label */}
+          <View style={styles.toggleContainer}>
+            <View style={styles.toggleButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleOption,
+                  selectedView === "map" && styles.toggleSelected,
+                ]}
+                onPress={() => setSelectedView("map")}
+              >
+                <Text
+                  style={[
+                    styles.toggleOptionText,
+                    selectedView === "map" && styles.toggleOptionTextSelected,
+                  ]}
+                >
+                  Map
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toggleOption,
+                  selectedView === "list" && styles.toggleSelected,
+                ]}
+                onPress={() => setSelectedView("list")}
+              >
+                <Text
+                  style={[
+                    styles.toggleOptionText,
+                    selectedView === "list" && styles.toggleOptionTextSelected,
+                  ]}
+                >
+                  List
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.toggleLabelBox}>
+              <Text style={styles.toggleLabel}>Drop-off stations</Text>
+            </View>
+          </View>
+
+          {/* Map or List */}
+          {selectedView === "map" ? (
+            <MapView
+              style={{ flex: 1 }}
+              region={region}
+              ref={mapRef}
+              onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
             >
-              List
-            </Text>
-          </TouchableOpacity>
+              <UrlTile
+                urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+                maximumZ={19}
+              />
+
+              {/* User marker */}
+              {marker && (
+                <Marker coordinate={marker}>
+                  <Callout>
+                    <Text>Your Location</Text>
+                  </Callout>
+                </Marker>
+              )}
+
+              {/* Collection Points */}
+              {points.map((p) => {
+                let pointSchedules = schedules.filter(
+                  (s) => s.pointId === p.id
+                );
+                pointSchedules = sortSchedules(pointSchedules);
+                return (
+                  <Marker
+                    key={p.id}
+                    coordinate={{ latitude: p.lat, longitude: p.lng }}
+                    title={p.name}
+                    description={p.address}
+                    image={collectionPointMarker}
+                  >
+                    <Callout>
+                      <View style={{ width: 200 }}>
+                        <Text style={{ fontWeight: "bold" }}>{p.name}</Text>
+                        <Text>{p.address}</Text>
+                        {pointSchedules.length > 0 ? (
+                          pointSchedules.map((s) => (
+                            <View key={s.id} style={styles.scheduleRow}>
+                              <Text>
+                                {formatFullDate(s.collectionDate)},{" "}
+                                {formatTime12h(s.collectionTime)} -{" "}
+                              </Text>
+                              <StatusBadge status={s.status} />
+                            </View>
+                          ))
+                        ) : (
+                          <Text>No schedules</Text>
+                        )}
+                      </View>
+                    </Callout>
+                  </Marker>
+                );
+              })}
+            </MapView>
+          ) : (
+            <FlatList
+              data={points}
+              keyExtractor={(item) => item.id}
+              renderItem={renderListItem}
+              contentContainerStyle={styles.listContainer}
+            />
+          )}
         </View>
-        <View style={styles.toggleLabelBox}>
-          <Text style={styles.toggleLabel}>Drop-off stations</Text>
-        </View>
-      </View>
-    </View>
+      </SafeAreaView>
+    </CustomBgColor>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   topOverlay: {
-    position: 'absolute',
-    top: 50,
+    position: "absolute",
+    top: 30,
     left: 20,
     right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
     zIndex: 10,
   },
-  backButton: {
-    marginRight: 10,
-  },
-  backButtonText: {
-    fontSize: 28,
-    color: '#333',
-  },
   searchBox: {
-    flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 10,
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
+  searchInput: { flex: 1, fontSize: 16 },
   toggleContainer: {
-    position: 'absolute',
-    top: 110,
+    position: "absolute",
+    top: 90,
     left: 20,
     right: 20,
     zIndex: 10,
-    alignItems: 'flex-start',
-  },
-  toggleLabelBox: {
-    marginBottom: 8,
-    paddingLeft: 4,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  toggleButtons: {
-    flexDirection: 'row',
-    backgroundColor: '#ccc',
-    borderRadius: 10,
-    overflow: 'hidden',
     marginTop: 10,
+  },
+  toggleLabelBox: { marginBottom: 8 },
+  toggleLabel: { fontSize: 16, fontWeight: "bold", color: "#333" },
+  toggleButtons: {
+    flexDirection: "row",
+    backgroundColor: "#ccc",
+    borderRadius: 10,
+    overflow: "hidden",
     marginBottom: 10,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   toggleOption: {
     flex: 1,
     paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: '#ccc',
+    alignItems: "center",
+    backgroundColor: "#ccc",
   },
-  toggleSelected: {
-    backgroundColor: 'white',
+  toggleSelected: { backgroundColor: "white" },
+  toggleOptionText: { fontSize: 16, color: "#555" },
+  toggleOptionTextSelected: { color: "#117D2E", fontWeight: "bold" },
+  listContainer: { paddingTop: 180, paddingHorizontal: 16, paddingBottom: 16 },
+  listCard: {
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
   },
-  toggleOptionText: {
+  listTitle: {
     fontSize: 16,
-    color: '#555',
+    fontWeight: "bold",
+    color: "#117D2E",
+    marginBottom: 10,
   },
-  toggleOptionTextSelected: {
-    color: '#117D2E',
-    fontWeight: 'bold',
+  listAddress: {
+    fontSize: 14,
+    color: "#555",
+    fontWeight: "bold",
+    marginBottom: 6,
   },
-  blankListView: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#F0F1C5',
-    justifyContent: 'center',
-    alignItems: 'center',
+  scheduleText: { fontSize: 14, color: "#333" },
+  noSchedule: { fontSize: 14, color: "#aaa", fontStyle: "italic" },
+  scheduleRow: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginLeft: 4,
   },
-  blankText: {
+  directionButton: {
+    marginTop: 8,
+    backgroundColor: "#117D2E",
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  directionButtonText: {
+    color: "white",
+    fontWeight: "bold",
     fontSize: 16,
-    color: '#aaa',
+    paddingVertical: 8,
+    marginRight: 6,
   },
 });
