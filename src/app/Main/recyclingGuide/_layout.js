@@ -17,9 +17,9 @@ export default function RecyclingGuideLayout() {
     >
       {/* Main Steps & Benefits page */}
       <Stack.Screen
-        name="stepsBenefits"
+        name="guides"
         options={{
-          title: "Recycling Guide",
+          title: "Guides",
           headerShown: true,
           headerBackVisible: false,
           headerLeft: () => (

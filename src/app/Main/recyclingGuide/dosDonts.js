@@ -11,7 +11,6 @@ import {
   Animated,
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
-import { useLocalSearchParams } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
 import { useEducational } from "../../../context/educationalContext";
 
@@ -56,19 +55,18 @@ const CustomToggleSwitch = ({ value, onToggle }) => {
 };
 
 const DosDonts = () => {
-  const { type } = useLocalSearchParams();
-  const { educationalContent } = useEducational();
-  const guide = educationalContent.find(
-    (item) => item.type.toLowerCase() === type.toLowerCase()
-  );
+  const { educationalContent, selectedType } = useEducational();
   const [showDos, setShowDos] = useState(true);
+
+  // 🔹 Case-sensitive match using selectedType
+  const guide = educationalContent.find((item) => item.type === selectedType);
 
   if (!guide) {
     return (
       <CustomBgColor bgColor={showDos ? "#90C67C" : "#E08282"}>
         <SafeAreaView style={styles.center}>
           <Text style={[styles.emptyText, styles.justifiedText]}>
-            No recycling guide found for {type}
+            No recycling guide found for {selectedType}
           </Text>
         </SafeAreaView>
       </CustomBgColor>
@@ -99,7 +97,7 @@ const DosDonts = () => {
 
           <View style={styles.box}>
             <View style={styles.headerContainer}>
-              <Text style={styles.guidelinesTitle}>{type}</Text>
+              <Text style={styles.guidelinesTitle}>{selectedType}</Text>
               <CustomToggleSwitch
                 value={!showDos}
                 onToggle={() => setShowDos(!showDos)}
@@ -154,7 +152,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20, // padding inside the box
+    padding: 20,
   },
   headerContainer: {
     flexDirection: "row",
@@ -178,7 +176,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_400Regular",
     fontSize: 15,
     color: "#333",
-    flex: 1, // ensures text wraps within available space
+    flex: 1,
   },
   toggleContainer: {
     width: 90,
