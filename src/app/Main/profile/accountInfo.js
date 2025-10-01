@@ -8,7 +8,6 @@ import {
   ScrollView,
   Dimensions,
   Image,
-  Alert,
   Modal,
   ActivityIndicator,
 } from "react-native";
@@ -23,6 +22,7 @@ import { useUser } from "../../../context/userContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, storage } from "../../../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import ToastManager, { Toast } from 'toastify-react-native';
 
 const { width } = Dimensions.get("window");
 
@@ -98,12 +98,13 @@ const AccountInfo = () => {
     if (!userData?.uid) return;
     const userRef = doc(db, "user", userData.uid);
 
-    // ✅ set profilePic to null instead of ""
     await updateDoc(userRef, { profilePic: null });
 
     setUserData({ ...userData, profilePic: null });
     setProfilePic(null);
     setProfileModalVisible(false);
+
+    Toast.success("Profile picture removed!");
   };
 
   const formatDOB = (dobValue) => {
@@ -118,12 +119,8 @@ const AccountInfo = () => {
 
       let finalProfilePic = profilePic;
 
-      // if new local image, upload to Firebase Storage
       if (profilePic && profilePic.startsWith("file://")) {
-        const uploadedUrl = await uploadImageToStorage(
-          profilePic,
-          userData.uid
-        );
+        const uploadedUrl = await uploadImageToStorage(profilePic, userData.uid);
         if (uploadedUrl) finalProfilePic = uploadedUrl;
       }
 
@@ -160,11 +157,11 @@ const AccountInfo = () => {
         address: updatedAddress,
       });
 
-      Alert.alert("Success", "Profile updated successfully!");
+      Toast.success("Profile updated successfully!");
       setEditMode(false);
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Failed to update profile.");
+      Toast.error("Failed to update profile.");
     }
   };
 
@@ -212,7 +209,6 @@ const AccountInfo = () => {
                 )}
               </View>
 
-              {/* Profile Modal */}
               <Modal
                 visible={profileModalVisible}
                 transparent
@@ -253,7 +249,6 @@ const AccountInfo = () => {
                 />
               )}
 
-              {/* Fields */}
               <View style={styles.row}>
                 <InputField
                   label="First Name"
@@ -270,20 +265,9 @@ const AccountInfo = () => {
                   containerStyle={{ flex: 1, marginLeft: 8 }}
                 />
               </View>
-              <InputField
-                label="Email"
-                value={email}
-                setValue={setEmail}
-                editable={editMode}
-              />
-              <InputField
-                label="Contact Number"
-                value={contact}
-                setValue={setContact}
-                editable={editMode}
-              />
+              <InputField label="Email" value={email} setValue={setEmail} editable={editMode} />
+              <InputField label="Contact Number" value={contact} setValue={setContact} editable={editMode} />
 
-              {/* Gender */}
               <DropdownField
                 label="Gender"
                 visible={genderMenuVisible}
@@ -294,7 +278,6 @@ const AccountInfo = () => {
                 editable={editMode}
               />
 
-              {/* DOB */}
               <View style={{ marginBottom: 16 }}>
                 <Text style={styles.label}>Date of Birth</Text>
                 <TouchableOpacity
@@ -302,12 +285,7 @@ const AccountInfo = () => {
                   onPress={() => editMode && setShowDatePicker(true)}
                   disabled={!editMode}
                 >
-                  <Text
-                    style={{
-                      color: editMode ? "#3A2E2E" : "#777",
-                      fontSize: 16,
-                    }}
-                  >
+                  <Text style={{ color: editMode ? "#3A2E2E" : "#777", fontSize: 16 }}>
                     {formatDOB(dob) || "Select Date"}
                   </Text>
                 </TouchableOpacity>
@@ -324,33 +302,11 @@ const AccountInfo = () => {
                 )}
               </View>
 
-              {/* Address */}
               <Text style={styles.label}>Address</Text>
-              <InputField
-                label="Street"
-                value={street}
-                setValue={setStreet}
-                editable={editMode}
-                subLabel
-              />
-              <InputField
-                label="Region"
-                value={userData?.address?.region || "Northern Mindanao"}
-                editable={false}
-                subLabel
-              />
-              <InputField
-                label="Province"
-                value={userData?.address?.province || "Misamis Oriental"}
-                editable={false}
-                subLabel
-              />
-              <InputField
-                label="City"
-                value={userData?.address?.city || "City of Cagayan De Oro"}
-                editable={false}
-                subLabel
-              />
+              <InputField label="Street" value={street} setValue={setStreet} editable={editMode} subLabel />
+              <InputField label="Region" value={userData?.address?.region || "Northern Mindanao"} editable={false} subLabel />
+              <InputField label="Province" value={userData?.address?.province || "Misamis Oriental"} editable={false} subLabel />
+              <InputField label="City" value={userData?.address?.city || "City of Cagayan De Oro"} editable={false} subLabel />
               <DropdownField
                 label="Barangay"
                 visible={barangayMenuVisible}
@@ -362,44 +318,25 @@ const AccountInfo = () => {
                 editable={editMode}
                 subLabel
               />
-              <InputField
-                label="Postal Code"
-                value={userData?.address?.postalCode || "9000"}
-                editable={false}
-                subLabel
-              />
+              <InputField label="Postal Code" value={userData?.address?.postalCode || "9000"} editable={false} subLabel />
 
-              {/* Buttons */}
               {editMode ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <TouchableOpacity
-                    style={[styles.cancelButton, { flex: 0.48 }]}
-                    onPress={handleCancel}
-                  >
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <TouchableOpacity style={[styles.cancelButton, { flex: 0.48 }]} onPress={handleCancel}>
                     <Text style={styles.cancelText}>Cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.saveButton, { flex: 0.48 }]}
-                    onPress={handleSave}
-                  >
+                  <TouchableOpacity style={[styles.saveButton, { flex: 0.48 }]} onPress={handleSave}>
                     <Text style={styles.saveText}>Save Changes</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => setEditMode(true)}
-                >
+                <TouchableOpacity style={styles.editButton} onPress={() => setEditMode(true)}>
                   <Ionicons name="pencil" size={20} color="#fff" />
                   <Text style={styles.editButtonText}>Edit Profile</Text>
                 </TouchableOpacity>
               )}
             </View>
+            <ToastManager />
           </ScrollView>
         </SafeAreaView>
       </CustomBgColor>
@@ -407,49 +344,21 @@ const AccountInfo = () => {
   );
 };
 
-// InputField
-const InputField = ({
-  label,
-  value,
-  setValue,
-  editable = false,
-  containerStyle,
-  subLabel,
-}) => (
+const InputField = ({ label, value, setValue, editable = false, containerStyle, subLabel }) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
-    <TextInput
-      value={value}
-      editable={editable}
-      onChangeText={setValue}
-      style={[styles.input, { color: editable ? "#3A2E2E" : "#777" }]}
-    />
+    <TextInput value={value} editable={editable} onChangeText={setValue} style={[styles.input, { color: editable ? "#3A2E2E" : "#777" }]} />
   </View>
 );
 
-// DropdownField
-const DropdownField = ({
-  label,
-  visible,
-  setVisible,
-  selected,
-  setSelected,
-  options,
-  optionKey,
-  editable = false,
-  subLabel,
-}) => (
+const DropdownField = ({ label, visible, setVisible, selected, setSelected, options, optionKey, editable = false, subLabel }) => (
   <View style={styles.inputContainer}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
     <Menu
       visible={visible && editable}
       onDismiss={() => setVisible(false)}
       anchor={
-        <TouchableOpacity
-          style={[styles.input, { alignItems: "flex-start" }]}
-          onPress={editable ? () => setVisible(true) : null}
-          disabled={!editable}
-        >
+        <TouchableOpacity style={[styles.input, { alignItems: "flex-start" }]} onPress={editable ? () => setVisible(true) : null} disabled={!editable}>
           <Text style={{ color: editable ? "#3A2E2E" : "#777", fontSize: 16 }}>
             {selected || `Select ${label}`}
           </Text>
@@ -483,90 +392,23 @@ const styles = StyleSheet.create({
     overflow: "visible",
     marginBottom: 16,
   },
-  profileImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: width / 8,
-    resizeMode: "cover",
-  },
-  editIconWrapper: {
-    position: "absolute",
-    bottom: -5,
-    right: -5,
-    backgroundColor: "#008243",
-    borderRadius: 20,
-    padding: 6,
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
-    paddingTop: width / 4 + 80,
-  },
-  modalContent: {
-    width: 220,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    paddingVertical: 10,
-    elevation: 5,
-  },
+  profileImage: { width: "100%", height: "100%", borderRadius: width / 8, resizeMode: "cover" },
+  editIconWrapper: { position: "absolute", bottom: -5, right: -5, backgroundColor: "#008243", borderRadius: 20, padding: 6, borderWidth: 2, borderColor: "#fff" },
+  modalOverlay: { flex: 1, justifyContent: "flex-start", alignItems: "center", paddingTop: width / 4 + 80 },
+  modalContent: { width: 220, backgroundColor: "#fff", borderRadius: 12, paddingVertical: 10, elevation: 5 },
   modalButton: { paddingVertical: 12, paddingHorizontal: 20 },
   modalButtonText: { fontSize: 16, color: "#3A2E2E" },
   row: { flexDirection: "row" },
   inputContainer: { marginBottom: 16 },
   label: { fontSize: 17, fontWeight: "700", color: "#3A2E2E", marginBottom: 6 },
-  subLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#71695B",
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: "#F1E3D3",
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#E0D4C3",
-    width: "100%",
-  },
+  subLabel: { fontSize: 13, fontWeight: "600", color: "#71695B", marginBottom: 6 },
+  input: { backgroundColor: "#F1E3D3", borderRadius: 10, paddingVertical: 14, paddingHorizontal: 18, fontSize: 16, borderWidth: 1, borderColor: "#E0D4C3", width: "100%" },
   menuContent: { backgroundColor: "#F1E3D3", borderRadius: 12 },
-  editButton: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#008243",
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  editButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  saveButton: {
-    backgroundColor: "#008243",
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginTop: 20,
-    alignItems: "center",
-    marginBottom: 30,
-  },
+  editButton: { flexDirection: "row", justifyContent: "center", alignItems: "center", backgroundColor: "#008243", paddingVertical: 16, borderRadius: 16, marginTop: 20, marginBottom: 30 },
+  editButtonText: { color: "#fff", fontSize: 16, fontWeight: "600", marginLeft: 8 },
+  saveButton: { backgroundColor: "#008243", paddingVertical: 16, borderRadius: 16, marginTop: 20, alignItems: "center", marginBottom: 30 },
   saveText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  cancelButton: {
-    backgroundColor: "#888",
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginTop: 20,
-    alignItems: "center",
-    marginBottom: 30,
-  },
+  cancelButton: { backgroundColor: "#888", paddingVertical: 16, borderRadius: 16, marginTop: 20, alignItems: "center", marginBottom: 30 },
   cancelText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });
 
