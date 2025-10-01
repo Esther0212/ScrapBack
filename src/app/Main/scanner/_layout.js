@@ -17,14 +17,14 @@ export default function ScannerLayout() {
       <Stack.Screen
         name="index"
         options={{
-          title: "QR Code Generation",
+          title: "Generate QR Code",
           headerShown: true,
         }}
       />
       <Stack.Screen
         name="earn"
         options={{
-          title: "QR Code For Earning Points",
+          title: "Earn Points",
           headerShown: true,
           headerBackVisible: false, // hide the default back
           headerLeft: () => (
@@ -37,7 +37,7 @@ export default function ScannerLayout() {
       <Stack.Screen
         name="redeem"
         options={{
-          title: "QR Code For Redeeming Rewards",
+          title: "Redeem Rewards",
           headerShown: true,
           headerBackVisible: false, // hide the default back
           headerLeft: () => (

@@ -17,8 +17,16 @@ const tabIcons = {
   profile: { Icon: Icons.FontAwesome5, name: "user-circle" },
 };
 
+const ROOT_TABS = ["index", "map", "scanner", "requestPickup", "profile"];
+
 const CustomTabBar = ({ state, navigation }) => {
   const insets = useSafeAreaInsets();
+
+  // check if current route is one of the root tabs
+  const currentRoute = state.routes[state.index];
+  if (!ROOT_TABS.includes(currentRoute.name)) {
+    return null; // 🔹 hide tab bar on nested screens
+  }
 
   // Track screen dimensions dynamically
   const [screen, setScreen] = useState(Dimensions.get("window"));
@@ -32,16 +40,14 @@ const CustomTabBar = ({ state, navigation }) => {
   }, []);
 
   // Icons spaced evenly
-  const spacedIcons = ["index", "map", "scanner", "requestPickup", "profile"];
+  const spacedIcons = ROOT_TABS;
   const tabWidth = width / spacedIcons.length;
 
   const translateX = useRef(new Animated.Value(0)).current;
   const prevIndexRef = useRef(state.index);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const currentRoute = state.routes[state.index];
   const previousRoute = state.routes[prevIndexRef.current];
-
   const isScannerTab = currentRoute.name === "scanner";
 
   // Animate slider (non-scanner tabs only)

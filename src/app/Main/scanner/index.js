@@ -18,14 +18,14 @@ export default function Scanner() {
           style={[styles.button, styles.buttonGreen]}
           onPress={() => router.push("/Main/scanner/earn")}
         >
-          <Text style={styles.buttonText}>Generate QR to Earn Points</Text>
+          <Text style={styles.buttonText}>Earn Points</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.button, styles.buttonDarkGreen]}
           onPress={() => router.push("/Main/scanner/redeem")}
         >
-          <Text style={styles.buttonText}>Generate QR to Redeem Rewards</Text>
+          <Text style={styles.buttonText}>Redeem Rewards</Text>
         </TouchableOpacity>
       </View>
     </CustomBgColor>

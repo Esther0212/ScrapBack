@@ -73,9 +73,11 @@ export default function RedeemRewardsQR() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#0047AB" />
-      </View>
+      <CustomBgColor>
+        <View style={styles.container}>
+          <ActivityIndicator size="large" color="#0047AB" />
+        </View>
+      </CustomBgColor>
     );
   }
 
@@ -83,25 +85,46 @@ export default function RedeemRewardsQR() {
   const seconds = String(timeLeft % 60).padStart(2, "0");
 
   return (
+    <CustomBgColor>
     <View style={styles.container}>
-      <Text style={styles.header}>Redeem Rewards QR Code</Text>
       <View style={styles.qrContainer}>
         <Text style={styles.description}>
-          Generate your QR code for staff to scan and deduct points for your reward.
+          Staff can scan this QR to deduct your points for rewards.
         </Text>
 
-        <Image
-          source={require("../../../assets/scanner/sample-qr.png")}
-          style={styles.qrImage}
-        />
+        {userData && timeLeft > 0 ? (
+          <QRCode
+            value={JSON.stringify({
+              uid: user.uid,
+              email: user.email,
+              name: `${userData.firstName || ""} ${userData.lastName || ""}`,
+              exp: expiryTimestamp,
+            })}
+            size={180}
+          />
+        ) : (
+          <Text style={styles.expiredMessage}>
+            {timeLeft === 0
+              ? "⚠️ QR code expired."
+              : "No Firestore data found."}
+          </Text>
+        )}
 
-        <Text style={styles.expiryText}>This QR code will expire in 2:35 minutes</Text>
+        {timeLeft > 0 && (
+          <Text style={styles.expiryText}>
+            This QR code will expire in {minutes}:{seconds}
+          </Text>
+        )}
 
-        <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={() => router.back()}
+        >
           <Text style={styles.closeButtonText}>CLOSE</Text>
         </TouchableOpacity>
       </View>
     </View>
+    </CustomBgColor>
   );
 }
 
@@ -113,12 +136,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 60,
   },
-  header: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 20,
-    textAlign: "center",
-  },
   qrContainer: {
     backgroundColor: "#D4F2B4",
     padding: 20,
@@ -126,8 +143,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
   },
-  description: { fontSize: 14, textAlign: "center", marginBottom: 20 },
-  expiryText: { color: "red", fontWeight: "500", marginBottom: 15 },
+  description: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  expiryText: {
+    color: "red",
+    fontWeight: "500",
+    marginBottom: 15,
+    marginTop: 15,
+  },
   expiredMessage: {
     color: "red",
     fontWeight: "bold",
@@ -137,9 +165,12 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     backgroundColor: "#A5C78A",
-    paddingVertical: 10,
+    paddingVertical: 14,
     paddingHorizontal: 25,
     borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+    width: "100%",
   },
   closeButtonText: { fontWeight: "bold", color: "#000" },
   errorText: { color: "red", fontWeight: "bold", textAlign: "center" },
