@@ -33,19 +33,38 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
+// 🔹 Format date
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
 // 🔹 Status badge
-const StatusBadge = ({ isOpen }) => (
-  <View
-    style={[
-      styles.statusBadge,
-      { backgroundColor: isOpen ? "#B9F8CF" : "#FFC9C9" },
-    ]}
-  >
-    <Text style={{ color: isOpen ? "#016630" : "#9F0712", fontWeight: "bold" }}>
-      {isOpen ? "Open Today" : "Closed Today"}
-    </Text>
-  </View>
-);
+const StatusBadge = ({ status }) => {
+  return (
+    <View
+      style={[
+        styles.statusBadge,
+        {
+          backgroundColor: status === "Open" ? "#B9F8CF" : "#FFC9C9",
+        },
+      ]}
+    >
+      <Text
+        style={{
+          color: status === "Open" ? "#016630" : "#9F0712",
+          fontWeight: "bold",
+        }}
+      >
+        {status}
+      </Text>
+    </View>
+  );
+};
 
 export default function Map() {
   const router = useRouter();
@@ -79,7 +98,16 @@ export default function Map() {
     };
   }, []);
 
-  // 📍 Get user location & nearest 3 points
+  // ✅ Filter OPEN points only
+  const getOpenPoints = () => {
+    return points.filter((p) =>
+      schedules.some(
+        (s) => s.pointId === p.id && s.status === "Open"
+      )
+    );
+  };
+
+  // 📍 Get user location & nearest 3 open points
   useEffect(() => {
     (async () => {
       try {
@@ -90,9 +118,9 @@ export default function Map() {
         const { latitude, longitude } = location.coords;
         setUserMarker({ latitude, longitude });
 
-        if (points.length > 0) {
-          // Sort by distance
-          const sorted = points
+        const openPoints = getOpenPoints();
+        if (openPoints.length > 0) {
+          const sorted = openPoints
             .map((p) => ({
               ...p,
               distance: getDistanceKm(latitude, longitude, p.lat, p.lng),
@@ -101,10 +129,9 @@ export default function Map() {
 
           const nearestThree = sorted.slice(0, 3);
 
-          // Fit map to nearest 3
           mapRef.current?.fitToCoordinates(
             [
-              { latitude, longitude }, // user
+              { latitude, longitude },
               ...nearestThree.map((p) => ({ latitude: p.lat, longitude: p.lng })),
             ],
             {
@@ -117,7 +144,7 @@ export default function Map() {
         console.warn("Location error:", err);
       }
     })();
-  }, [points]);
+  }, [points, schedules]);
 
   // 🔍 Search
   const handleSearch = async () => {
@@ -148,18 +175,14 @@ export default function Map() {
     Linking.openURL(url);
   };
 
-  // Check if a point is open today
-  const isPointOpenToday = (pointId) => {
-    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-    return schedules.some(
-      (s) =>
-        s.pointId === pointId &&
-        s.collectionDate === today &&
-        s.status === "Open"
-    );
+  // ✅ Get all schedules for a point (only Open)
+  const getOpenSchedules = (pointId) => {
+    return schedules
+      .filter((s) => s.pointId === pointId && s.status === "Open")
+      .sort((a, b) => new Date(a.collectionDate) - new Date(b.collectionDate));
   };
 
-  // 📋 List item
+  // 📋 Render list item
   const renderListItem = ({ item }) => {
     let distance = null;
     if (userMarker) {
@@ -170,7 +193,7 @@ export default function Map() {
         item.lng
       ).toFixed(2);
     }
-    const openToday = isPointOpenToday(item.id);
+    const pointSchedules = getOpenSchedules(item.id);
 
     return (
       <View style={styles.listCard}>
@@ -179,7 +202,16 @@ export default function Map() {
         {distance && (
           <Text style={styles.distanceText}>Distance: {distance} km</Text>
         )}
-        <StatusBadge isOpen={openToday} />
+        {pointSchedules.length > 0 ? (
+          pointSchedules.map((s) => (
+            <View key={s.id} style={styles.scheduleRow}>
+              <Text style={styles.scheduleText}>{formatDate(s.collectionDate)}</Text>
+              <StatusBadge status={s.status} />
+            </View>
+          ))
+        ) : (
+          <Text style={styles.noSchedule}>No Open schedules</Text>
+        )}
         <TouchableOpacity
           style={styles.directionButton}
           onPress={() => openGoogleMaps(item.lat, item.lng)}
@@ -253,7 +285,7 @@ export default function Map() {
               </TouchableOpacity>
             </View>
             <View style={styles.toggleLabelBox}>
-              <Text style={styles.toggleLabel}>Drop-off stations</Text>
+              <Text style={styles.toggleLabel}>Open Drop-off stations</Text>
             </View>
           </View>
 
@@ -274,8 +306,8 @@ export default function Map() {
                 </Marker>
               )}
 
-              {/* Collection points */}
-              {points.map((p) => {
+              {/* Open collection points only */}
+              {getOpenPoints().map((p) => {
                 let distance = null;
                 if (userMarker) {
                   distance = getDistanceKm(
@@ -285,7 +317,7 @@ export default function Map() {
                     p.lng
                   ).toFixed(2);
                 }
-                const openToday = isPointOpenToday(p.id);
+                const pointSchedules = getOpenSchedules(p.id);
 
                 return (
                   <Marker
@@ -300,7 +332,16 @@ export default function Map() {
                         <Text style={{ fontWeight: "bold" }}>{p.name}</Text>
                         <Text>{p.address}</Text>
                         {distance && <Text>Distance: {distance} km</Text>}
-                        <StatusBadge isOpen={openToday} />
+                        {pointSchedules.length > 0 ? (
+                          pointSchedules.map((s) => (
+                            <View key={s.id} style={styles.scheduleRow}>
+                              <Text>{formatDate(s.collectionDate)}</Text>
+                              <StatusBadge status={s.status} />
+                            </View>
+                          ))
+                        ) : (
+                          <Text>No Open schedules</Text>
+                        )}
                         <TouchableOpacity
                           style={[styles.directionButton, { marginTop: 8 }]}
                           onPress={() => openGoogleMaps(p.lat, p.lng)}
@@ -308,7 +349,11 @@ export default function Map() {
                           <Text style={styles.directionButtonText}>
                             Navigate
                           </Text>
-                          <MaterialIcons name="directions" size={20} color="white" />
+                          <MaterialIcons
+                            name="directions"
+                            size={20}
+                            color="white"
+                          />
                         </TouchableOpacity>
                       </View>
                     </Callout>
@@ -318,7 +363,7 @@ export default function Map() {
             </MapView>
           ) : (
             <FlatList
-              data={points}
+              data={getOpenPoints()}
               keyExtractor={(item) => item.id}
               renderItem={renderListItem}
               contentContainerStyle={styles.listContainer}
@@ -345,7 +390,7 @@ const styles = StyleSheet.create({
   topOverlay: {
     position: "absolute",
     top: 30,
-    left: 60, // space for back button
+    left: 60,
     right: 20,
     zIndex: 10,
   },
@@ -418,9 +463,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    marginTop: 6,
-    alignSelf: "flex-start",
+    marginLeft: 6,
   },
+  scheduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  scheduleText: { fontSize: 14, color: "#333" },
+  noSchedule: { fontSize: 14, color: "#aaa", fontStyle: "italic" },
   directionButton: {
     marginTop: 8,
     backgroundColor: "#117D2E",
