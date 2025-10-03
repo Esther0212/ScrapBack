@@ -93,11 +93,12 @@ const LoadDescription = () => {
 
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => router.push("Main/map/MapSelector")}
+              onPress={() => router.push("Main/rewards/map")}
               style={styles.ctaButtonSolid}
             >
               <Text style={styles.ctaText}>Go to Nearest PACAFACO Point</Text>
             </TouchableOpacity>
+
           </View>
         </ScrollView>
       </SafeAreaView>
