@@ -16,6 +16,8 @@ import { getAuth, signOut } from "firebase/auth";
 import { useRouter } from "expo-router";
 import { useUser } from "../../../context/userContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { signInWithEmailAndPassword } from "firebase/auth";
+
 
 const Settings = () => {
   const router = useRouter();
@@ -48,13 +50,26 @@ const Settings = () => {
     fetchUsers();
   }, []);
 
-  const handleSwitch = async (user) => {
+const handleSwitch = async (user) => {
+  try {
+    const auth = getAuth();
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      user.email,
+      user.password
+    );
+
     Alert.alert(
       "Switch Account",
-      `Logging in as ${user.firstName} ${user.lastName}`
+      `Now logged in as ${user.firstName} ${user.lastName}`
     );
+
     setModalVisible(false);
-  };
+    router.replace("/Main"); 
+  } catch (error) {
+    Alert.alert("Switch Failed", error.message);
+  }
+};
 
   // helper: profile image fallback
   const getProfileImageSource = (profilePic) => {
