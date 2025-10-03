@@ -151,7 +151,7 @@ const SwitchAccount = () => {
         contact,
         gender,
         dob,
-        userType: "user", // ✅ added here
+        userType: "user",
         address: {
           street,
           region: region.name,
@@ -213,14 +213,22 @@ const SwitchAccount = () => {
         await AsyncStorage.setItem("firstName", firstName);
       }
 
-      // ✅ Remember Me logic
-      if (rememberMe) {
-        await AsyncStorage.setItem("savedEmail", email);
-        await AsyncStorage.setItem("savedPassword", password);
-      } else {
-        await AsyncStorage.removeItem("savedEmail");
-        await AsyncStorage.removeItem("savedPassword");
-      }
+  if (rememberMe) {
+    let savedUsers = JSON.parse(await AsyncStorage.getItem("savedUsers")) || [];
+
+    if (!savedUsers.some(u => u.uid === user.uid)) {
+      savedUsers.push({
+        uid: user.uid,
+        email,
+        password, 
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        profilePic: userData.profilePic || null,
+      });
+      await AsyncStorage.setItem("savedUsers", JSON.stringify(savedUsers));
+    }
+  }
+
 
       Alert.alert("Login Success", "You have successfully logged in!");
       router.replace("/Main");
