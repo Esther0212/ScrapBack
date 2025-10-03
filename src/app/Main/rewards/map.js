@@ -195,14 +195,6 @@ export default function Map() {
     <CustomBgColor>
       <SafeAreaView style={{ flex: 1, paddingTop: 25 }}>
         <View style={styles.container}>
-          {/* 🔙 Back button */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={28} color="#333" />
-          </TouchableOpacity>
-
           {/* 🔍 Search */}
           <View style={styles.topOverlay}>
             <View style={styles.searchBox}>
@@ -332,20 +324,10 @@ export default function Map() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backButton: {
-    position: "absolute",
-    top: 25,
-    left: 15,
-    zIndex: 20,
-    backgroundColor: "white",
-    padding: 6,
-    borderRadius: 20,
-    elevation: 4,
-  },
   topOverlay: {
     position: "absolute",
     top: 30,
-    left: 60, // space for back button
+    left: 20,
     right: 20,
     zIndex: 10,
   },
