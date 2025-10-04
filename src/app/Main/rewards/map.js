@@ -193,7 +193,7 @@ export default function Map() {
 
   return (
     <CustomBgColor>
-      <SafeAreaView style={{ flex: 1, paddingTop: 25 }}>
+      <SafeAreaView style={{ flex: 1}}>
         <View style={styles.container}>
           {/* 🔍 Search */}
           <View style={styles.topOverlay}>

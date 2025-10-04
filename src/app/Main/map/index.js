@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import MapView, { UrlTile, Marker, Callout } from "react-native-maps";
 import CustomBgColor from "../../../components/customBgColor";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import Feather from "@expo/vector-icons/Feather";
 
 // Firebase
 import { db } from "../../../../firebase";
@@ -54,10 +54,10 @@ const StatusBadge = ({ status }) => {
       ]}
     >
       <Text
-        style={{
-          color: isOpen ? "#016630" : "#9F0712",
-          fontWeight: "bold",
-        }}
+        style={[
+          styles.statusBadgeText,
+          { color: isOpen ? "#016630" : "#9F0712" },
+        ]}
       >
         {status}
       </Text>
@@ -76,8 +76,7 @@ export default function MapSelector() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
-  const [marker, setMarker] = useState(null);
-
+  const [marker, setMarker] = useState(null); // user location
   const [points, setPoints] = useState([]);
   const [schedules, setSchedules] = useState([]);
 
@@ -161,9 +160,11 @@ export default function MapSelector() {
       );
   };
 
-  // 🔗 Open Google Maps directions
-  const openGoogleMaps = (lat, lng, label) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+  // 🔗 Open Google Maps with origin + destination
+  const openGoogleMaps = (destLat, destLng, label) => {
+    if (!marker) return; // make sure we have user location
+    const { latitude, longitude } = marker;
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${latitude},${longitude}&destination=${destLat},${destLng}&travelmode=driving`;
     Linking.openURL(url);
   };
 
@@ -177,38 +178,38 @@ export default function MapSelector() {
         <Text style={styles.listTitle}>{item.name}</Text>
         <Text style={styles.listAddress}>{item.address}</Text>
         {pointSchedules.length > 0 ? (
-          pointSchedules.map((s) => (
-            <View key={s.id} style={styles.scheduleRow}>
+          pointSchedules.map((s, idx) => (
+            <TouchableOpacity
+              key={s.id}
+              style={[
+                styles.scheduleRow,
+                { backgroundColor: idx % 2 === 0 ? "#E3F6E3" : "#FFFFFF" },
+              ]}
+              onPress={() => openGoogleMaps(item.lat, item.lng, item.name)}
+            >
               <Text style={styles.scheduleText}>
                 {formatFullDate(s.collectionDate)},{" "}
-                {formatTime12h(s.collectionTime)} -{" "}
+                {formatTime12h(s.collectionTime)}
               </Text>
               <StatusBadge status={s.status} />
-            </View>
+              <Feather
+                name="arrow-up-right"
+                size={20}
+                color="black"
+                style={{ marginLeft: "auto" }}
+              />
+            </TouchableOpacity>
           ))
         ) : (
           <Text style={styles.noSchedule}>No schedules</Text>
         )}
-        <TouchableOpacity
-          style={styles.directionButton}
-          onPress={() => openGoogleMaps(item.lat, item.lng, item.name)}
-        >
-          <Text style={styles.directionButtonText}>Show Directions</Text>
-          <MaterialIcons name="directions" size={28} color="white" />
-        </TouchableOpacity>
       </View>
     );
   };
 
   return (
     <CustomBgColor>
-      <SafeAreaView
-        style={{
-          flex: 1,
-          paddingTop: 25, // was 40, now pushed further down
-          flexGrow: 1,
-        }}
-      >
+      <SafeAreaView style={{ flex: 1, paddingTop: 25, flexGrow: 1 }}>
         <View style={styles.container}>
           {/* Top Overlay: Search */}
           <View style={styles.topOverlay}>
@@ -306,14 +307,32 @@ export default function MapSelector() {
                         <Text style={{ fontWeight: "bold" }}>{p.name}</Text>
                         <Text>{p.address}</Text>
                         {pointSchedules.length > 0 ? (
-                          pointSchedules.map((s) => (
-                            <View key={s.id} style={styles.scheduleRow}>
+                          pointSchedules.map((s, idx) => (
+                            <TouchableOpacity
+                              key={s.id}
+                              style={[
+                                styles.scheduleRow,
+                                {
+                                  backgroundColor:
+                                    idx % 2 === 0 ? "#FFFFFF" : "#E3F6E3",
+                                },
+                              ]}
+                              onPress={() =>
+                                openGoogleMaps(p.lat, p.lng, p.name)
+                              }
+                            >
                               <Text>
                                 {formatFullDate(s.collectionDate)},{" "}
-                                {formatTime12h(s.collectionTime)} -{" "}
+                                {formatTime12h(s.collectionTime)}
                               </Text>
                               <StatusBadge status={s.status} />
-                            </View>
+                              <Feather
+                                name="arrow-up-right"
+                                size={20}
+                                color="black"
+                                style={{ marginLeft: "auto" }}
+                              />
+                            </TouchableOpacity>
                           ))
                         ) : (
                           <Text>No schedules</Text>
@@ -406,39 +425,43 @@ const styles = StyleSheet.create({
   },
   listTitle: {
     fontSize: 16,
-    fontWeight: "bold",
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
     color: "#117D2E",
     marginBottom: 10,
   },
   listAddress: {
-    fontSize: 14,
-    color: "#555",
-    fontWeight: "bold",
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
     marginBottom: 6,
   },
-  scheduleText: { fontSize: 14, color: "#333" },
-  noSchedule: { fontSize: 14, color: "#aaa", fontStyle: "italic" },
-  scheduleRow: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
+  scheduleText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+  },
+  noSchedule: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
+  scheduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    marginLeft: 4,
+    marginLeft: 6,
+    alignSelf: "flex-start", // keeps it snug to the content
   },
-  directionButton: {
-    marginTop: 8,
-    backgroundColor: "#117D2E",
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-  },
-  directionButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 16,
-    paddingVertical: 8,
-    marginRight: 6,
+  statusBadgeText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+    textAlign: "center", // horizontal centering
+    textAlignVertical: "center", // vertical centering (Android only)
   },
 });

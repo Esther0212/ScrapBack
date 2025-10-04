@@ -106,6 +106,19 @@ export default function RewardsLayout() {
           ),
         }}
       />
+      <Stack.Screen
+        name="map"
+        options={{
+          title: "Map",
+          headerShown: true,
+          headerBackVisible: false,
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="chevron-back-outline" size={24} color="black" />
+            </TouchableOpacity>
+          ),
+        }}
+      />
     </Stack>
   );
 }
