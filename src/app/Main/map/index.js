@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  searchInput: { flex: 1, fontSize: 16 },
+  searchInput: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
   toggleContainer: {
     position: "absolute",
     top: 90,
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   toggleLabelBox: { marginBottom: 8 },
-  toggleLabel: { fontSize: 16, fontWeight: "bold", color: "#333" },
+  toggleLabel: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
   toggleButtons: {
     flexDirection: "row",
     backgroundColor: "#ccc",
@@ -409,8 +409,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#ccc",
   },
   toggleSelected: { backgroundColor: "white" },
-  toggleOptionText: { fontSize: 16, color: "#555" },
-  toggleOptionTextSelected: { color: "#117D2E", fontWeight: "bold" },
+  toggleOptionText: {
+    fontSize: 16,
+    color: "#555",
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+  },
+  toggleOptionTextSelected: {
+    color: "#117D2E",
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+  },
   listContainer: { paddingTop: 180, paddingHorizontal: 16, paddingBottom: 16 },
   listCard: {
     backgroundColor: "white",

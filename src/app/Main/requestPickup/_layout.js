@@ -34,6 +34,19 @@ export default function RequestPickupLayout() {
           ),
         }}
       />
+      <Stack.Screen
+        name="ArchivedRequests"
+        options={{
+          title: "Archived Requests",
+          headerShown: true,
+          headerBackVisible: false, // hide the default back
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="chevron-back-outline" size={24} color="black" />
+            </TouchableOpacity>
+          ),
+        }}
+      />
     </Stack>
   );
 }

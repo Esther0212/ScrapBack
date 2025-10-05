@@ -339,7 +339,7 @@ export default function PickupRequestForm() {
           estimatedWeight: weight,
           pickupDateTime,
           pickupAddress,
-          pickupDate: date, 
+          pickupDate: date,
           coords: markerCoords,
           photoUrl: photo || null,
           updatedAt: serverTimestamp(),
@@ -351,7 +351,7 @@ export default function PickupRequestForm() {
           types: selectedTypes,
           estimatedWeight: weight,
           pickupDateTime,
-          pickupDate: date,      // 👈 save actual Date object
+          pickupDate: date, // 👈 save actual Date object
           pickupAddress,
           coords: markerCoords,
           photoUrl: photo || null,
@@ -648,11 +648,10 @@ export default function PickupRequestForm() {
 const styles = StyleSheet.create({
   container: { padding: 20, paddingTop: 10, flexGrow: 1 },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#3a3a3a",
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
     marginBottom: 8,
-    marginTop: 6,
   },
   categoryCard: {
     flexDirection: "row",
@@ -669,14 +668,21 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  categoryTitle: { fontSize: 15, fontWeight: "600", color: "#333" },
-  categorySub: { fontSize: 13, color: "#777", marginTop: 2 },
+  categoryTitle: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
+  categorySub: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#777",
+    marginTop: 2,
+  },
   input: {
     backgroundColor: "#fff",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#EFEFEF",
@@ -693,8 +699,13 @@ const styles = StyleSheet.create({
   },
   iconWrapper: { width: 36, alignItems: "center" },
   infoTextContainer: { marginLeft: 12, flex: 1 },
-  infoTitle: { fontSize: 14, fontWeight: "600", color: "#333" },
-  infoSub: { color: "#6b6b6b", fontSize: 13, marginTop: 4 },
+  infoTitle: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
+  infoSub: {
+    color: "#6b6b6b",
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    marginTop: 4,
+  },
   requestButton: {
     flexDirection: "row",
     backgroundColor: "#0E9247",
@@ -706,8 +717,8 @@ const styles = StyleSheet.create({
   },
   requestButtonText: {
     color: "#fff",
-    fontWeight: "700",
     fontSize: 16,
+    fontFamily: "Poppins_700Bold",
     marginLeft: 10,
   },
   topOverlay: {
@@ -730,7 +741,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  searchOverlay: { flex: 1, fontSize: 16 },
+  searchOverlay: { flex: 1, fontSize: 15,
+    fontFamily: "Poppins_400Regular", },
   footerOverlay: {
     position: "absolute",
     bottom: 40,
@@ -756,7 +768,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#7EBF62",
     alignItems: "center",
   },
-  footerText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  footerText: { color: "#fff", fontSize: 16, fontFamily: "Poppins_700Bold" },
   modalHeader: {
     fontSize: 16,
     fontWeight: "700",

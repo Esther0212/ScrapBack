@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 34,
-    fontWeight: "800",
+    fontFamily: "Poppins_700Bold",
     color: "#3A2E2E",
     textAlign: "center",
     marginBottom: 6,
@@ -240,6 +240,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 17,
     color: "#555",
+    fontFamily: "Poppins_400Regular",
     textAlign: "center",
     marginBottom: 42,
   },
@@ -248,7 +249,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 17,
-    fontWeight: "700",
+    fontFamily: "Poppins_700Bold",
     color: "#3A2E2E",
     marginBottom: 6,
   },
@@ -257,7 +258,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 16,
     paddingHorizontal: 18,
-    fontSize: 16,
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
     color: "#3A2E2E",
     borderWidth: 1,
     borderColor: "#E0D4C3",
@@ -284,10 +286,12 @@ const styles = StyleSheet.create({
   rememberText: {
     marginLeft: 6,
     fontSize: 14,
+    fontFamily: "Poppins_400Regular",
     color: "#3A2E2E",
   },
   forgotText: {
     fontSize: 14,
+    fontFamily: "Poppins_400Regular",
     color: "#3A2E2E",
     textDecorationLine: "underline",
   },
@@ -305,7 +309,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: "600",
+    fontFamily: "Poppins_700Bold",
     letterSpacing: 0.5,
   },
   signupLink: {
@@ -315,9 +319,10 @@ const styles = StyleSheet.create({
   signupText: {
     fontSize: 14,
     color: "#3A2E2E",
+    fontFamily: "Poppins_400Regular",
   },
   signupTextBold: {
-    fontWeight: "700",
+    fontFamily: "Poppins_700Bold",
     textDecorationLine: "underline",
   },
   errorText: {
