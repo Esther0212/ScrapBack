@@ -175,81 +175,89 @@ const SwitchAccount = () => {
     return regex.test(email);
   };
 
-const handleLogin = async () => {
-  let tempErrors = { email: "", password: "" };
-  let isValid = true;
+  const handleLogin = async () => {
+    let tempErrors = { email: "", password: "" };
+    let isValid = true;
 
-  if (!email) {
-    tempErrors.email = "Email is required";
-    isValid = false;
-  } else if (!validateEmail(email)) {
-    tempErrors.email = "Enter a valid email address";
-    isValid = false;
-  }
-
-  if (!password) {
-    tempErrors.password = "Password is required";
-    isValid = false;
-  }
-
-  setErrors(tempErrors);
-  if (!isValid) return;
-
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-
-    const userDocRef = doc(db, "user", user.uid);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-      const userData = userDocSnap.data();
-
-      // ✅ Always save to savedUsers (for Switch Account modal)
-      let savedUsers = JSON.parse(await AsyncStorage.getItem("savedUsers")) || [];
-
-      const exists = savedUsers.some((u) => u.uid === user.uid);
-      if (!exists) {
-        savedUsers.push({
-          uid: user.uid,
-          email,
-          password, // ⚠️ (consider encrypting this in future)
-          firstName: userData.firstName || "",
-          lastName: userData.lastName || "",
-          profilePic: userData.profilePic || null,
-        });
-        await AsyncStorage.setItem("savedUsers", JSON.stringify(savedUsers));
-      }
-
-      // ✅ Save name for quick access (optional)
-      await AsyncStorage.setItem("firstName", userData.firstName || "");
-
-      // ✅ Only store "lastUsedUser" if Remember Me is checked
-      if (rememberMe) {
-        await AsyncStorage.setItem("lastUsedUser", JSON.stringify({
-          uid: user.uid,
-          email,
-          password,
-        }));
-      }
+    if (!email) {
+      tempErrors.email = "Email is required";
+      isValid = false;
+    } else if (!validateEmail(email)) {
+      tempErrors.email = "Enter a valid email address";
+      isValid = false;
     }
 
-    Alert.alert("Login Success", "You have successfully logged in!");
-    router.replace("/Main");
-  } catch (error) {
-    let message = "Login failed. Please try again.";
-
-    if (error.code === "auth/invalid-email") {
-      message = "Invalid email address.";
-    } else if (error.code === "auth/user-not-found") {
-      message = "User not found.";
-    } else if (error.code === "auth/wrong-password") {
-      message = "Incorrect password.";
+    if (!password) {
+      tempErrors.password = "Password is required";
+      isValid = false;
     }
 
-    Alert.alert("Login Error", message);
-  }
-};
+    setErrors(tempErrors);
+    if (!isValid) return;
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+
+        // Always save to savedUsers (for Switch Account modal)
+        let savedUsers =
+          JSON.parse(await AsyncStorage.getItem("savedUsers")) || [];
+
+        const exists = savedUsers.some((u) => u.uid === user.uid);
+        if (!exists) {
+          savedUsers.push({
+            uid: user.uid,
+            email,
+            password, // (consider encrypting this in future)
+            firstName: userData.firstName || "",
+            lastName: userData.lastName || "",
+            profilePic: userData.profilePic || null,
+          });
+          await AsyncStorage.setItem("savedUsers", JSON.stringify(savedUsers));
+        }
+
+        // Save name for quick access (optional)
+        await AsyncStorage.setItem("firstName", userData.firstName || "");
+
+        // Only store "lastUsedUser" if Remember Me is checked
+        if (rememberMe) {
+          await AsyncStorage.setItem(
+            "lastUsedUser",
+            JSON.stringify({
+              uid: user.uid,
+              email,
+              password,
+            })
+          );
+        }
+      }
+
+      Alert.alert("Login Success", "You have successfully logged in!");
+      router.replace("/Main");
+    } catch (error) {
+      let message = "Login failed. Please try again.";
+
+      if (error.code === "auth/invalid-email") {
+        message = "Invalid email address.";
+      } else if (error.code === "auth/user-not-found") {
+        message = "User not found.";
+      } else if (error.code === "auth/wrong-password") {
+        message = "Incorrect password.";
+      }
+
+      Alert.alert("Login Error", message);
+    }
+  };
 
   // 🔹 UI
   return (
