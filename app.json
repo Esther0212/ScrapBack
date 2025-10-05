@@ -33,7 +33,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
-    ]
+      "expo-font",
+      "expo-notifications"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "82e9e238-1aff-47d6-8778-6960b258804e"
+      }
+    },
+    "owner": "missel012"
   }
 }

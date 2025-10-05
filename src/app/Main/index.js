@@ -1,3 +1,4 @@
+// src/app/Main/Home.jsx
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -11,9 +12,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+} from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useUser } from "../../context/userContext";
 import { useEducational } from "../../context/educationalContext";
@@ -21,26 +26,33 @@ import { useEducational } from "../../context/educationalContext";
 const { width } = Dimensions.get("window");
 
 const Home = () => {
-  const { userData } = useUser(); // context
-  const { educationalContent, setSelectedType } = useEducational(); // 🔹 now includes setSelectedType
+  const { userData } = useUser();
+  const { educationalContent, setSelectedType } = useEducational();
   const [hasNewNotification, setHasNewNotification] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [pressedIndex, setPressedIndex] = useState(null);
   const [recyclingTypes, setRecyclingTypes] = useState([]);
-
   const router = useRouter();
 
+  // 🔔 Realtime listener for user notifications
   useEffect(() => {
-    const checkNotifications = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
-      const docRef = doc(db, "notifications", user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setHasNewNotification(data.unreadCount > 0);
-      }
-    };
-    checkNotifications();
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const q = query(
+      collection(db, "userNotifications"),
+      where("userId", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map((doc) => doc.data());
+      const unread = docs.filter((d) => !d.read).length;
+
+      setUnreadCount(unread);
+      setHasNewNotification(unread > 0);
+    });
+
+    return unsubscribe;
   }, []);
 
   // 🔹 Extract recycling types from context
@@ -57,6 +69,7 @@ const Home = () => {
         <ScrollView
           contentContainerStyle={styles.scrollView}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           {/* Header */}
           <View style={styles.header}>
@@ -65,13 +78,21 @@ const Home = () => {
               style={styles.wordmarkLogo}
               resizeMode="contain"
             />
-            <Ionicons
-              name={
-                hasNewNotification ? "notifications" : "notifications-outline"
-              }
-              size={24}
-              color="black"
-            />
+            <View style={{ position: "relative" }}>
+              <Ionicons
+                name="notifications-outline"
+                size={28}
+                color="black"
+                onPress={() => {
+                  router.push("/Main/notifications");
+                }}
+              />
+              {hasNewNotification && (
+                <View style={styles.badgeNumber}>
+                  <Text style={styles.badgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </View>
           </View>
 
           {/* Greeting */}
@@ -129,8 +150,8 @@ const Home = () => {
                   index !== 0 ? { marginLeft: 10 } : { marginLeft: 0 },
                 ]}
                 onPress={() => {
-                  setSelectedType(type); // 🔹 save selected type globally
-                  router.push("/Main/recyclingGuide/guides"); // 🔹 no params anymore
+                  setSelectedType(type);
+                  router.push("/Main/recyclingGuide/guides");
                 }}
               >
                 <Text style={styles.typeButtonText}>{type}</Text>
@@ -214,6 +235,22 @@ const styles = StyleSheet.create({
   },
   typeButtonPressed: { backgroundColor: "#005f1a" },
   typeButtonText: { color: "white", fontFamily: "Poppins_700Bold" },
+  badgeNumber: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    backgroundColor: "red",
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    minWidth: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
 });
 
 export default Home;
