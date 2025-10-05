@@ -14,58 +14,40 @@ import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import MapView, { UrlTile, Marker, Callout } from "react-native-maps";
 import CustomBgColor from "../../../components/customBgColor";
-import Feather from "@expo/vector-icons/Feather";
-
-// Firebase
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { Ionicons } from "@expo/vector-icons";
 import { db } from "../../../../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
-
-// Custom marker
 import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
 
-// 🔹 Convert 24-hour to 12-hour format
-const formatTime12h = (time24) => {
-  if (!time24) return "";
-  const [hourStr, minute] = time24.split(":");
-  let hour = parseInt(hourStr, 10);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  hour = hour % 12 || 12;
-  return `${hour}:${minute} ${ampm}`;
-};
+// 🔹 Distance calculation (Haversine)
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
 
-// 🔹 Convert date to full form
-const formatFullDate = (dateStr) => {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  const options = { year: "numeric", month: "long", day: "numeric" };
-  return date.toLocaleDateString(undefined, options);
-};
+// 🔹 Status badge
+const StatusBadge = ({ isOpen }) => (
+  <View
+    style={[
+      styles.statusBadge,
+      { backgroundColor: isOpen ? "#B9F8CF" : "#FFC9C9" },
+    ]}
+  >
+    <Text style={{ color: isOpen ? "#016630" : "#9F0712", fontWeight: "bold" }}>
+      {isOpen ? "Open Today" : "Closed Today"}
+    </Text>
+  </View>
+);
 
-// 🔹 Status component
-const StatusBadge = ({ status }) => {
-  const isOpen = status === "Open";
-  return (
-    <View
-      style={[
-        styles.statusBadge,
-        {
-          backgroundColor: isOpen ? "#B9F8CF" : "#FFC9C9",
-        },
-      ]}
-    >
-      <Text
-        style={[
-          styles.statusBadgeText,
-          { color: isOpen ? "#016630" : "#9F0712" },
-        ]}
-      >
-        {status}
-      </Text>
-    </View>
-  );
-};
-
-export default function MapSelector() {
+export default function Map() {
   const router = useRouter();
   const mapRef = useRef(null);
   const [searchText, setSearchText] = useState("");
@@ -76,33 +58,28 @@ export default function MapSelector() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
-  const [marker, setMarker] = useState(null); // user location
+  const [userMarker, setUserMarker] = useState(null);
   const [points, setPoints] = useState([]);
   const [schedules, setSchedules] = useState([]);
 
-  // 🔥 Load Firestore points + schedules
+  // 🔥 Load Firestore points & schedules
   useEffect(() => {
-    const unsubPoints = onSnapshot(
-      collection(db, "collectionPoint"),
-      (snap) => {
-        setPoints(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      }
-    );
-
+    const unsubPoints = onSnapshot(collection(db, "collectionPoint"), (snap) => {
+      setPoints(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
     const unsubSchedules = onSnapshot(
       collection(db, "collectionSchedule"),
       (snap) => {
         setSchedules(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
       }
     );
-
     return () => {
       unsubPoints();
       unsubSchedules();
     };
   }, []);
 
-  // 📍 Get user location
+  // 📍 Get user location & nearest 3 points
   useEffect(() => {
     (async () => {
       try {
@@ -111,24 +88,40 @@ export default function MapSelector() {
 
         const location = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = location.coords;
-        const newRegion = {
-          latitude,
-          longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        };
-        setRegion(newRegion);
-        setMarker({ latitude, longitude });
-      } catch (error) {
-        console.warn("Location error. Showing default region.");
+        setUserMarker({ latitude, longitude });
+
+        if (points.length > 0) {
+          // Sort by distance
+          const sorted = points
+            .map((p) => ({
+              ...p,
+              distance: getDistanceKm(latitude, longitude, p.lat, p.lng),
+            }))
+            .sort((a, b) => a.distance - b.distance);
+
+          const nearestThree = sorted.slice(0, 3);
+
+          // Fit map to nearest 3
+          mapRef.current?.fitToCoordinates(
+            [
+              { latitude, longitude }, // user
+              ...nearestThree.map((p) => ({ latitude: p.lat, longitude: p.lng })),
+            ],
+            {
+              edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+              animated: true,
+            }
+          );
+        }
+      } catch (err) {
+        console.warn("Location error:", err);
       }
     })();
-  }, []);
+  }, [points]);
 
-  // 🔍 Search bar
+  // 🔍 Search
   const handleSearch = async () => {
     if (!searchText) return;
-
     try {
       const results = await Location.geocodeAsync(searchText);
       if (results.length > 0) {
@@ -140,7 +133,7 @@ export default function MapSelector() {
           longitudeDelta: 0.05,
         };
         setRegion(newRegion);
-        setMarker({ latitude, longitude });
+        setUserMarker({ latitude, longitude });
         mapRef.current?.animateToRegion(newRegion, 1000);
         Keyboard.dismiss();
       }
@@ -149,69 +142,60 @@ export default function MapSelector() {
     }
   };
 
-  // Sort schedules by time AM → PM
-  const sortSchedules = (scheds) => {
-    return scheds
-      .slice()
-      .sort(
-        (a, b) =>
-          parseInt(a.collectionTime.replace(":", ""), 10) -
-          parseInt(b.collectionTime.replace(":", ""), 10)
-      );
-  };
-
-  // 🔗 Open Google Maps with origin + destination
-  const openGoogleMaps = (destLat, destLng, label) => {
-    if (!marker) return; // make sure we have user location
-    const { latitude, longitude } = marker;
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${latitude},${longitude}&destination=${destLat},${destLng}&travelmode=driving`;
+  // 🔗 Google Maps directions
+  const openGoogleMaps = (lat, lng) => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
     Linking.openURL(url);
   };
 
-  // 📋 Render list item
+  // Check if a point is open today
+  const isPointOpenToday = (pointId) => {
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    return schedules.some(
+      (s) =>
+        s.pointId === pointId &&
+        s.collectionDate === today &&
+        s.status === "Open"
+    );
+  };
+
+  // 📋 List item
   const renderListItem = ({ item }) => {
-    let pointSchedules = schedules.filter((s) => s.pointId === item.id);
-    pointSchedules = sortSchedules(pointSchedules);
+    let distance = null;
+    if (userMarker) {
+      distance = getDistanceKm(
+        userMarker.latitude,
+        userMarker.longitude,
+        item.lat,
+        item.lng
+      ).toFixed(2);
+    }
+    const openToday = isPointOpenToday(item.id);
 
     return (
       <View style={styles.listCard}>
         <Text style={styles.listTitle}>{item.name}</Text>
         <Text style={styles.listAddress}>{item.address}</Text>
-        {pointSchedules.length > 0 ? (
-          pointSchedules.map((s, idx) => (
-            <TouchableOpacity
-              key={s.id}
-              style={[
-                styles.scheduleRow,
-                { backgroundColor: idx % 2 === 0 ? "#E3F6E3" : "#FFFFFF" },
-              ]}
-              onPress={() => openGoogleMaps(item.lat, item.lng, item.name)}
-            >
-              <Text style={styles.scheduleText}>
-                {formatFullDate(s.collectionDate)},{" "}
-                {formatTime12h(s.collectionTime)}
-              </Text>
-              <StatusBadge status={s.status} />
-              <Feather
-                name="arrow-up-right"
-                size={20}
-                color="black"
-                style={{ marginLeft: "auto" }}
-              />
-            </TouchableOpacity>
-          ))
-        ) : (
-          <Text style={styles.noSchedule}>No schedules</Text>
+        {distance && (
+          <Text style={styles.distanceText}>Distance: {distance} km</Text>
         )}
+        <StatusBadge isOpen={openToday} />
+        <TouchableOpacity
+          style={styles.directionButton}
+          onPress={() => openGoogleMaps(item.lat, item.lng)}
+        >
+          <Text style={styles.directionButtonText}>Show Directions</Text>
+          <MaterialIcons name="directions" size={28} color="white" />
+        </TouchableOpacity>
       </View>
     );
   };
 
   return (
     <CustomBgColor>
-      <SafeAreaView style={{ flex: 1, paddingTop: 25, flexGrow: 1 }}>
+      <SafeAreaView style={{ flex: 1}}>
         <View style={styles.container}>
-          {/* Top Overlay: Search */}
+          {/* 🔍 Search */}
           <View style={styles.topOverlay}>
             <View style={styles.searchBox}>
               <TextInput
@@ -224,7 +208,7 @@ export default function MapSelector() {
             </View>
           </View>
 
-          {/* Toggle buttons + Label */}
+          {/* Toggle Map/List */}
           <View style={styles.toggleContainer}>
             <View style={styles.toggleButtons}>
               <TouchableOpacity
@@ -243,7 +227,6 @@ export default function MapSelector() {
                   Map
                 </Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[
                   styles.toggleOption,
@@ -268,32 +251,34 @@ export default function MapSelector() {
 
           {/* Map or List */}
           {selectedView === "map" ? (
-            <MapView
-              style={{ flex: 1 }}
-              region={region}
-              ref={mapRef}
-              onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
-            >
+            <MapView style={{ flex: 1 }} region={region} ref={mapRef}>
               <UrlTile
                 urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
                 maximumZ={19}
               />
 
               {/* User marker */}
-              {marker && (
-                <Marker coordinate={marker}>
+              {userMarker && (
+                <Marker coordinate={userMarker}>
                   <Callout>
                     <Text>Your Location</Text>
                   </Callout>
                 </Marker>
               )}
 
-              {/* Collection Points */}
+              {/* Collection points */}
               {points.map((p) => {
-                let pointSchedules = schedules.filter(
-                  (s) => s.pointId === p.id
-                );
-                pointSchedules = sortSchedules(pointSchedules);
+                let distance = null;
+                if (userMarker) {
+                  distance = getDistanceKm(
+                    userMarker.latitude,
+                    userMarker.longitude,
+                    p.lat,
+                    p.lng
+                  ).toFixed(2);
+                }
+                const openToday = isPointOpenToday(p.id);
+
                 return (
                   <Marker
                     key={p.id}
@@ -306,37 +291,17 @@ export default function MapSelector() {
                       <View style={{ width: 200 }}>
                         <Text style={{ fontWeight: "bold" }}>{p.name}</Text>
                         <Text>{p.address}</Text>
-                        {pointSchedules.length > 0 ? (
-                          pointSchedules.map((s, idx) => (
-                            <TouchableOpacity
-                              key={s.id}
-                              style={[
-                                styles.scheduleRow,
-                                {
-                                  backgroundColor:
-                                    idx % 2 === 0 ? "#FFFFFF" : "#E3F6E3",
-                                },
-                              ]}
-                              onPress={() =>
-                                openGoogleMaps(p.lat, p.lng, p.name)
-                              }
-                            >
-                              <Text>
-                                {formatFullDate(s.collectionDate)},{" "}
-                                {formatTime12h(s.collectionTime)}
-                              </Text>
-                              <StatusBadge status={s.status} />
-                              <Feather
-                                name="arrow-up-right"
-                                size={20}
-                                color="black"
-                                style={{ marginLeft: "auto" }}
-                              />
-                            </TouchableOpacity>
-                          ))
-                        ) : (
-                          <Text>No schedules</Text>
-                        )}
+                        {distance && <Text>Distance: {distance} km</Text>}
+                        <StatusBadge isOpen={openToday} />
+                        <TouchableOpacity
+                          style={[styles.directionButton, { marginTop: 8 }]}
+                          onPress={() => openGoogleMaps(p.lat, p.lng)}
+                        >
+                          <Text style={styles.directionButtonText}>
+                            Navigate
+                          </Text>
+                          <MaterialIcons name="directions" size={20} color="white" />
+                        </TouchableOpacity>
                       </View>
                     </Callout>
                   </Marker>
@@ -425,43 +390,33 @@ const styles = StyleSheet.create({
   },
   listTitle: {
     fontSize: 16,
-    fontFamily: "Poppins_700Bold",
-    color: "#333",
+    fontWeight: "bold",
     color: "#117D2E",
     marginBottom: 10,
   },
-  listAddress: {
-    fontSize: 15,
-    fontFamily: "Poppins_400Regular",
-    color: "#333",
-    marginBottom: 6,
-  },
-  scheduleText: {
-    fontSize: 15,
-    fontFamily: "Poppins_400Regular",
-    color: "#333",
-  },
-  noSchedule: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
-  scheduleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
+  listAddress: { fontSize: 14, color: "#555", marginBottom: 6 },
+  distanceText: { fontSize: 14, color: "#333" },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    marginLeft: 6,
-    alignSelf: "flex-start", // keeps it snug to the content
+    marginTop: 6,
+    alignSelf: "flex-start",
   },
-  statusBadgeText: {
-    fontSize: 15,
-    fontFamily: "Poppins_400Regular",
-    color: "#333",
-    textAlign: "center", // horizontal centering
-    textAlignVertical: "center", // vertical centering (Android only)
+  directionButton: {
+    marginTop: 8,
+    backgroundColor: "#117D2E",
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  directionButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
+    marginRight: 6,
   },
 });

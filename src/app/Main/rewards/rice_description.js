@@ -49,7 +49,11 @@ const LoadDescription = () => {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 40 }} />
+          <ActivityIndicator
+            size="large"
+            color="#2E7D32"
+            style={{ marginTop: 40 }}
+          />
         </SafeAreaView>
       </CustomBgColor>
     );
@@ -59,7 +63,9 @@ const LoadDescription = () => {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <Text style={styles.notFoundText}>No description found for this reward.</Text>
+          <Text style={styles.notFoundText}>
+            No description found for this reward.
+          </Text>
         </SafeAreaView>
       </CustomBgColor>
     );
@@ -70,17 +76,19 @@ const LoadDescription = () => {
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="black" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>{reward.title}</Text>
           <View style={{ width: 24 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Image */}
-          <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
-            {reward.image ? <Image source={{ uri: reward.image }} style={styles.image} /> : null}
+          <LinearGradient
+            colors={["#E8F5E9", "#FFFFFF"]}
+            style={styles.imageWrapper}
+          >
+            {reward.image ? (
+              <Image source={{ uri: reward.image }} style={styles.image} />
+            ) : null}
           </LinearGradient>
 
           {/* Card */}
@@ -93,7 +101,7 @@ const LoadDescription = () => {
 
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => router.push("Main/map/MapSelector")}
+              onPress={() => router.push("Main/rewards/map")}
               style={styles.ctaButtonSolid}
             >
               <Text style={styles.ctaText}>Go to Nearest PACAFACO Point</Text>

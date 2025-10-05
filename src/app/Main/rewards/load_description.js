@@ -73,9 +73,6 @@ const LoadDescription = () => {
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="black" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>{reward.title}</Text>
           <View style={{ width: 24 }} />
         </View>

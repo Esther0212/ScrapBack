@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,98 +6,243 @@ import {
   TouchableOpacity,
   FlatList,
   SafeAreaView,
+  ActivityIndicator,
+  Image,
+  Alert,
+  ToastAndroid,
+  Platform,
 } from "react-native";
 import * as Animatable from "react-native-animatable";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
 
-const dummyData = [
-  {
-    id: "1",
-    status: "Requested",
-    statusColor: "#2da9ef",
-    recyclables: "Plastic, Metal, Glass",
-    weight: "2.5 kg",
-    datetime: "7 Sept, 13:00",
-    address: "123 Green Street, Brooklyn",
-  },
-  {
-    id: "2",
-    status: "Requested",
-    statusColor: "#2da9ef",
-    recyclables: "Paper, Glass",
-    weight: "1.2 kg",
-    datetime: "9 Sept, 10:30",
-    address: "456 Eco Avenue, Queens",
-  },
-  {
-    id: "3",
-    status: "Pending",
-    statusColor: "#f4c430",
-    recyclables: "Plastic, Metal",
-    weight: "3.0 kg",
-    datetime: "10 Sept, 09:15",
-    address: "789 Reuse Blvd, Manhattan",
-  },
-  {
-    id: "4",
-    status: "Completed",
-    statusColor: "#2fa64f",
-    recyclables: "Glass, Paper",
-    weight: "4.5 kg",
-    datetime: "5 Sept, 14:00",
-    address: "321 Green Lane, Bronx",
-  },
-];
+// 🔥 Firebase
+import { db } from "../../../../firebase";
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const RequestPickup = () => {
   const router = useRouter();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [collapsed, setCollapsed] = useState({});
+  const [menuOpen, setMenuOpen] = useState(null); // track which menu is open
 
-  const renderCard = (item) => (
-    <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
-      <View style={[styles.statusTag, { backgroundColor: item.statusColor }]}>
-        <Text style={styles.statusLabel}>{item.status}</Text>
-      </View>
-      <View style={styles.cardContent}>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Recyclables:</Text> {item.recyclables}
-        </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Weight:</Text> {item.weight}
-        </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Datetime:</Text> {item.datetime}
-        </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Address:</Text> {item.address}
-        </Text>
-      </View>
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.cancelBtn}>
-          <Text style={styles.cancelText}>Cancel</Text>
+  // Load current user's pickup requests
+  useEffect(() => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const q = query(collection(db, "pickupRequests"), where("userId", "==", user.uid));
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // ✅ Sort client-side by createdAt (newest first)
+      const sorted = data
+        .filter((d) => !d.archived) // hide archived requests
+        .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+
+      setRequests(sorted);
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, []);
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "pending":
+        return "#f4c430";
+      case "in progress":
+        return "#2da9ef";
+      case "scheduled":
+        return "#9370db";
+      case "not approved":
+        return "#ff8c00";
+      case "completed":
+        return "#2fa64f";
+      case "cancelled":
+        return "#d9534f";
+      default:
+        return "#999";
+    }
+  };
+
+  const showToast = (msg) => {
+    if (Platform.OS === "android") {
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    } else {
+      Alert.alert(msg);
+    }
+  };
+
+  const handleCancel = (id) => {
+    Alert.alert("Cancel Pickup", "Are you sure you want to cancel this request?", [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes",
+        onPress: async () => {
+          try {
+            await updateDoc(doc(db, "pickupRequests", id), { status: "cancelled" });
+            showToast("Pickup request cancelled.");
+          } catch (err) {
+            console.error("Error cancelling request:", err);
+            showToast("Failed to cancel request.");
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleEdit = (item) => {
+    Alert.alert("Edit Pickup", "Do you want to edit this pickup request?", [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes",
+        onPress: () => {
+          router.push({
+            pathname: "Main/requestPickup/PickupRequestForm",
+            params: { requestId: item.id },
+          });
+        },
+      },
+    ]);
+  };
+
+  const handleArchive = (id) => {
+    Alert.alert("Archive Pickup", "Move this request to archive?", [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes",
+        onPress: async () => {
+          try {
+            await updateDoc(doc(db, "pickupRequests", id), { archived: true });
+            showToast("Pickup request archived.");
+          } catch (err) {
+            console.error("Error archiving request:", err);
+            showToast("Failed to archive request.");
+          }
+        },
+      },
+    ]);
+  };
+
+  const toggleCollapse = (id) => {
+    setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const renderCard = (item) => {
+    const imageUrl = item.photoUrl || null;
+    const isCollapsed = collapsed[item.id];
+    const isMenuOpen = menuOpen === item.id;
+
+    return (
+      <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
+        <View>
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.photo} resizeMode="cover" />
+          ) : (
+            <Text style={{ color: "#999", marginBottom: 10 }}>No image available</Text>
+          )}
+
+          {/* Three dots menu */}
+          <TouchableOpacity
+            style={styles.menuBtn}
+            onPress={() => setMenuOpen(isMenuOpen ? null : item.id)}
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color="#fff" />
+          </TouchableOpacity>
+
+          {isMenuOpen && (
+            <View style={styles.menuDropdown}>
+              <TouchableOpacity onPress={() => handleArchive(item.id)}>
+                <Text style={styles.menuItem}>Archive</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Status tag */}
+        <View style={[styles.statusTag, { backgroundColor: getStatusColor(item.status) }]}>
+          <Text style={styles.statusLabel}>
+            {item.status
+              ? item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase()
+              : "Pending"}
+          </Text>
+        </View>
+
+        {/* Show/Hide Button */}
+        <TouchableOpacity onPress={() => toggleCollapse(item.id)} style={styles.toggleBtn}>
+          <Text style={styles.toggleText}>{isCollapsed ? "Show Details" : "Hide Details"}</Text>
+          <Ionicons name={isCollapsed ? "chevron-down" : "chevron-up"} size={18} color="#333" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.editBtn}>
-          <Text style={styles.editText}>Edit</Text>
-        </TouchableOpacity>
-      </View>
-    </Animatable.View>
-  );
+
+        {/* Details (hidden if collapsed) */}
+        {!isCollapsed && (
+          <>
+            <View style={styles.cardContent}>
+              <Text style={styles.cardText}>
+                <Text style={styles.bold}>Recyclables:</Text> {item.types?.join(", ") || "N/A"}
+              </Text>
+              <Text style={styles.cardText}>
+                <Text style={styles.bold}>Weight:</Text>{" "}
+                {item.estimatedWeight ? `${item.estimatedWeight} kg` : "N/A"}
+              </Text>
+              <Text style={styles.cardText}>
+                <Text style={styles.bold}>Datetime:</Text> {item.pickupDateTime || "N/A"}
+              </Text>
+              <Text style={styles.cardText}>
+                <Text style={styles.bold}>Address:</Text> {item.pickupAddress || "N/A"}
+              </Text>
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.buttonRow}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(item.id)}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.editBtn} onPress={() => handleEdit(item)}>
+                <Text style={styles.editText}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </Animatable.View>
+    );
+  };
 
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
-        <FlatList
-          data={dummyData}
-          renderItem={({ item }) => renderCard(item)}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16,}}
-          ListHeaderComponent={
-            <View style={styles.statusBar}>
-              <Text style={styles.statusBarText}>Status</Text>
-            </View>
-          }
-        />
+        {loading ? (
+          <ActivityIndicator size="large" style={{ marginTop: 40 }} />
+        ) : (
+          <FlatList
+            data={requests}
+            renderItem={({ item }) => renderCard(item)}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 16 }}
+            ListHeaderComponent={
+              <View style={styles.statusBar}>
+                <Text style={styles.statusBarText}>Pickup Requests</Text>
+                <TouchableOpacity onPress={() => router.push("Main/requestPickup/ArchivedRequests")}>
+                  <Text style={styles.link}>Go to Archive</Text>
+                </TouchableOpacity>
+              </View>
+            }
+            ListEmptyComponent={
+              <Text style={{ textAlign: "center", marginTop: 40, color: "#555" }}>
+                No pickup requests yet.
+              </Text>
+            }
+          />
+        )}
 
         {/* Floating Action Button */}
         <TouchableOpacity
@@ -114,25 +259,21 @@ const RequestPickup = () => {
 export default RequestPickup;
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
   statusBar: {
     backgroundColor: "#7ac47f",
     padding: 14,
     borderRadius: 12,
     marginBottom: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
-  statusBarText: {
-    fontWeight: "700",
-    fontSize: 15,
-    color: "#fff",
-    textAlign: "center",
-  },
+  statusBarText: { fontWeight: "700", fontSize: 15, color: "#fff" },
+  link: { color: "#fff", textDecorationLine: "underline" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
-    padding: 20,
+    padding: 16,
     marginBottom: 16,
     shadowColor: "#000",
     shadowOpacity: 0.1,
@@ -140,57 +281,33 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 3,
   },
-  statusTag: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 10,
+  photo: { width: "100%", height: 180, borderRadius: 10, marginBottom: 10 },
+  menuBtn: { position: "absolute", top: 8, right: 8, padding: 4, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 20 },
+  menuDropdown: {
+    position: "absolute",
+    top: 32,
+    right: 8,
+    backgroundColor: "#fff",
+    borderRadius: 6,
+    padding: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
-  statusLabel: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  cardContent: {
-    marginBottom: 10,
-  },
-  cardText: {
-    marginBottom: 4,
-    color: "#555",
-  },
-  bold: {
-    fontWeight: "bold",
-    color: "#333",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 12,
-  },
-  cancelBtn: {
-    backgroundColor: "#e0e0e0",
-    flex: 1,
-    padding: 10,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    alignItems: "center",
-  },
-  cancelText: {
-    color: "#000",
-    fontWeight: "bold",
-  },
-  editBtn: {
-    backgroundColor: "#7ac47f",
-    flex: 1,
-    padding: 10,
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-    alignItems: "center",
-  },
-  editText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
+  menuItem: { paddingVertical: 6, paddingHorizontal: 10, color: "#333" },
+  statusTag: { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, marginBottom: 10 },
+  statusLabel: { color: "#fff", fontWeight: "bold" },
+  toggleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", marginVertical: 6 },
+  toggleText: { fontWeight: "600", color: "#333", marginRight: 4 },
+  cardContent: { marginBottom: 10 },
+  cardText: { marginBottom: 4, color: "#555" },
+  bold: { fontWeight: "bold", color: "#333" },
+  buttonRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 12 },
+  cancelBtn: { backgroundColor: "#e0e0e0", flex: 1, padding: 10, borderRadius: 8, alignItems: "center", marginHorizontal: 2 },
+  cancelText: { color: "#000", fontWeight: "bold" },
+  editBtn: { backgroundColor: "#7ac47f", flex: 1, padding: 10, borderRadius: 8, alignItems: "center", marginHorizontal: 2 },
+  editText: { color: "#fff", fontWeight: "bold" },
   fab: {
     position: "absolute",
     bottom: 24,

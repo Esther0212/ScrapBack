@@ -50,14 +50,6 @@ const Rice = () => {
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/Main/redeem_rewards")}>
-            <Ionicons name="arrow-back" size={26} color="#000000" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>ScrapBack Offers</Text>
-          <View style={{ width: 26 }} />
-        </View>
 
         {/* Content */}
         {loading ? (

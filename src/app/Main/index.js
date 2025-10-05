@@ -99,7 +99,7 @@ const Home = () => {
             <View style={styles.rightContainer}>
               <Pressable
                 style={styles.redeemButton}
-                onPress={() => router.push("/Main/redeem_rewards")}
+                onPress={() => router.push("/Main/rewards/")}
               >
                 <Ionicons
                   name="gift-outline"

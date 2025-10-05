@@ -11,16 +11,35 @@ import {
   Alert,
   Platform,
   SafeAreaView,
+  Image,
+  ToastAndroid,
 } from "react-native";
-import MapView, { Marker, UrlTile } from "react-native-maps";
+import MapView, { Marker, UrlTile, Callout } from "react-native-maps";
 import * as Location from "expo-location";
+import * as ImagePicker from "expo-image-picker";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
+import { useLocalSearchParams } from "expo-router";
+
+// 🔥 Firebase
+import { db, storage } from "../../../../firebase";
+import {
+  collection,
+  onSnapshot,
+  doc,
+  getDoc,
+  updateDoc,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function PickupRequestForm() {
+  const [wasteCategories, setWasteCategories] = useState([]);
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [weight, setWeight] = useState("");
   const [pickupDateTime, setPickupDateTime] = useState("");
@@ -34,8 +53,43 @@ export default function PickupRequestForm() {
   const [showDateOnlyPicker, setShowDateOnlyPicker] = useState(false);
   const [showTimeOnlyPicker, setShowTimeOnlyPicker] = useState(false);
   const router = useRouter();
-
   const [date, setDate] = useState(new Date());
+  const [photo, setPhoto] = useState(null);
+
+  const [submitting, setSubmitting] = useState(false);
+
+  // waste category modal
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const { requestId } = useLocalSearchParams(); // 👈 get passed id
+
+  // 📡 Fetch wasteConversionRates
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "wasteConversionRates"),
+      (snapshot) => {
+        const rawData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        const grouped = rawData.reduce((acc, item) => {
+          if (!acc[item.category]) acc[item.category] = [];
+          acc[item.category].push(item);
+          return acc;
+        }, {});
+
+        const groupedArray = Object.keys(grouped).map((cat) => ({
+          category: cat,
+          items: grouped[cat],
+        }));
+
+        setWasteCategories(groupedArray);
+      }
+    );
+
+    return () => unsub();
+  }, []);
 
   const toggleType = (type) => {
     setSelectedTypes((prev) =>
@@ -43,66 +97,177 @@ export default function PickupRequestForm() {
     );
   };
 
-  const fetchAddressName = async (coords) => {
-    try {
-      // Always try Google Geocoding API first
-      const resp = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.latitude},${coords.longitude}&key=YOUR_API_KEY`
-      );
-      const data = await resp.json();
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Denied", "Camera permission is required.");
+      return;
+    }
 
-      let formatted = "";
-      if (data.results && data.results.length > 0) {
-        formatted = data.results[0].formatted_address;
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      const localUri = result.assets[0].uri;
+
+      try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const response = await fetch(localUri);
+        const blob = await response.blob();
+
+        // Unique file path for this user + timestamp
+        const storageRef = ref(
+          storage,
+          `pickupRequests/${user.uid}_${Date.now()}.jpg`
+        );
+
+        await uploadBytes(storageRef, blob);
+
+        const downloadUrl = await getDownloadURL(storageRef);
+        setPhoto(downloadUrl); // ✅ save the cloud URL, not file://
+      } catch (err) {
+        console.error("Image upload failed:", err);
+        Alert.alert("Upload failed", "Could not upload photo.");
       }
-
-      // If Google failed, fallback to expo-location
-      if (!formatted) {
-        const [address] = await Location.reverseGeocodeAsync(coords);
-        if (address) {
-          const parts = [
-            address.name,
-            address.street,
-            address.district,
-            address.city,
-            address.region,
-            address.country,
-          ].filter(Boolean);
-          formatted = parts.join(", ");
-        }
-      }
-
-      setAddressName(formatted || "Unknown location");
-    } catch (err) {
-      console.error("Geocoding failed:", err);
-      setAddressName("Unknown location");
     }
   };
 
-  useEffect(() => {
-    (async () => {
-      setLoadingLocation(true);
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission Denied", "Location permission is required.");
-        setLoadingLocation(false);
+  const fetchAddressName = async (coords) => {
+    try {
+      const apiKey = "21e4ce510e324d2c81b5caa1989a69d2";
+      const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${coords.latitude}&lon=${coords.longitude}&apiKey=${apiKey}`;
+
+      const res = await fetch(url);
+      if (!res.ok) {
+        setAddressName("Unknown location");
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
-      const coords = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      };
-      setInitialRegion(coords);
-      setMarkerCoords({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
-      fetchAddressName(location.coords);
-      setLoadingLocation(false);
+      const data = await res.json();
+      const props = data.features[0]?.properties;
+
+      if (props) {
+        const parts = [
+          props.street,
+          props.suburb || props.district,
+          props.city || props.county,
+          props.state || props.region,
+          props.postcode,
+          props.country,
+        ].filter(Boolean);
+
+        const detailed = parts.join(", ");
+        setAddressName(detailed || props.formatted || "Unknown location");
+      } else {
+        setAddressName("Unknown location");
+      }
+    } catch (err) {
+      console.error("Reverse geocode failed:", err);
+      setAddressName("Unknown location");
+    }
+  };
+  // 👇 fetch existing request if editing
+  useEffect(() => {
+    const loadRequest = async () => {
+      if (!requestId) return; // new request
+
+      try {
+        const docRef = doc(db, "pickupRequests", requestId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setSelectedTypes(data.types || []);
+          setWeight(data.estimatedWeight?.toString() || "");
+          setPickupDateTime(data.pickupDateTime || "");
+          setPickupAddress(data.pickupAddress || "");
+          setMarkerCoords(data.coords || null);
+          setPhoto(data.photoUrl || null);
+        }
+      } catch (err) {
+        console.error("Failed to load request:", err);
+      }
+    };
+
+    loadRequest();
+  }, [requestId]);
+
+  // 🔹 Load user default address or fallback to GPS
+  useEffect(() => {
+    (async () => {
+      setLoadingLocation(true);
+      try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+
+        if (user) {
+          const userDoc = await getDoc(doc(db, "user", user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.address) {
+              const { street, barangay, city, province, region, postalCode } =
+                userData.address;
+
+              const formattedAddress = [
+                street,
+                barangay,
+                city,
+                province,
+                region,
+                postalCode,
+              ]
+                .filter(Boolean)
+                .join(", ");
+
+              setPickupAddress(formattedAddress);
+              setAddressName(formattedAddress);
+
+              if (userData.addressCoords) {
+                setMarkerCoords(userData.addressCoords);
+                setInitialRegion({
+                  ...userData.addressCoords,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                });
+                setLoadingLocation(false);
+                return;
+              }
+            }
+          }
+        }
+
+        // fallback to GPS if no saved address
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission Denied", "Location permission is required.");
+          setLoadingLocation(false);
+          return;
+        }
+
+        const location = await Location.getCurrentPositionAsync({});
+        const coords = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        };
+        setInitialRegion(coords);
+        setMarkerCoords({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
+        fetchAddressName(location.coords);
+      } catch (err) {
+        console.error("Error fetching user address:", err);
+      } finally {
+        setLoadingLocation(false);
+      }
     })();
   }, []);
 
@@ -126,7 +291,7 @@ export default function PickupRequestForm() {
         updatedDate.setMonth(selectedDate.getMonth());
         updatedDate.setDate(selectedDate.getDate());
         setDate(updatedDate);
-        setShowTimeOnlyPicker(true); // show time picker after date
+        setShowTimeOnlyPicker(true);
       }
     } else if (showTimeOnlyPicker) {
       setShowTimeOnlyPicker(false);
@@ -136,6 +301,7 @@ export default function PickupRequestForm() {
         updatedDate.setMinutes(selectedDate.getMinutes());
         setDate(updatedDate);
         const formatted = updatedDate.toLocaleString("en-US", {
+          year: "numeric",
           month: "long",
           day: "numeric",
           hour: "numeric",
@@ -147,35 +313,111 @@ export default function PickupRequestForm() {
     }
   };
 
+  const showToast = (msg) => {
+    if (Platform.OS === "android") {
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    } else {
+      Alert.alert(msg);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedTypes.length || !weight || !pickupDateTime || !pickupAddress) {
+      Alert.alert("Please fill in all fields.");
+      return;
+    }
+
+    try {
+      setSubmitting(true); // ⬅️ FIXED
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) return;
+
+      if (requestId) {
+        await updateDoc(doc(db, "pickupRequests", requestId), {
+          types: selectedTypes,
+          estimatedWeight: weight,
+          pickupDateTime,
+          pickupAddress,
+          pickupDate: date, 
+          coords: markerCoords,
+          photoUrl: photo || null,
+          updatedAt: serverTimestamp(),
+        });
+        Alert.alert("Pickup request updated!");
+      } else {
+        await addDoc(collection(db, "pickupRequests"), {
+          userId: user.uid,
+          types: selectedTypes,
+          estimatedWeight: weight,
+          pickupDateTime,
+          pickupDate: date,      // 👈 save actual Date object
+          pickupAddress,
+          coords: markerCoords,
+          photoUrl: photo || null,
+          status: "pending",
+          createdAt: serverTimestamp(),
+        });
+        Alert.alert("Pickup request created!");
+      }
+    } catch (err) {
+      console.error("Error saving request:", err);
+      Alert.alert("Failed to save request.");
+    } finally {
+      setSubmitting(false); // ⬅️ FIXED
+    }
+  };
+
   return (
     <CustomBgColor>
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.container}>
+          {/* Waste Categories */}
+          <Text style={styles.label}>Select Waste Category</Text>
+          {wasteCategories.map((cat) => {
+            const selectedInCat = selectedTypes.filter((t) =>
+              cat.items.some((item) => item.type === t)
+            );
 
-          <Text style={styles.label}>Type of recyclable</Text>
-          <View style={styles.card}>
-            <Text style={styles.selectLabel}>Select all that applies</Text>
-            {["Plastic", "Paper", "Metal", "Glass"].map((type) => (
+            return (
               <TouchableOpacity
-                key={type}
-                onPress={() => toggleType(type)}
+                key={cat.category}
                 style={[
-                  styles.option,
-                  selectedTypes.includes(type) && styles.optionSelected,
+                  styles.categoryCard,
+                  selectedInCat.length > 0 && styles.categoryCardSelected, // ✅ highlight selected category
                 ]}
+                onPress={() => {
+                  setSelectedCategory(cat);
+                  setCategoryModalVisible(true);
+                }}
               >
-                <Text
-                  style={[
-                    styles.optionText,
-                    selectedTypes.includes(type) && styles.optionTextSelected,
-                  ]}
-                >
-                  {type}
-                </Text>
+                <View style={styles.iconWrapper}>
+                  <FontAwesome
+                    name="recycle"
+                    size={28}
+                    color={selectedInCat.length > 0 ? "#0E9247" : "#999"} // ✅ icon turns green if selected
+                  />
+                </View>
+                <View style={styles.infoTextContainer}>
+                  <Text
+                    style={[
+                      styles.categoryTitle,
+                      selectedInCat.length > 0 && { color: "#0E9247" }, // ✅ category text green if selected
+                    ]}
+                  >
+                    {cat.category}
+                  </Text>
+                  <Text style={styles.categorySub}>
+                    {selectedInCat.length > 0
+                      ? `${selectedInCat.length} selected`
+                      : `${cat.items.length} types available`}
+                  </Text>
+                </View>
               </TouchableOpacity>
-            ))}
-          </View>
+            );
+          })}
 
+          {/* Weight */}
           <Text style={styles.label}>Estimated weight (kg)</Text>
           <TextInput
             style={styles.input}
@@ -185,6 +427,33 @@ export default function PickupRequestForm() {
             onChangeText={setWeight}
           />
 
+          {/* Waste photo */}
+          <Text style={styles.label}>Waste Picture</Text>
+          <TouchableOpacity style={styles.infoBox} onPress={pickImage}>
+            <View style={styles.iconWrapper}>
+              <Ionicons name="camera" size={30} color="green" />
+            </View>
+            <View style={styles.infoTextContainer}>
+              <Text style={styles.infoTitle}>Add a Photo</Text>
+              <Text style={styles.infoSub}>
+                {photo ? "Photo added" : "Take a photo of your waste"}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {photo && (
+            <Image
+              source={{ uri: photo }}
+              style={{
+                width: "100%",
+                height: 200,
+                borderRadius: 12,
+                marginBottom: 16,
+              }}
+            />
+          )}
+
+          {/* Date */}
           <TouchableOpacity
             style={styles.infoBox}
             onPress={() => setShowDateOnlyPicker(true)}
@@ -200,6 +469,7 @@ export default function PickupRequestForm() {
             </View>
           </TouchableOpacity>
 
+          {/* Address */}
           <TouchableOpacity
             style={styles.infoBox}
             onPress={() => setModalVisible(true)}
@@ -215,21 +485,23 @@ export default function PickupRequestForm() {
             </View>
           </TouchableOpacity>
 
+          {/* Submit */}
           <TouchableOpacity
-            style={styles.requestButton}
-            onPress={() => {
-              // Do validation here if needed
-              Alert.alert(
-                "Request Submitted",
-                "Your pickup request has been sent."
-              );
-              router.back(); // This will navigate back to the index/root screen
-            }}
+            style={[styles.requestButton, submitting && { opacity: 0.6 }]}
+            onPress={handleSubmit}
+            disabled={submitting}
           >
-            <FontAwesome name="truck" size={30} color="#fff" />
-            <Text style={styles.requestButtonText}>Request Pickup</Text>
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <FontAwesome name="truck" size={30} color="#fff" />
+                <Text style={styles.requestButtonText}>Request Pickup</Text>
+              </>
+            )}
           </TouchableOpacity>
 
+          {/* Date Pickers */}
           {showDateOnlyPicker && (
             <DateTimePicker
               value={date}
@@ -238,7 +510,6 @@ export default function PickupRequestForm() {
               onChange={onChangeDate}
             />
           )}
-
           {showTimeOnlyPicker && (
             <DateTimePicker
               value={date}
@@ -252,7 +523,6 @@ export default function PickupRequestForm() {
           {/* Map Modal */}
           <Modal visible={modalVisible} animationType="slide">
             <View style={{ flex: 1 }}>
-              {/* Floating header search */}
               <View style={styles.topOverlay}>
                 <View style={styles.searchBox}>
                   <TextInput
@@ -273,7 +543,7 @@ export default function PickupRequestForm() {
                   onPress={(e) => {
                     const coords = e.nativeEvent.coordinate;
                     setMarkerCoords(coords);
-                    fetchAddressName(coords); // ✅ improved geocoding
+                    fetchAddressName(coords);
                   }}
                 >
                   <UrlTile
@@ -287,16 +557,23 @@ export default function PickupRequestForm() {
                       onDragEnd={(e) => {
                         const coords = e.nativeEvent.coordinate;
                         setMarkerCoords(coords);
-                        fetchAddressName(coords); // ✅ improved geocoding
+                        fetchAddressName(coords);
                       }}
                     >
                       <FontAwesome name="map-marker" size={38} color="red" />
+                      <Callout>
+                        <View style={{ width: 200 }}>
+                          <Text style={{ fontWeight: "bold", marginBottom: 4 }}>
+                            Selected Location
+                          </Text>
+                          <Text>{addressName || "Fetching address..."}</Text>
+                        </View>
+                      </Callout>
                     </Marker>
                   )}
                 </MapView>
               )}
 
-              {/* Floating footer buttons */}
               <View style={styles.footerOverlay}>
                 <TouchableOpacity
                   style={styles.cancelBtnOverlay}
@@ -313,6 +590,55 @@ export default function PickupRequestForm() {
               </View>
             </View>
           </Modal>
+
+          {/* Waste Category Modal */}
+          <Modal visible={categoryModalVisible} animationType="slide">
+            <SafeAreaView style={{ flex: 1 }}>
+              <Text style={styles.modalHeader}>
+                {selectedCategory?.category}
+              </Text>
+              <ScrollView contentContainerStyle={styles.modalList}>
+                {selectedCategory?.items.map((item) => {
+                  const isSelected = selectedTypes.includes(item.type);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => toggleType(item.type)}
+                      style={[
+                        styles.wasteOption,
+                        isSelected && styles.wasteOptionSelected, // ✅ background/border change
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.wasteText,
+                          isSelected && styles.wasteTextSelected, // ✅ text change
+                        ]}
+                      >
+                        {item.type}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.wastePoints,
+                          isSelected && { color: "#0E9247", fontWeight: "700" }, // ✅ points color change too
+                        ]}
+                      >
+                        {item.points} pts/kg
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setCategoryModalVisible(false)}
+                >
+                  <Text style={styles.modalCloseText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </Modal>
         </ScrollView>
       </SafeAreaView>
     </CustomBgColor>
@@ -320,13 +646,7 @@ export default function PickupRequestForm() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    paddingTop: 10, 
-    flexGrow: 1,
-  },
-
-  /* Labels */
+  container: { padding: 20, paddingTop: 10, flexGrow: 1 },
   label: {
     fontSize: 14,
     fontWeight: "600",
@@ -334,60 +654,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 6,
   },
-
-  /* Recyclable card w/ green header */
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    overflow: "hidden",
-    marginBottom: 24,
-    // subtle shadow
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowOffset: { width: 0, height: 6 },
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  selectLabel: {
-    backgroundColor: "#7DBF61", // green header band
-    color: "#fff",
-    fontWeight: "700",
-    textAlign: "center",
-    paddingVertical: 12,
-    fontSize: 15,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    overflow: "hidden",
-  },
-
-  /* Option rows */
-  option: {
-    paddingVertical: 14,
+  categoryCard: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
     backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+    elevation: 2,
   },
-  optionSelected: {
-    backgroundColor: "#F2FAF1", // subtle selected tint
-  },
-  optionText: {
-    fontSize: 16,
-    color: "#333",
-  },
-  optionTextSelected: {
-    fontWeight: "600",
-    color: "#2F6C31",
-  },
-
-  /* weight input */
+  categoryTitle: { fontSize: 15, fontWeight: "600", color: "#333" },
+  categorySub: { fontSize: 13, color: "#777", marginTop: 2 },
   input: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -397,20 +680,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#EFEFEF",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOpacity: 0.02,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
   },
-
-  /* date/address info boxes */
   infoBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -420,129 +690,25 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#EFEFEF",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOpacity: 0.03,
-        shadowOffset: { width: 0, height: 6 },
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
   },
-  iconWrapper: {
-    width: 36, // fixed width to align text consistently
-    alignItems: "center",
-  },
-  infoTextContainer: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-  },
-  infoSub: {
-    color: "#6b6b6b",
-    fontSize: 13,
-    marginTop: 4,
-  },
-
-  /* Request button (truck + text) */
+  iconWrapper: { width: 36, alignItems: "center" },
+  infoTextContainer: { marginLeft: 12, flex: 1 },
+  infoTitle: { fontSize: 14, fontWeight: "600", color: "#333" },
+  infoSub: { color: "#6b6b6b", fontSize: 13, marginTop: 4 },
   requestButton: {
     flexDirection: "row",
-    backgroundColor: "#0E9247", // brighter green like screenshot
+    backgroundColor: "#0E9247",
     paddingVertical: 16,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOpacity: 0.12,
-        shadowOffset: { width: 0, height: 8 },
-        shadowRadius: 18,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
   },
   requestButtonText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 16,
-    marginLeft: 10, // spacing between icon and text
-  },
-
-  /* Modal / map */
-  modalHeader: {
-    fontSize: 16,
-    fontWeight: "700",
-    padding: 16,
-    textAlign: "center",
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  modalFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 16,
-    backgroundColor: "#fff",
-  },
-  cancelBtn: {
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    flex: 1,
-    marginRight: 8,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  confirmBtn: {
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: "#0E9247",
-    flex: 1,
-    marginLeft: 8,
-    alignItems: "center",
-  },
-  cancelBtnText: {
-    color: "#333",
-    fontWeight: "700",
-  },
-  confirmBtnText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-
-  /* address input in modal */
-  addressInput: {
-    marginTop: 12,
-    fontSize: 15,
-    fontWeight: "500",
-    textAlign: "center",
-    padding: 12,
-    borderColor: "#eee",
-    borderWidth: 1,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-  },
-  mapHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    marginLeft: 10,
   },
   topOverlay: {
     position: "absolute",
@@ -564,8 +730,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  searchInput: { flex: 1, fontSize: 16 },
-
+  searchOverlay: { flex: 1, fontSize: 16 },
   footerOverlay: {
     position: "absolute",
     bottom: 40,
@@ -580,7 +745,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     paddingVertical: 14,
     borderRadius: 10,
-    backgroundColor: "rgba(0,0,0,0.6)", // dark translucent
+    backgroundColor: "rgba(0,0,0,0.6)",
     alignItems: "center",
   },
   confirmBtnOverlay: {
@@ -588,12 +753,49 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     paddingVertical: 14,
     borderRadius: 10,
-    backgroundColor: "#7EBF62", // green confirm
+    backgroundColor: "#7EBF62",
     alignItems: "center",
   },
-  footerText: {
-    color: "#fff",
+  footerText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  modalHeader: {
+    fontSize: 16,
     fontWeight: "700",
+    padding: 16,
+    textAlign: "center",
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modalList: { padding: 16 },
+  wasteOption: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  wasteOptionSelected: {
+    borderColor: "#0E9247",
+    backgroundColor: "#E6F4EA", // lighter green background when selected
+  },
+  wasteText: { fontSize: 15, color: "#333", fontWeight: "500" },
+  wasteTextSelected: { color: "#0E9247", fontWeight: "700" },
+  wastePoints: { fontSize: 13, color: "#666", marginTop: 4 },
+  modalFooter: {
+    padding: 16,
+    backgroundColor: "#f9f9f9",
+    alignItems: "center",
+  },
+  modalCloseBtn: {
+    backgroundColor: "#0E9247",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  modalCloseText: {
+    color: "#fff",
+    fontWeight: "600",
     fontSize: 15,
   },
 });
