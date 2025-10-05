@@ -193,7 +193,6 @@ const SwitchAccount = () => {
     }
 
     setErrors(tempErrors);
-
     if (!isValid) return;
 
     try {
@@ -209,26 +208,39 @@ const SwitchAccount = () => {
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        const firstName = userData.firstName || "";
-        await AsyncStorage.setItem("firstName", firstName);
+
+        // Always save to savedUsers (for Switch Account modal)
+        let savedUsers =
+          JSON.parse(await AsyncStorage.getItem("savedUsers")) || [];
+
+        const exists = savedUsers.some((u) => u.uid === user.uid);
+        if (!exists) {
+          savedUsers.push({
+            uid: user.uid,
+            email,
+            password, // (consider encrypting this in future)
+            firstName: userData.firstName || "",
+            lastName: userData.lastName || "",
+            profilePic: userData.profilePic || null,
+          });
+          await AsyncStorage.setItem("savedUsers", JSON.stringify(savedUsers));
+        }
+
+        // Save name for quick access (optional)
+        await AsyncStorage.setItem("firstName", userData.firstName || "");
+
+        // Only store "lastUsedUser" if Remember Me is checked
+        if (rememberMe) {
+          await AsyncStorage.setItem(
+            "lastUsedUser",
+            JSON.stringify({
+              uid: user.uid,
+              email,
+              password,
+            })
+          );
+        }
       }
-
-  if (rememberMe) {
-    let savedUsers = JSON.parse(await AsyncStorage.getItem("savedUsers")) || [];
-
-    if (!savedUsers.some(u => u.uid === user.uid)) {
-      savedUsers.push({
-        uid: user.uid,
-        email,
-        password, 
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        profilePic: userData.profilePic || null,
-      });
-      await AsyncStorage.setItem("savedUsers", JSON.stringify(savedUsers));
-    }
-  }
-
 
       Alert.alert("Login Success", "You have successfully logged in!");
       router.replace("/Main");
