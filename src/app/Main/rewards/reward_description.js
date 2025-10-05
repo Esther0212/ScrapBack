@@ -68,7 +68,11 @@ const RewardDescription = () => {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 40 }} />
+          <ActivityIndicator
+            size="large"
+            color="#2E7D32"
+            style={{ marginTop: 40 }}
+          />
         </SafeAreaView>
       </CustomBgColor>
     );
@@ -87,40 +91,6 @@ const RewardDescription = () => {
     );
   }
 
-  // ✅ Dynamic about text per category
-  const renderAboutText = () => {
-    switch (reward.category) {
-      case "sack":
-        return (
-          <Text style={styles.text}>
-            <Text style={styles.bold}>ABOUT ScrapBack{"\n"}</Text>
-            ScrapBack is a digital recycling rewards system developed for PACAFACO
-            residents. Recyclable materials are converted into reward points,
-            which can be redeemed for essential items such as sacks of rice.
-          </Text>
-        );
-      case "load":
-        return (
-          <Text style={styles.text}>
-            <Text style={styles.bold}>ABOUT ScrapBack{"\n"}</Text>
-            ScrapBack empowers residents by turning recyclable waste into digital
-            points. These points can be exchanged for prepaid mobile load rewards.
-          </Text>
-        );
-      case "gcash":
-        return (
-          <Text style={styles.text}>
-            <Text style={styles.bold}>ABOUT ScrapBack{"\n"}</Text>
-            ScrapBack promotes sustainability by rewarding recycling habits.
-            Users can convert their collected points into GCash balance for
-            flexible use.
-          </Text>
-        );
-      default:
-        return null;
-    }
-  };
-
   return (
     <CustomBgColor>
       {/* ✅ Dynamic header title */}
@@ -136,53 +106,55 @@ const RewardDescription = () => {
         {/* Content */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Image */}
-          <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
+          <LinearGradient
+            colors={["#E8F5E9", "#FFFFFF"]}
+            style={styles.imageWrapper}
+          >
             {reward.image && (
               <Image source={{ uri: reward.image }} style={styles.image} />
             )}
           </LinearGradient>
 
           {/* Card Content */}
-          <View style={styles.card}>
-            {renderAboutText()}
+ <View style={styles.card}>
+  <Text style={styles.sectionTitle}>About this Reward</Text>
+  <Text style={styles.text}>{reward.description}</Text>
 
-            <Text style={styles.sectionTitle}>About this Reward</Text>
-            <Text style={styles.text}>{reward.description}</Text>
+  <Text style={styles.sectionTitle}>Points Required</Text>
+  <Text style={styles.text}>{reward.points} pts</Text>
 
-            <Text style={styles.sectionTitle}>Points Required</Text>
-            <Text style={styles.text}>{reward.points} pts</Text>
+  <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
+  <Text style={styles.text}>
+    {reward.howToRedeem
+      ? reward.howToRedeem
+      : "Redemption instructions are not available at the moment."}
+  </Text>
 
-            <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
-            <Text style={styles.text}>
-              1. Go to any designated PACAFACO collection point.{"\n"}
-              2. Show your QR code from the ScrapBack app to the staff.{"\n"}
-              3. Staff will scan your QR and validate your points.{"\n"}
-              4. Choose your reward and confirm redemption.{"\n"}
-              5. Receive your reward on the spot or be notified for scheduled claiming.{"\n\n"}
-              <Text style={styles.bold}>
-                Note: Ensure you meet the minimum points required before redeeming.
-              </Text>
-            </Text>
+  <Text style={styles.bold}>
+    Note: Ensure you meet the minimum points required before redeeming.
+  </Text>
 
-            {/* CTA Button */}
-{reward.category === "sack" ? (
-  <TouchableOpacity
-    activeOpacity={0.85}
-    onPress={() => router.push("Main/map/MapSelector")}
-    style={styles.ctaButtonSolid}
-  >
-    <Text style={styles.ctaText}>Go to Nearest PACAFACO Point</Text>
-  </TouchableOpacity>
-) : (
-  <TouchableOpacity
-    activeOpacity={0.85}
-    onPress={() => setModalVisible(true)}
-    style={styles.ctaButtonSolid}
-  >
-    <Text style={styles.ctaText}>Redeem for {reward.points} Points</Text>
-  </TouchableOpacity>
-)}
-          </View>
+  {/* CTA Button */}
+  {reward.category === "sack" ? (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => router.push("Main/map/MapSelector")}
+      style={styles.ctaButtonSolid}
+    >
+      <Text style={styles.ctaText}>Go to Nearest PACAFACO Point</Text>
+    </TouchableOpacity>
+  ) : (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => setModalVisible(true)}
+      style={styles.ctaButtonSolid}
+    >
+      <Text style={styles.ctaText}>
+        Redeem for {reward.points} Points
+      </Text>
+    </TouchableOpacity>
+  )}
+</View>
         </ScrollView>
 
         {/* Modal */}
@@ -273,21 +245,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   bold: { fontFamily: "Poppins_700Bold" },
-ctaButtonSolid: {
-  backgroundColor: "#008243",
-  borderRadius: 10,
-  paddingVertical: 14,
-  marginTop: 24,
-  alignItems: "center",
-  justifyContent: "center",
-  alignSelf: "center", 
-  width: "90%",       
-  shadowColor: "#008243",
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.3,
-  shadowRadius: 6,
-  elevation: 3,
-},
+  ctaButtonSolid: {
+    backgroundColor: "#008243",
+    borderRadius: 10,
+    paddingVertical: 14,
+    marginTop: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    width: "90%",
+    shadowColor: "#008243",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
   ctaText: {
     color: "white",
     fontSize: 16,
