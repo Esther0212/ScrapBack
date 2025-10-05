@@ -284,7 +284,7 @@ const RequestPickup = () => {
                 <Text style={styles.statusBarText}>Pickup Requests</Text>
                 <TouchableOpacity
                   onPress={() =>
-                    router.push("Main/requestPickup/ArchivedRequests")
+                    router.push("Main/requestPickup/RequestHistory")
                   }
                 >
                   <Text style={styles.link}>Go to Archive</Text>
