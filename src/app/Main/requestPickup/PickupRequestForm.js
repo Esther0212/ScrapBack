@@ -301,6 +301,7 @@ export default function PickupRequestForm() {
         updatedDate.setMinutes(selectedDate.getMinutes());
         setDate(updatedDate);
         const formatted = updatedDate.toLocaleString("en-US", {
+          year: "numeric",
           month: "long",
           day: "numeric",
           hour: "numeric",
@@ -338,6 +339,7 @@ export default function PickupRequestForm() {
           estimatedWeight: weight,
           pickupDateTime,
           pickupAddress,
+          pickupDate: date, 
           coords: markerCoords,
           photoUrl: photo || null,
           updatedAt: serverTimestamp(),
@@ -349,6 +351,7 @@ export default function PickupRequestForm() {
           types: selectedTypes,
           estimatedWeight: weight,
           pickupDateTime,
+          pickupDate: date,      // 👈 save actual Date object
           pickupAddress,
           coords: markerCoords,
           photoUrl: photo || null,
