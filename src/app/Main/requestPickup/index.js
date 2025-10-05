@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,98 +6,208 @@ import {
   TouchableOpacity,
   FlatList,
   SafeAreaView,
+  ActivityIndicator,
+  Image,
+  Alert,
+  ToastAndroid,
+  Platform,
 } from "react-native";
 import * as Animatable from "react-native-animatable";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
 
-const dummyData = [
-  {
-    id: "1",
-    status: "Requested",
-    statusColor: "#2da9ef",
-    recyclables: "Plastic, Metal, Glass",
-    weight: "2.5 kg",
-    datetime: "7 Sept, 13:00",
-    address: "123 Green Street, Brooklyn",
-  },
-  {
-    id: "2",
-    status: "Requested",
-    statusColor: "#2da9ef",
-    recyclables: "Paper, Glass",
-    weight: "1.2 kg",
-    datetime: "9 Sept, 10:30",
-    address: "456 Eco Avenue, Queens",
-  },
-  {
-    id: "3",
-    status: "Pending",
-    statusColor: "#f4c430",
-    recyclables: "Plastic, Metal",
-    weight: "3.0 kg",
-    datetime: "10 Sept, 09:15",
-    address: "789 Reuse Blvd, Manhattan",
-  },
-  {
-    id: "4",
-    status: "Completed",
-    statusColor: "#2fa64f",
-    recyclables: "Glass, Paper",
-    weight: "4.5 kg",
-    datetime: "5 Sept, 14:00",
-    address: "321 Green Lane, Bronx",
-  },
-];
+// 🔥 Firebase
+import { db } from "../../../../firebase";
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const RequestPickup = () => {
   const router = useRouter();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const renderCard = (item) => (
-    <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
-      <View style={[styles.statusTag, { backgroundColor: item.statusColor }]}>
-        <Text style={styles.statusLabel}>{item.status}</Text>
-      </View>
-      <View style={styles.cardContent}>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Recyclables:</Text> {item.recyclables}
+  // Load current user's pickup requests
+  useEffect(() => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const q = query(collection(db, "pickupRequests"), where("userId", "==", user.uid));
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setRequests(data);
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, []);
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "requested":
+        return "#2da9ef"; // blue
+      case "pending":
+        return "#f4c430"; // yellow
+      case "completed":
+        return "#2fa64f"; // green
+      case "cancelled":
+        return "#d9534f"; // red
+      default:
+        return "#999"; // gray
+    }
+  };
+
+  const showToast = (msg) => {
+    if (Platform.OS === "android") {
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    } else {
+      Alert.alert(msg);
+    }
+  };
+
+  const handleCancel = (id) => {
+    Alert.alert(
+      "Cancel Pickup",
+      "Are you sure you want to cancel this request?",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes",
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, "pickupRequests", id), { status: "cancelled" });
+              showToast("Pickup request cancelled.");
+            } catch (err) {
+              console.error("Error cancelling request:", err);
+              showToast("Failed to cancel request.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEdit = (item) => {
+    Alert.alert(
+      "Edit Pickup",
+      "Do you want to edit this pickup request?",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes",
+          onPress: () => {
+            // Navigate to form with request data
+            router.push({
+              pathname: "Main/requestPickup/PickupRequestForm",
+              params: { requestId: item.id }, // pass id, you can fetch inside form
+            });
+          },
+        },
+      ]
+    );
+  };
+
+  const renderCard = (item) => {
+    // decode URL in case of %2F issues
+    const imageUrl = item.photoUrl || null;
+    console.log("Rendering photo URL:", imageUrl);
+
+    return (
+      <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
+        {/* Waste photo */}
+       {imageUrl ? (
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.photo}
+          resizeMode="cover"
+          onError={(e) =>
+            console.error("Image failed to load:", e.nativeEvent.error)
+          }
+        />
+      ) : (
+        <Text style={{ color: "#999", marginBottom: 10 }}>
+          No image available
         </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Weight:</Text> {item.weight}
-        </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Datetime:</Text> {item.datetime}
-        </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.bold}>Address:</Text> {item.address}
-        </Text>
-      </View>
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.cancelBtn}>
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.editBtn}>
-          <Text style={styles.editText}>Edit</Text>
-        </TouchableOpacity>
-      </View>
-    </Animatable.View>
-  );
+      )}
+
+        {/* Status tag */}
+        <View
+          style={[styles.statusTag, { backgroundColor: getStatusColor(item.status) }]}
+        >
+          <Text style={styles.statusLabel}>
+            {item.status
+              ? item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase()
+              : "Pending"}
+          </Text>
+        </View>
+
+        {/* Details */}
+        <View style={styles.cardContent}>
+          <Text style={styles.cardText}>
+            <Text style={styles.bold}>Recyclables:</Text>{" "}
+            {item.types?.join(", ") || "N/A"}
+          </Text>
+          <Text style={styles.cardText}>
+            <Text style={styles.bold}>Weight:</Text>{" "}
+            {item.estimatedWeight ? `${item.estimatedWeight} kg` : "N/A"}
+          </Text>
+          <Text style={styles.cardText}>
+            <Text style={styles.bold}>Datetime:</Text>{" "}
+            {item.pickupDateTime || "N/A"}
+          </Text>
+          <Text style={styles.cardText}>
+            <Text style={styles.bold}>Address:</Text>{" "}
+            {item.pickupAddress || "N/A"}
+          </Text>
+        </View>
+
+        {/* Buttons */}
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={() => handleCancel(item.id)}
+          >
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => handleEdit(item)}
+          >
+            <Text style={styles.editText}>Edit</Text>
+          </TouchableOpacity>
+        </View>
+      </Animatable.View>
+    );
+  };
 
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
-        <FlatList
-          data={dummyData}
-          renderItem={({ item }) => renderCard(item)}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16,}}
-          ListHeaderComponent={
-            <View style={styles.statusBar}>
-              <Text style={styles.statusBarText}>Status</Text>
-            </View>
-          }
-        />
+        {loading ? (
+          <ActivityIndicator size="large" style={{ marginTop: 40 }} />
+        ) : (
+          <FlatList
+            data={requests}
+            renderItem={({ item }) => renderCard(item)}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 16 }}
+            ListHeaderComponent={
+              <View style={styles.statusBar}>
+                <Text style={styles.statusBarText}>Status</Text>
+              </View>
+            }
+            ListEmptyComponent={
+              <Text style={{ textAlign: "center", marginTop: 40, color: "#555" }}>
+                No pickup requests yet.
+              </Text>
+            }
+          />
+        )}
 
         {/* Floating Action Button */}
         <TouchableOpacity
@@ -132,13 +242,19 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
-    padding: 20,
+    padding: 16,
     marginBottom: 16,
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 5,
     elevation: 3,
+  },
+  photo: {
+    width: "100%",
+    height: 180,
+    borderRadius: 10,
+    marginBottom: 10,
   },
   statusTag: {
     alignSelf: "flex-start",
