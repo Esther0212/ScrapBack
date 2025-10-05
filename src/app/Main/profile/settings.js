@@ -36,19 +36,19 @@ const Settings = () => {
   };
 
   // Load saved accounts
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const users = await AsyncStorage.getItem("savedUsers");
-        if (users) {
-          setSavedUsers(JSON.parse(users));
-        }
-      } catch (err) {
-        console.error("Error loading saved users:", err);
+useEffect(() => {
+  const fetchUsers = async () => {
+    try {
+      const users = await AsyncStorage.getItem("savedUsers");
+      if (users) {
+        setSavedUsers(JSON.parse(users));
       }
-    };
-    fetchUsers();
-  }, []);
+    } catch (err) {
+      console.error("Error loading saved users:", err);
+    }
+  };
+  fetchUsers();
+}, []);
 
 const handleSwitch = async (user) => {
   try {
@@ -58,6 +58,8 @@ const handleSwitch = async (user) => {
       user.email,
       user.password
     );
+
+    await AsyncStorage.setItem("lastUsedUser", JSON.stringify(user));
 
     Alert.alert(
       "Switch Account",
