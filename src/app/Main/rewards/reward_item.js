@@ -31,7 +31,13 @@ const RewardItem = ({ category }) => {
         const querySnapshot = await getDocs(collection(db, "reward"));
         const filteredRewards = querySnapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((r) => r.category === category);
+          .filter((r) => {
+  if (category === "others") {
+    // ✅ Collect all rewards that are NOT gcash, load, or sack
+    return r.category !== "gcash" && r.category !== "load" && r.category !== "sack";
+  }
+  return r.category === category;
+});
 
         setOffers(filteredRewards);
       } catch (err) {

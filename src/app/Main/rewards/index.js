@@ -106,6 +106,31 @@ const RewardsIndex = () => {
                 </TouchableOpacity>
               </LinearGradient>
             </TouchableOpacity>
+            {/* OTHERS */}
+<TouchableOpacity
+  style={styles.card}
+  activeOpacity={0.9}
+  onPress={() => router.push("/Main/rewards/others")}
+>
+  <LinearGradient
+    colors={["#A5D6A7", "#E8F5E9"]}
+    style={styles.gradientCard}
+  >
+    <Image
+      source={require("../../../assets/redeem/other.png")}
+      style={styles.icon}
+    />
+    <Text style={styles.cardTitle}>Others</Text>
+    <Text style={styles.cardSubtitle}>Redeemable Onsite/Online</Text>
+    <TouchableOpacity
+      style={styles.redeemButton}
+      onPress={() => router.push("/Main/rewards/others")}
+    >
+      <Text style={styles.redeemText}>Redeem</Text>
+    </TouchableOpacity>
+  </LinearGradient>
+</TouchableOpacity>
+
           </View>
         </ScrollView>
       </SafeAreaView>
