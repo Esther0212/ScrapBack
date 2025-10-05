@@ -40,8 +40,8 @@ const styles = StyleSheet.create({
     alignItems: "center", // horizontally center content
   },
   subtitle: {
-    fontSize: 14,
-    color: "#333",
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
     textAlign: "center",
     marginBottom: 30,
     maxWidth: 300,
@@ -61,6 +61,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#000",
-    fontWeight: "bold",
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
   },
 });

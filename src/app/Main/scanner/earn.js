@@ -164,7 +164,8 @@ const styles = StyleSheet.create({
   },
   expiryText: {
     color: "red",
-    fontWeight: "500",
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
     marginBottom: 15,
     marginTop: 15,
   },
@@ -185,6 +186,7 @@ const styles = StyleSheet.create({
     marginVertical: 40, // pushes it away from description and button
   },
 
-  closeButtonText: { fontWeight: "bold", color: "#000" },
+  closeButtonText: { fontSize: 15,
+    fontFamily: "Poppins_700Bold", color: "#000" },
   errorText: { color: "red", fontWeight: "bold", textAlign: "center" },
 });

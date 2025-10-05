@@ -86,44 +86,44 @@ export default function RedeemRewardsQR() {
 
   return (
     <CustomBgColor>
-    <View style={styles.container}>
-      <View style={styles.qrContainer}>
-        <Text style={styles.description}>
-          Staff can scan this QR to deduct your points for rewards.
-        </Text>
-
-        {userData && timeLeft > 0 ? (
-          <QRCode
-            value={JSON.stringify({
-              uid: user.uid,
-              email: user.email,
-              name: `${userData.firstName || ""} ${userData.lastName || ""}`,
-              exp: expiryTimestamp,
-            })}
-            size={180}
-          />
-        ) : (
-          <Text style={styles.expiredMessage}>
-            {timeLeft === 0
-              ? "⚠️ QR code expired."
-              : "No Firestore data found."}
+      <View style={styles.container}>
+        <View style={styles.qrContainer}>
+          <Text style={styles.description}>
+            Staff can scan this QR to deduct your points for rewards.
           </Text>
-        )}
 
-        {timeLeft > 0 && (
-          <Text style={styles.expiryText}>
-            This QR code will expire in {minutes}:{seconds}
-          </Text>
-        )}
+          {userData && timeLeft > 0 ? (
+            <QRCode
+              value={JSON.stringify({
+                uid: user.uid,
+                email: user.email,
+                name: `${userData.firstName || ""} ${userData.lastName || ""}`,
+                exp: expiryTimestamp,
+              })}
+              size={180}
+            />
+          ) : (
+            <Text style={styles.expiredMessage}>
+              {timeLeft === 0
+                ? "⚠️ QR code expired."
+                : "No Firestore data found."}
+            </Text>
+          )}
 
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.closeButtonText}>CLOSE</Text>
-        </TouchableOpacity>
+          {timeLeft > 0 && (
+            <Text style={styles.expiryText}>
+              This QR code will expire in {minutes}:{seconds}
+            </Text>
+          )}
+
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.closeButtonText}>CLOSE</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
     </CustomBgColor>
   );
 }
@@ -152,7 +152,8 @@ const styles = StyleSheet.create({
   },
   expiryText: {
     color: "red",
-    fontWeight: "500",
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
     marginBottom: 15,
     marginTop: 15,
   },
@@ -172,6 +173,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     width: "100%",
   },
-  closeButtonText: { fontWeight: "bold", color: "#000" },
+  closeButtonText: {
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    color: "#000",
+  },
   errorText: { color: "red", fontWeight: "bold", textAlign: "center" },
 });
