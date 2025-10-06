@@ -191,6 +191,7 @@ const AccountInfo = () => {
             <View style={styles.container}>
               <View style={styles.imageWrapper}>
                 <TouchableOpacity
+                  disabled={!editMode}
                   onPress={() => editMode && setProfileModalVisible(true)}
                 >
                   <Image
