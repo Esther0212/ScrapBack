@@ -72,6 +72,79 @@ const ArchivedRequests = () => {
     }
   };
 
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "pending":
+        return "#f4c430";
+      case "in progress":
+        return "#2da9ef";
+      case "scheduled":
+        return "#9370db";
+      case "not approved":
+        return "#ff8c00";
+      case "completed":
+        return "#2fa64f";
+      case "cancelled":
+        return "#d9534f";
+      default:
+        return "#999";
+    }
+  };
+
+  const renderCard = (item) => {
+    return (
+      <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
+        {/* Status Badge */}
+        <View
+          style={[styles.statusTag, { backgroundColor: getStatusColor(item.status) }]}
+        >
+          <Text style={styles.statusLabel}>
+            {item.status
+              ? item.status.charAt(0).toUpperCase() +
+                item.status.slice(1).toLowerCase()
+              : "N/A"}
+          </Text>
+        </View>
+
+        {/* Info */}
+        <View style={styles.cardContent}>
+          <Text style={styles.cardText}>
+            <Text style={styles.bold}>Recyclables:</Text>{" "}
+            {item.types?.join(", ") || "N/A"}
+          </Text>
+          <Text style={styles.cardText}>
+            <Text style={styles.bold}>Datetime:</Text>{" "}
+            {item.pickupDateTime || "N/A"}
+          </Text>
+          <Text style={styles.cardText}>
+            <Text style={styles.bold}>Address:</Text>{" "}
+            {item.pickupAddress || "N/A"}
+          </Text>
+          {/* ✅ Reason Display */}
+          <Text style={styles.cardText}>
+            <Text style={styles.bold}>Reason:</Text>{" "}
+            {item.reason || item.cancelReason
+              ? `${item.reason || item.cancelReason} (${
+                  item.reasonBy === "admin" ? "by Admin" : "by You"
+                })`
+              : "No reason provided"}
+          </Text>
+        </View>
+
+        {/* ✅ Always show Unarchive button */}
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={styles.unarchiveBtn}
+            onPress={() => handleUnarchive(item.id)}
+          >
+            <Ionicons name="refresh" size={18} color="#fff" />
+            <Text style={styles.unarchiveText}>Unarchive</Text>
+          </TouchableOpacity>
+        </View>
+      </Animatable.View>
+    );
+  };
+
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
@@ -80,40 +153,9 @@ const ArchivedRequests = () => {
         ) : (
           <FlatList
             data={archived}
-            renderItem={({ item }) => (
-              <Animatable.View
-                animation="fadeInUp"
-                duration={600}
-                style={styles.card}
-              >
-                <Text style={styles.cardText}>
-                  <Text style={styles.bold}>Recyclables:</Text>{" "}
-                  {item.types?.join(", ") || "N/A"}
-                </Text>
-                <Text style={styles.cardText}>
-                  <Text style={styles.bold}>Datetime:</Text>{" "}
-                  {item.pickupDateTime || "N/A"}
-                </Text>
-                <View style={styles.buttonRow}>
-                  <TouchableOpacity
-                    style={styles.unarchiveBtn}
-                    onPress={() => handleUnarchive(item.id)}
-                  >
-                    <Text style={styles.unarchiveText}>Unarchive</Text>
-                  </TouchableOpacity>
-                </View>
-              </Animatable.View>
-            )}
+            renderItem={({ item }) => renderCard(item)}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 16 }}
-            ListHeaderComponent={
-              <View style={styles.statusBar}>
-                <Text style={styles.statusBarText}>Archived Requests</Text>
-                <TouchableOpacity onPress={() => router.back()}>
-                  <Ionicons name="arrow-back" size={22} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            }
             ListEmptyComponent={
               <Text
                 style={{
@@ -138,29 +180,50 @@ export default ArchivedRequests;
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  statusBar: {
-    backgroundColor: "#666",
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  statusBarText: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#fff" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
-  cardText: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
-  bold: { flex: 1, fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
-  buttonRow: {
+  statusTag: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 10,
+  },
+  statusLabel: {
+    color: "#fff",
+    fontSize: 13,
+    fontFamily: "Poppins_700Bold",
+  },
+  cardContent: { marginBottom: 12 },
+  cardText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+    marginBottom: 4,
+  },
+  bold: { fontFamily: "Poppins_700Bold", color: "#333" },
+  buttonRow: { flexDirection: "row", justifyContent: "flex-end" },
+  unarchiveBtn: {
     flexDirection: "row",
-    marginTop: 12,
-    justifyContent: "flex-end",
+    backgroundColor: "#2fa64f",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: "center",
   },
-  unarchiveBtn: { backgroundColor: "#2fa64f", padding: 10, borderRadius: 8 },
-  unarchiveText: { color: "#fff", fontSize: 15, fontFamily: "Poppins_700Bold" },
+  unarchiveText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Poppins_700Bold",
+    marginLeft: 6,
+  },
 });
