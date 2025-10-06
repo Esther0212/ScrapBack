@@ -305,7 +305,8 @@ const AccountInfo = () => {
                   <Text
                     style={{
                       color: editMode ? "#3A2E2E" : "#777",
-                      fontSize: 16,
+                      fontSize: 15,
+                      fontFamily: "Poppins_400Regular",
                     }}
                   >
                     {formatDOB(dob) || "Select Date"}
@@ -395,7 +396,6 @@ const AccountInfo = () => {
                   style={styles.editButton}
                   onPress={() => setEditMode(true)}
                 >
-                  <Ionicons name="pencil" size={20} color="#fff" />
                   <Text style={styles.editButtonText}>Edit Profile</Text>
                 </TouchableOpacity>
               )}
@@ -450,7 +450,12 @@ const DropdownField = ({
           onPress={editable ? () => setVisible(true) : null}
           disabled={!editable}
         >
-          <Text style={{ color: editable ? "#3A2E2E" : "#777", fontSize: 16 }}>
+          <Text
+            style={[
+              styles.dropdownText,
+              { color: editable ? (selected ? "#3A2E2E" : "#777") : "#777" },
+            ]}
+          >
             {selected || `Select ${label}`}
           </Text>
         </TouchableOpacity>
@@ -465,6 +470,11 @@ const DropdownField = ({
             setVisible(false);
           }}
           title={optionKey ? o[optionKey] : o}
+          titleStyle={{
+            fontSize: 15,
+            fontFamily: "Poppins_400Regular",
+            color: "#3A2E2E",
+          }}
         />
       ))}
     </Menu>
@@ -506,20 +516,30 @@ const styles = StyleSheet.create({
     paddingTop: width / 4 + 80,
   },
   modalContent: {
-    width: 220,
     backgroundColor: "#fff",
     borderRadius: 12,
     paddingVertical: 10,
+    paddingHorizontal: 10, // ✅ Add horizontal padding instead of fixed width
     elevation: 5,
+    alignSelf: "center", // ✅ Center horizontally without stretching
   },
   modalButton: { paddingVertical: 12, paddingHorizontal: 20 },
-  modalButtonText: { fontSize: 16, color: "#3A2E2E" },
+  modalButtonText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+  },
   row: { flexDirection: "row" },
   inputContainer: { marginBottom: 16 },
-  label: { fontSize: 17, fontWeight: "700", color: "#3A2E2E", marginBottom: 6 },
+  label: {
+    fontSize: 17,
+    fontFamily: "Poppins_700Bold",
+    color: "#3A2E2E",
+    marginBottom: 6,
+  },
   subLabel: {
     fontSize: 13,
-    fontWeight: "600",
+    fontFamily: "Poppins_700Bold",
     color: "#71695B",
     marginBottom: 6,
   },
@@ -528,12 +548,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 18,
-    fontSize: 16,
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
     borderWidth: 1,
     borderColor: "#E0D4C3",
     width: "100%",
   },
-  menuContent: { backgroundColor: "#F1E3D3", borderRadius: 12 },
+  menuContent: { backgroundColor: "#fff", borderRadius: 12 },
   editButton: {
     flexDirection: "row",
     justifyContent: "center",
@@ -547,7 +569,7 @@ const styles = StyleSheet.create({
   editButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
+    fontFamily: "Poppins_700Bold",
     marginLeft: 8,
   },
   saveButton: {
@@ -558,7 +580,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 30,
   },
-  saveText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  saveText: { color: "#fff", fontSize: 16, fontFamily: "Poppins_700Bold" },
   cancelButton: {
     backgroundColor: "#888",
     paddingVertical: 16,
@@ -567,7 +589,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 30,
   },
-  cancelText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  cancelText: { color: "#fff", fontSize: 16, fontFamily: "Poppins_700Bold" },
+  dropdownText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+  },
 });
 
 export default AccountInfo;

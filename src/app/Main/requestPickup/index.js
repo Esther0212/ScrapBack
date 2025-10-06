@@ -443,14 +443,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   cancelBtn: {
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "#888",
     flex: 1,
     padding: 10,
     borderRadius: 8,
     alignItems: "center",
     marginHorizontal: 2,
   },
-  cancelText: { color: "#000", fontSize: 15, fontFamily: "Poppins_700Bold" },
+  cancelText: { color: "#fff", fontSize: 15, fontFamily: "Poppins_700Bold" },
   editBtn: {
     backgroundColor: "#7ac47f",
     flex: 1,

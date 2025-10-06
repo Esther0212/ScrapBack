@@ -244,7 +244,6 @@ const Signup = () => {
                     style={{
                       color: dob ? "#3A2E2E" : "#777",
                       fontSize: 15,
-                      fontSize: 15,
                       fontFamily: "Poppins_400Regular",
                     }}
                   >
@@ -424,7 +423,7 @@ const DropdownField = ({
           <Text
             style={[
               styles.dropdownText,
-              { color: selected ? "#3A2E2E" : "#777" },
+              { color: selected ? "#3A2E2E" : "#777" }, 
             ]}
           >
             {selected || `Select ${label}`}
@@ -441,6 +440,11 @@ const DropdownField = ({
             setVisible(false);
           }}
           title={optionKey ? o[optionKey] : o}
+          titleStyle={{
+            fontSize: 15,
+            fontFamily: "Poppins_400Regular",
+            color: "#3A2E2E",
+          }}
         />
       ))}
     </Menu>
@@ -494,7 +498,7 @@ const styles = StyleSheet.create({
   },
   passwordWrapper: { position: "relative" },
   eyeIcon: { position: "absolute", right: 16, top: 14, padding: 4 },
-  menuContent: { backgroundColor: "#F1E3D3", borderRadius: 12 },
+  menuContent: { backgroundColor: "#fff", borderRadius: 12 },
   signupButton: {
     backgroundColor: "#008243",
     paddingVertical: 18,

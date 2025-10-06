@@ -439,6 +439,7 @@ const SwitchAccount = () => {
                 value={email}
                 setValue={setEmail}
                 keyboardType="email-address"
+                autoCapitalize="none"
               />
               <PasswordField
                 label="Password"
@@ -575,6 +576,11 @@ const DropdownField = ({
             setVisible(false);
           }}
           title={optionKey ? o[optionKey] : o}
+          titleStyle={{
+            fontSize: 15,
+            fontFamily: "Poppins_400Regular",
+            color: "#3A2E2E",
+          }}
         />
       ))}
     </Menu>
@@ -676,7 +682,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     textDecorationLine: "underline",
   },
-  menuContent: { backgroundColor: "#F1E3D3", borderRadius: 12 },
+  menuContent: { backgroundColor: "#fff", borderRadius: 12 },
   dropdownText: {
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
