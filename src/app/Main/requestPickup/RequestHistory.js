@@ -18,7 +18,14 @@ import CustomBgColor from "../../../components/customBgColor";
 
 // 🔥 Firebase
 import { db } from "../../../../firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const ArchivedRequests = () => {
@@ -31,7 +38,10 @@ const ArchivedRequests = () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const q = query(collection(db, "pickupRequests"), where("userId", "==", user.uid));
+    const q = query(
+      collection(db, "pickupRequests"),
+      where("userId", "==", user.uid)
+    );
 
     const unsub = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
@@ -71,15 +81,24 @@ const ArchivedRequests = () => {
           <FlatList
             data={archived}
             renderItem={({ item }) => (
-              <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
+              <Animatable.View
+                animation="fadeInUp"
+                duration={600}
+                style={styles.card}
+              >
                 <Text style={styles.cardText}>
-                  <Text style={styles.bold}>Recyclables:</Text> {item.types?.join(", ") || "N/A"}
+                  <Text style={styles.bold}>Recyclables:</Text>{" "}
+                  {item.types?.join(", ") || "N/A"}
                 </Text>
                 <Text style={styles.cardText}>
-                  <Text style={styles.bold}>Datetime:</Text> {item.pickupDateTime || "N/A"}
+                  <Text style={styles.bold}>Datetime:</Text>{" "}
+                  {item.pickupDateTime || "N/A"}
                 </Text>
                 <View style={styles.buttonRow}>
-                  <TouchableOpacity style={styles.unarchiveBtn} onPress={() => handleUnarchive(item.id)}>
+                  <TouchableOpacity
+                    style={styles.unarchiveBtn}
+                    onPress={() => handleUnarchive(item.id)}
+                  >
                     <Text style={styles.unarchiveText}>Unarchive</Text>
                   </TouchableOpacity>
                 </View>
@@ -95,7 +114,19 @@ const ArchivedRequests = () => {
                 </TouchableOpacity>
               </View>
             }
-            ListEmptyComponent={<Text style={{ textAlign: "center", marginTop: 40 }}>No archived requests</Text>}
+            ListEmptyComponent={
+              <Text
+                style={{
+                  textAlign: "center",
+                  marginTop: 40,
+                  color: "#333",
+                  fontSize: 15,
+                  fontFamily: "Poppins_400Regular",
+                }}
+              >
+                No archived requests
+              </Text>
+            }
           />
         )}
       </SafeAreaView>
@@ -115,11 +146,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  statusBarText: { fontWeight: "700", fontSize: 15, color: "#fff" },
-  card: { backgroundColor: "#fff", borderRadius: 12, padding: 16, marginBottom: 16, elevation: 3 },
-  cardText: { marginBottom: 4 },
-  bold: { fontWeight: "bold" },
-  buttonRow: { flexDirection: "row", marginTop: 12, justifyContent: "flex-end" },
+  statusBarText: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#fff" },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 3,
+  },
+  cardText: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
+  bold: { flex: 1, fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
+  buttonRow: {
+    flexDirection: "row",
+    marginTop: 12,
+    justifyContent: "flex-end",
+  },
   unarchiveBtn: { backgroundColor: "#2fa64f", padding: 10, borderRadius: 8 },
-  unarchiveText: { color: "#fff", fontWeight: "bold" },
+  unarchiveText: { color: "#fff", fontSize: 15, fontFamily: "Poppins_700Bold" },
 });

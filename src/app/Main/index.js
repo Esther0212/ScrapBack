@@ -8,6 +8,7 @@ import {
   ScrollView,
   Pressable,
   Dimensions,
+  TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../components/customBgColor";
@@ -32,6 +33,10 @@ const Home = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [pressedIndex, setPressedIndex] = useState(null);
   const [recyclingTypes, setRecyclingTypes] = useState([]);
+
+  // conversion rates
+  const [conversionRates, setConversionRates] = useState([]);
+  const [collapsedCategories, setCollapsedCategories] = useState({});
   const router = useRouter();
 
   // 🔔 Realtime listener for user notifications
@@ -55,13 +60,42 @@ const Home = () => {
     return unsubscribe;
   }, []);
 
-  // 🔹 Extract recycling types from context
+  // recycling types
   useEffect(() => {
     if (educationalContent && educationalContent.length > 0) {
       const types = educationalContent.map((item) => item.type);
       setRecyclingTypes(types);
     }
   }, [educationalContent]);
+
+  // fetch conversion rates
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "wasteConversionRates"),
+      (snapshot) => {
+        const rates = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setConversionRates(rates);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  // group by category
+  const groupedRates = conversionRates.reduce((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = [];
+    acc[item.category].push(item);
+    return acc;
+  }, {});
+
+  const toggleCategory = (category) => {
+    setCollapsedCategories((prev) => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
+  };
 
   return (
     <CustomBgColor>
@@ -103,7 +137,7 @@ const Home = () => {
             Every action counts—start recycling today!
           </Text>
 
-          {/* Points and Rewards */}
+          {/* Points */}
           <View style={styles.pointsContainer}>
             <View style={styles.leftContainer}>
               <Text style={styles.pointsLabel}>Your Total Points</Text>
@@ -152,12 +186,60 @@ const Home = () => {
                 onPress={() => {
                   setSelectedType(type);
                   router.push("/Main/recyclingGuide/guides");
+                  setSelectedType(type);
+                  router.push("/Main/recyclingGuide/guides");
                 }}
               >
                 <Text style={styles.typeButtonText}>{type}</Text>
               </Pressable>
             ))}
           </ScrollView>
+
+          {/* Conversion Rates */}
+          <Text style={styles.sectionTitle}>Conversion Rates</Text>
+
+          <TouchableOpacity
+            onPress={() => router.push("/Main/conversionRates")}
+            activeOpacity={0.8}
+          >
+            {/* Table Header */}
+            <View style={styles.tableHeader}>
+              <Text style={styles.headerText}>Waste Type</Text>
+              <Text style={styles.headerText}>Points/kg</Text>
+            </View>
+
+            {Object.keys(groupedRates)
+              .slice(0, 5)
+              .map((category) => {
+                const rows = groupedRates[category];
+                const firstRow = rows[0]; // still only showing first row per category
+
+                return (
+                  <View key={category}>
+                    {/* Category Row */}
+                    <View style={styles.categoryRow}>
+                      <Text style={styles.categoryText}>{category}</Text>
+                    </View>
+
+                    {/* First Row */}
+                    {firstRow && (
+                      <View style={styles.tableRow}>
+                        <Text style={styles.rowType}>{firstRow.type}</Text>
+                        <Text style={styles.rowPoints}>
+                          {firstRow.points} pts/kg
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+
+            {/* Footer to show it's preview */}
+            <View style={styles.previewFooter}>
+              <Text style={styles.previewText}>See all conversion rates</Text>
+              <Ionicons name="chevron-forward" size={18} color="#008243" />
+            </View>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </CustomBgColor>
@@ -250,6 +332,70 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 10,
     fontWeight: "bold",
+  },
+
+  // table styles
+  tableHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#008243",
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  headerText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Poppins_700Bold",
+  },
+  categoryRow: {
+    backgroundColor: "#E3F6E3",
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+  },
+  categoryText: {
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
+  },
+  tableRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    backgroundColor: "#fff",
+  },
+  rowType: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
+  rowPoints: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
+  toggleText: { fontSize: 12, color: "#666" },
+
+  previewContainer: {
+    borderRadius: 8,
+    overflow: "hidden", // ✅ makes header and footer radius clip properly
+    backgroundColor: "#fff",
+    marginTop: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  
+  previewFooter: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 10,
+    backgroundColor: "#E3F6E3",
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  previewText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#008243",
+    marginRight: 6,
   },
 });
 
