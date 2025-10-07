@@ -20,6 +20,7 @@ import {
   writeBatch,
   doc,
   updateDoc,
+  orderBy,
 } from "firebase/firestore";
 import CustomBgColor from "../../components/customBgColor";
 import { useRouter } from "expo-router";
@@ -34,15 +35,29 @@ export default function NotificationsScreen() {
 
     const q = query(
       collection(db, "userNotifications"),
-      where("userId", "==", user.uid)
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc")
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      const toMillis = (c) => {
+        if (!c) return 0;
+        if (typeof c === "number") return c; // epoch millis
+        if (c.toDate) return c.toDate().getTime(); // Firestore Timestamp
+        if (c.seconds != null)
+          return c.seconds * 1000 + Math.floor((c.nanoseconds || 0) / 1e6);
+        return 0;
+      };
+
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setNotifications(data.sort((a, b) => b.createdAt - a.createdAt));
+
+      // Safe sort
+      data.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+
+      setNotifications(data);
     });
 
     return unsubscribe;
@@ -95,6 +110,21 @@ export default function NotificationsScreen() {
           },
         ]
       );
+    } else if (
+      item.title?.includes("Pickup Request Created") ||
+      item.title?.includes("Pickup Request Updated")
+    ) {
+      Alert.alert(
+        "Go to Pickup Requests?",
+        "Do you want to view your pickup requests?",
+        [
+          { text: "No", style: "cancel" },
+          {
+            text: "Yes",
+            onPress: () => router.push("/Main/requestPickup"),
+          },
+        ]
+      );
     }
   };
 
@@ -108,7 +138,7 @@ export default function NotificationsScreen() {
       <Ionicons
         name={item.read ? "notifications-outline" : "notifications"}
         size={20}
-        color={item.read ? "gray" : "#F5A25D"} // 🟠 unread orange bell
+        color={item.read ? "gray" : "#F5A25D"}
         style={{ marginRight: 8 }}
       />
       <View style={{ flex: 1 }}>
@@ -122,7 +152,13 @@ export default function NotificationsScreen() {
           {item.body}
         </Text>
         <Text style={styles.date}>
-          {new Date(item.createdAt).toLocaleString()}
+          {(() => {
+            const c = item.createdAt;
+            if (!c) return "";
+            if (c.toDate) return c.toDate().toLocaleString();
+            if (typeof c === "number") return new Date(c).toLocaleString();
+            return "";
+          })()}
         </Text>
       </View>
     </TouchableOpacity>
@@ -131,12 +167,9 @@ export default function NotificationsScreen() {
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.container}>
-        {/* ✅ Custom Header like Requests History */}
+        {/* Header */}
         <View style={styles.topHeader}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backBtn}
-          >
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={24} color="black" />
           </TouchableOpacity>
 
@@ -172,17 +205,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     justifyContent: "space-between",
   },
-  backBtn: {
-    padding: 4,
-    marginRight: 8,
-  },
+  backBtn: { padding: 4, marginRight: 8 },
   topHeaderText: {
     flex: 1,
     fontSize: 20,
     fontFamily: "Poppins_700Bold",
-    color: "#2E7D32",
+    color: "black",
   },
-  clearBtn: { color: "#008243", fontFamily: "Poppins_400Regular" },
+  clearBtn: {
+    color: "#008243",
+    fontFamily: "Poppins_400Regular",
+  },
   card: {
     flexDirection: "row",
     backgroundColor: "white",
@@ -226,14 +259,4 @@ const styles = StyleSheet.create({
   },
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { fontSize: 14, color: "#888" },
-  topHeaderText: {
-    flex: 1,
-    fontSize: 20,
-    fontFamily: "Poppins_700Bold",
-    color: "black", // ← title black
-  },
-  clearBtn: {
-    color: "#008243", // ← keep green
-    fontFamily: "Poppins_400Regular",
-  },
 });

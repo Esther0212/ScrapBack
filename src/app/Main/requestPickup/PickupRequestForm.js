@@ -127,7 +127,7 @@ export default function PickupRequestForm() {
         // Select → add type and initialize weight to "0"
         setWeights((w) => ({
           ...w,
-          [type]: w[type] || "0", // ensure there's always a value
+          [type]: w[type] || "1", // ensure there's always a value
         }));
         return [...prev, type];
       }
@@ -384,36 +384,99 @@ export default function PickupRequestForm() {
       const user = auth.currentUser;
       if (!user) return;
 
+      // 🔹 Fetch user profile to get full name
+      let displayName = user.email; // fallback if no name
+      try {
+        const userDoc = await getDoc(doc(db, "user", user.uid));
+        if (userDoc.exists()) {
+          const { firstName, lastName } = userDoc.data();
+          displayName = `${firstName || ""} ${lastName || ""}`.trim();
+        }
+      } catch (err) {
+        console.error("Could not fetch user profile:", err);
+      }
+
       if (requestId) {
+        // 🔹 Update existing request
         await updateDoc(doc(db, "pickupRequests", requestId), {
           types: selectedTypes,
-          weights: weights, // 👈 save per-type
-          estimatedWeight: totalWeight, // 👈 save total
+          weights: weights,
+          estimatedWeight: totalWeight,
           pickupDateTime,
           pickupAddress,
           pickupDate: date,
           estimatedPoints: totalPoints,
           coords: markerCoords,
           photoUrl: photo || null,
+          seenByAdmin: false, // 👈 reset so admin sees "UPDATED"
           updatedAt: serverTimestamp(),
         });
-        Alert.alert("Pickup request updated!");
+
+        // ✅ Save notification for the user
+        await addDoc(collection(db, "userNotifications"), {
+          userId: user.uid,
+          title: "Pickup Request Updated",
+          body: `Your pickup request at ${pickupAddress} was updated.`,
+          createdAt: serverTimestamp(),
+          read: false,
+        });
+
+        // ✅ Save notification for admins
+        await addDoc(collection(db, "adminNotifications"), {
+          title: "Pickup Request Updated",
+          body: `User <b>${displayName}</b> updated a request at ${pickupAddress}. Click for more details.`,
+          userId: user.uid,
+          createdAt: serverTimestamp(),
+          read: false,
+          type: "updated",
+          requestId: requestId,
+        });
+
+        // ✅ Consistent alert with routing
+        Alert.alert("Success", "Pickup request updated!", [
+          { text: "OK", onPress: () => router.push("/Main/requestPickup") },
+        ]);
       } else {
-        await addDoc(collection(db, "pickupRequests"), {
+        // 🔹 Create new request
+        const newDoc = await addDoc(collection(db, "pickupRequests"), {
           userId: user.uid,
           types: selectedTypes,
-          weights: weights, // 👈 save per-type
-          estimatedWeight: totalWeight, // 👈 save total
+          weights: weights,
+          estimatedWeight: totalWeight,
           pickupDateTime,
-          pickupDate: date, // save actual Date object
-          estimatedPoints: totalPoints, // ✅ add this
+          pickupDate: date,
+          estimatedPoints: totalPoints,
           pickupAddress,
           coords: markerCoords,
           photoUrl: photo || null,
           status: "pending",
+          seenByAdmin: false,
           createdAt: serverTimestamp(),
         });
-        Alert.alert("Pickup request created!");
+
+        // ✅ Save notification for the user
+        await addDoc(collection(db, "userNotifications"), {
+          userId: user.uid,
+          title: "Pickup Request Created",
+          body: `You created a pickup request for ${pickupAddress}.`,
+          createdAt: serverTimestamp(),
+          read: false,
+        });
+
+        // ✅ Save notification for admins
+        await addDoc(collection(db, "adminNotifications"), {
+          title: "New Pickup Request",
+          body: `User <b>${displayName}</b> created a new request for ${pickupAddress}. Click for more details.`,
+          userId: user.uid,
+          createdAt: serverTimestamp(),
+          type: "new",
+          read: false,
+          requestId: newDoc.id,
+        });
+
+        Alert.alert("Success", "Pickup request created!", [
+          { text: "OK", onPress: () => router.push("/Main/requestPickup") },
+        ]);
       }
     } catch (err) {
       console.error("Error saving request:", err);
@@ -552,7 +615,9 @@ export default function PickupRequestForm() {
             ) : (
               <>
                 <FontAwesome name="truck" size={30} color="#fff" />
-                <Text style={styles.requestButtonText}>Request Pickup</Text>
+                <Text style={styles.requestButtonText}>
+                  {requestId ? "Update Request" : "Request Pickup"}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -713,12 +778,13 @@ export default function PickupRequestForm() {
                               placeholder="kg"
                               keyboardType="numeric"
                               value={weights[item.type] || ""}
-                              onChangeText={(val) =>
+                              onChangeText={(val) => {
+                                const sanitized = val.replace(/[^0-9.]/g, ""); // ✅ only allow numbers + dot
                                 setWeights((prev) => ({
                                   ...prev,
-                                  [item.type]: val,
-                                }))
-                              }
+                                  [item.type]: sanitized,
+                                }));
+                              }}
                             />
 
                             <TouchableOpacity
