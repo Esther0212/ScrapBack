@@ -1,6 +1,6 @@
 // _layout.js
 import { Slot, useRouter } from "expo-router";
-import { View, Alert } from "react-native";
+import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   useFonts as useGoogleFonts,
@@ -12,16 +12,23 @@ import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect } from "react";
 import { UserProvider } from "../context/userContext";
 import { EducationalProvider } from "../context/educationalContext";
-
-// 🔔 Notifications
 import * as Notifications from "expo-notifications";
 
-SplashScreen.preventAutoHideAsync(); // keep splash until fonts are loaded
+// 👇 Ensure foreground shows the SMALL system banner (toast-style)
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    // IMPORTANT: use shouldShowAlert (correct key)
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+SplashScreen.preventAutoHideAsync();
 
 export default function Layout() {
   const router = useRouter();
 
-  // Load Google Fonts
   const [googleFontsLoaded] = useGoogleFonts({
     Poppins_400Regular,
     Poppins_700Bold,
@@ -40,21 +47,24 @@ export default function Layout() {
     onLayoutRootView();
   }, [fontsLoaded]);
 
-  // 🔔 Global Notification Listeners
+  // 🔔 Global notification listeners
   useEffect(() => {
-    // Foreground listener → show alert when a notification arrives while app is open
-    const sub1 = Notifications.addNotificationReceivedListener((notification) => {
-      const { title, body } = notification.request.content;
-      Alert.alert(title || "Notification", body || "");
+    // (Optional) just log when a foreground notification is received
+    const sub1 = Notifications.addNotificationReceivedListener(() => {
+      console.log("📬 Notification received in foreground");
     });
 
-    // Tap listener → navigate when user taps the notification
-    const sub2 = Notifications.addNotificationResponseReceivedListener((resp) => {
-      const screen = resp.notification.request.content.data?.screen;
-      if (screen) {
-        router.push(screen);
+    // Navigate when the user taps the banner / tray notification
+    const sub2 = Notifications.addNotificationResponseReceivedListener(
+      (resp) => {
+        const screen = resp?.notification?.request?.content?.data?.screen;
+        if (screen) {
+          router.push(screen);
+        } else {
+          router.push("/Main/notifications");
+        }
       }
-    });
+    );
 
     return () => {
       sub1.remove();
@@ -62,9 +72,7 @@ export default function Layout() {
     };
   }, []);
 
-  if (!fontsLoaded) {
-    return null; // don't render until all fonts are loaded
-  }
+  if (!fontsLoaded) return null;
 
   return (
     <SafeAreaProvider>

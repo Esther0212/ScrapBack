@@ -9,6 +9,7 @@ import {
   Pressable,
   Dimensions,
   TouchableOpacity,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../components/customBgColor";
@@ -19,12 +20,53 @@ import {
   query,
   where,
   onSnapshot,
+  setDoc,
+  doc,
 } from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useUser } from "../../context/userContext";
 import { useEducational } from "../../context/educationalContext";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
 
 const { width } = Dimensions.get("window");
+
+async function registerForPushNotificationsAsync() {
+  if (!Device.isDevice) {
+    alert("Must use physical device for Push Notifications");
+    return null;
+  }
+
+  let { status } = await Notifications.getPermissionsAsync();
+  if (status !== "granted") {
+    const { status: newStatus } = await Notifications.requestPermissionsAsync();
+    status = newStatus;
+  }
+  if (status !== "granted") {
+    alert("Push notification permissions not granted!");
+    return null;
+  }
+
+  const projectId =
+    Constants?.expoConfig?.extra?.eas?.projectId ??
+    Constants?.easConfig?.projectId;
+
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  console.log("Expo push token:", token);
+
+  if (Platform.OS === "android") {
+    // Make sure the channel exists and has high importance for heads-up banners
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF231F7C",
+    });
+  }
+
+  return token;
+}
 
 const Home = () => {
   const { userData } = useUser();
@@ -33,13 +75,28 @@ const Home = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [pressedIndex, setPressedIndex] = useState(null);
   const [recyclingTypes, setRecyclingTypes] = useState([]);
-
-  // conversion rates
   const [conversionRates, setConversionRates] = useState([]);
   const [collapsedCategories, setCollapsedCategories] = useState({});
   const router = useRouter();
 
-  // 🔔 Realtime listener for user notifications
+  // Save Expo push token to Firestore (merge-safe)
+  useEffect(() => {
+    const saveToken = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await setDoc(
+          doc(db, "user", user.uid),
+          { expoPushToken: token },
+          { merge: true }
+        );
+      }
+    };
+    saveToken();
+  }, []);
+
+  // Realtime badge for user notifications
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
@@ -52,7 +109,6 @@ const Home = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map((doc) => doc.data());
       const unread = docs.filter((d) => !d.read).length;
-
       setUnreadCount(unread);
       setHasNewNotification(unread > 0);
     });
@@ -186,8 +242,6 @@ const Home = () => {
                 onPress={() => {
                   setSelectedType(type);
                   router.push("/Main/recyclingGuide/guides");
-                  setSelectedType(type);
-                  router.push("/Main/recyclingGuide/guides");
                 }}
               >
                 <Text style={styles.typeButtonText}>{type}</Text>
@@ -202,7 +256,6 @@ const Home = () => {
             onPress={() => router.push("/Main/conversionRates")}
             activeOpacity={0.8}
           >
-            {/* Table Header */}
             <View style={styles.tableHeader}>
               <Text style={styles.headerText}>Waste Type</Text>
               <Text style={styles.headerText}>Points/kg</Text>
@@ -212,16 +265,12 @@ const Home = () => {
               .slice(0, 5)
               .map((category) => {
                 const rows = groupedRates[category];
-                const firstRow = rows[0]; // still only showing first row per category
-
+                const firstRow = rows[0];
                 return (
                   <View key={category}>
-                    {/* Category Row */}
                     <View style={styles.categoryRow}>
                       <Text style={styles.categoryText}>{category}</Text>
                     </View>
-
-                    {/* First Row */}
                     {firstRow && (
                       <View style={styles.tableRow}>
                         <Text style={styles.rowType}>{firstRow.type}</Text>
@@ -234,7 +283,6 @@ const Home = () => {
                 );
               })}
 
-            {/* Footer to show it's preview */}
             <View style={styles.previewFooter}>
               <Text style={styles.previewText}>See all conversion rates</Text>
               <Ionicons name="chevron-forward" size={18} color="#008243" />
@@ -333,8 +381,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "bold",
   },
-
-  // table styles
   tableHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -368,20 +414,6 @@ const styles = StyleSheet.create({
   },
   rowType: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
   rowPoints: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
-  toggleText: { fontSize: 12, color: "#666" },
-
-  previewContainer: {
-    borderRadius: 8,
-    overflow: "hidden", // ✅ makes header and footer radius clip properly
-    backgroundColor: "#fff",
-    marginTop: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  
   previewFooter: {
     flexDirection: "row",
     justifyContent: "center",

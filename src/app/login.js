@@ -1,3 +1,4 @@
+// src/app/Login.jsx
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -18,6 +19,7 @@ import { registerForPushNotificationsAsync } from "../utils/notifications";
 
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
+import { useUser } from "../context/userContext"; // 👈 import context
 
 const { width } = Dimensions.get("window");
 
@@ -29,85 +31,90 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
 
+  const { setUserData } = useUser(); // 👈 grab setUserData from context
+
   const validateEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
   };
 
-const handleLogin = async () => {
-  let tempErrors = { email: "", password: "" };
-  let isValid = true;
+  const handleLogin = async () => {
+    let tempErrors = { email: "", password: "" };
+    let isValid = true;
 
-  if (!email) {
-    tempErrors.email = "Email is required";
-    isValid = false;
-  } else if (!validateEmail(email)) {
-    tempErrors.email = "Enter a valid email address";
-    isValid = false;
-  }
+    if (!email) {
+      tempErrors.email = "Email is required";
+      isValid = false;
+    } else if (!validateEmail(email)) {
+      tempErrors.email = "Enter a valid email address";
+      isValid = false;
+    }
 
-  if (!password) {
-    tempErrors.password = "Password is required";
-    isValid = false;
-  }
+    if (!password) {
+      tempErrors.password = "Password is required";
+      isValid = false;
+    }
 
-  setErrors(tempErrors);
-  if (!isValid) return;
+    setErrors(tempErrors);
+    if (!isValid) return;
 
-  try {
-    // 🔐 Sign in
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    console.log("✅ Logged in:", user.uid);
-
-    // 🔔 Register device push token
-    const token = await registerForPushNotificationsAsync();
-    if (token) {
-      await setDoc(
-        doc(db, "user", user.uid), // 🔍 make sure this matches your Firestore collection name!
-        { expoPushToken: token },
-        { merge: true }
+    try {
+      // 🔐 Sign in
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
       );
-      console.log("🔥 Expo Push Token saved for:", user.uid, token);
-    } else {
-      console.log("⚠️ No token generated (emulator or permission denied)");
+      const user = userCredential.user;
+      console.log("✅ Logged in:", user.uid);
+
+      // 🔔 Register device push token
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await setDoc(
+          doc(db, "user", user.uid),
+          { expoPushToken: token },
+          { merge: true }
+        );
+        console.log("🔥 Expo Push Token saved for:", user.uid, token);
+      }
+
+      // Load user profile
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        const firstName = userData.firstName || "";
+        await AsyncStorage.setItem("firstName", firstName);
+
+        // 👇 update context immediately so Home sees it
+        setUserData(userData);
+      }
+
+      // Remember me
+      if (rememberMe) {
+        await AsyncStorage.setItem("savedEmail", email);
+        await AsyncStorage.setItem("savedPassword", password);
+      } else {
+        await AsyncStorage.removeItem("savedEmail");
+        await AsyncStorage.removeItem("savedPassword");
+      }
+
+      Alert.alert("Login Success", "You have successfully logged in!");
+      router.replace("/Main");
+    } catch (error) {
+      console.error("❌ FULL LOGIN ERROR:", error);
+      let message = "Login failed. Please try again.";
+      if (error.code === "auth/invalid-email") {
+        message = "Invalid email address.";
+      } else if (error.code === "auth/user-not-found") {
+        message = "User not found.";
+      } else if (error.code === "auth/wrong-password") {
+        message = "Incorrect password.";
+      }
+      Alert.alert("Login Error", message);
     }
-
-    // Load user profile
-    const userDocRef = doc(db, "user", user.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    if (userDocSnap.exists()) {
-      const userData = userDocSnap.data();
-      const firstName = userData.firstName || "";
-      await AsyncStorage.setItem("firstName", firstName);
-    }
-
-    // Remember me
-    if (rememberMe) {
-      await AsyncStorage.setItem("savedEmail", email);
-      await AsyncStorage.setItem("savedPassword", password);
-    } else {
-      await AsyncStorage.removeItem("savedEmail");
-      await AsyncStorage.removeItem("savedPassword");
-    }
-
-    Alert.alert("Login Success", "You have successfully logged in!");
-    router.replace("/Main");
-
-  } catch (error) {
-     console.error("❌ FULL LOGIN ERROR:", error); // 👈 this will show the real problem
-    let message = "Login failed. Please try again.";
-    if (error.code === "auth/invalid-email") {
-      message = "Invalid email address.";
-    } else if (error.code === "auth/user-not-found") {
-      message = "User not found.";
-    } else if (error.code === "auth/wrong-password") {
-      message = "Incorrect password.";
-    }
-    Alert.alert("Login Error", message);
-  }
-};
-
+  };
 
   useEffect(() => {
     const loadSavedCredentials = async () => {
@@ -143,6 +150,7 @@ const handleLogin = async () => {
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Login to your account</Text>
 
+          {/* Email Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email address</Text>
             <TextInput
@@ -162,6 +170,7 @@ const handleLogin = async () => {
             ) : null}
           </View>
 
+          {/* Password Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordWrapper}>
@@ -192,6 +201,7 @@ const handleLogin = async () => {
             ) : null}
           </View>
 
+          {/* Remember Me + Forgot Password */}
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.rememberMe}
@@ -210,6 +220,7 @@ const handleLogin = async () => {
             </TouchableOpacity>
           </View>
 
+          {/* Login Button */}
           <TouchableOpacity
             style={styles.loginButton}
             activeOpacity={0.8}
@@ -218,6 +229,7 @@ const handleLogin = async () => {
             <Text style={styles.loginButtonText}>Log in</Text>
           </TouchableOpacity>
 
+          {/* Sign Up Link */}
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => router.push("/signup")}
