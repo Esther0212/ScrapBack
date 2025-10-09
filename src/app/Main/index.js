@@ -14,12 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../firebase";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-} from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useUser } from "../../context/userContext";
 import { useEducational } from "../../context/educationalContext";
@@ -99,7 +94,7 @@ const Home = () => {
 
   return (
     <CustomBgColor>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <ScrollView
           contentContainerStyle={styles.scrollView}
           keyboardShouldPersistTaps="handled"
@@ -152,7 +147,7 @@ const Home = () => {
             </View>
 
             <View style={styles.rightContainer}>
-              <Pressable
+              <TouchableOpacity
                 style={styles.redeemButton}
                 onPress={() => router.push("/Main/rewards/")}
               >
@@ -163,7 +158,7 @@ const Home = () => {
                   style={{ marginRight: 6 }}
                 />
                 <Text style={styles.redeemText}>Redeem Rewards</Text>
-              </Pressable>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -176,7 +171,7 @@ const Home = () => {
             contentContainerStyle={styles.iconScroll}
           >
             {recyclingTypes.map((type, index) => (
-              <Pressable
+              <TouchableOpacity
                 key={index}
                 style={[
                   styles.typeButton,
@@ -191,55 +186,55 @@ const Home = () => {
                 }}
               >
                 <Text style={styles.typeButtonText}>{type}</Text>
-              </Pressable>
+              </TouchableOpacity>
             ))}
           </ScrollView>
 
           {/* Conversion Rates */}
           <Text style={styles.sectionTitle}>Conversion Rates</Text>
 
-          <TouchableOpacity
-            onPress={() => router.push("/Main/conversionRates")}
-            activeOpacity={0.8}
-          >
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={styles.headerText}>Waste Type</Text>
-              <Text style={styles.headerText}>Points/kg</Text>
-            </View>
+          {Object.keys(groupedRates)
+            .slice(0, 5)
+            .map((category, catIdx) => {
+              const rows = groupedRates[category];
+              const firstRow = rows[0];
 
-            {Object.keys(groupedRates)
-              .slice(0, 5)
-              .map((category) => {
-                const rows = groupedRates[category];
-                const firstRow = rows[0]; // still only showing first row per category
-
-                return (
-                  <View key={category}>
-                    {/* Category Row */}
-                    <View style={styles.categoryRow}>
-                      <Text style={styles.categoryText}>{category}</Text>
+              return (
+                <TouchableOpacity
+                  key={catIdx}
+                  onPress={() => router.push("/Main/conversionTable")}
+                >
+                  <View style={styles.card}>
+                    {/* Header Bar */}
+                    <View style={styles.headerBar}>
+                      <Text style={styles.category}>{category} Conversion</Text>
+                      <Ionicons name="chevron-forward" size={20} color="#fff" />
                     </View>
 
-                    {/* First Row */}
-                    {firstRow && (
-                      <View style={styles.tableRow}>
-                        <Text style={styles.rowType}>{firstRow.type}</Text>
-                        <Text style={styles.rowPoints}>
-                          {firstRow.points} pts/kg
+                    {/* Table preview with only first row */}
+                    <View style={styles.table}>
+                      <View style={styles.tableHeader}>
+                        <Text style={[styles.cellHeader, { flex: 2 }]}>
+                          Type of Waste
                         </Text>
+                        <Text style={styles.cellHeader}>Points/kg</Text>
                       </View>
-                    )}
-                  </View>
-                );
-              })}
 
-            {/* Footer to show it's preview */}
-            <View style={styles.previewFooter}>
-              <Text style={styles.previewText}>See all conversion rates</Text>
-              <Ionicons name="chevron-forward" size={18} color="#008243" />
-            </View>
-          </TouchableOpacity>
+                      {firstRow && (
+                        <View
+                          style={[styles.row, { backgroundColor: "#FFFFFF" }]}
+                        >
+                          <Text style={[styles.cell, { flex: 2 }]}>
+                            {firstRow.type}
+                          </Text>
+                          <Text style={styles.cell}>{firstRow.points} pts</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
         </ScrollView>
       </SafeAreaView>
     </CustomBgColor>
@@ -247,7 +242,7 @@ const Home = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
+  safeArea: { flexGrow: 1 },
   scrollView: { padding: 16 },
   header: {
     flexDirection: "row",
@@ -334,68 +329,55 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  // table styles
-  tableHeader: {
+  // conversion cards (same as staff styling)
+  card: {
+    backgroundColor: "#F6F8F0",
+    borderRadius: 14,
+    marginBottom: 15,
+    overflow: "hidden",
+  },
+  headerBar: {
+    backgroundColor: "#008243",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: "#008243",
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    alignItems: "center",
   },
-  headerText: {
-    color: "#fff",
-    fontSize: 14,
+  category: {
+    color: "#FFFFFF",
+    fontSize: 16,
     fontFamily: "Poppins_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  categoryRow: {
-    backgroundColor: "#E3F6E3",
-    paddingVertical: 6,
-    paddingHorizontal: 6,
+  table: { borderTopWidth: 1, borderTopColor: "#DDE3DA" },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#CDE3B1",
+    borderBottomWidth: 1,
+    borderBottomColor: "#BBD39F",
   },
-  categoryText: {
+  row: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#D6DEC8",
+  },
+  cellHeader: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     fontSize: 15,
     fontFamily: "Poppins_700Bold",
     color: "#333",
   },
-  tableRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    backgroundColor: "#fff",
-  },
-  rowType: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
-  rowPoints: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
-  toggleText: { fontSize: 12, color: "#666" },
-
-  previewContainer: {
-    borderRadius: 8,
-    overflow: "hidden", // ✅ makes header and footer radius clip properly
-    backgroundColor: "#fff",
-    marginTop: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  
-  previewFooter: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 10,
-    backgroundColor: "#E3F6E3",
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-  },
-  previewText: {
+  cell: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
-    color: "#008243",
-    marginRight: 6,
+    color: "#333",
   },
 });
 
