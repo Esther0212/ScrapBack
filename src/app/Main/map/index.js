@@ -41,6 +41,19 @@ const formatFullDate = (dateStr) => {
   return date.toLocaleDateString(undefined, options);
 };
 
+// 🔹 Distance calculation (Haversine)
+const getDistanceKm = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+};
+
 // 🔹 Status component
 const StatusBadge = ({ status }) => {
   const isOpen = status === "Open";
@@ -102,13 +115,12 @@ export default function MapSelector() {
     };
   }, []);
 
-  // 📍 Get user location
+  // 📍 Get user location + compute distances
   useEffect(() => {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
-
         const location = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = location.coords;
         const newRegion = {
@@ -119,11 +131,20 @@ export default function MapSelector() {
         };
         setRegion(newRegion);
         setMarker({ latitude, longitude });
+
+        if (points.length > 0) {
+          const withDistance = points.map((p) => ({
+            ...p,
+            distance: getDistanceKm(latitude, longitude, p.lat, p.lng),
+          }));
+          withDistance.sort((a, b) => a.distance - b.distance); // nearest → farthest
+          setPoints(withDistance);
+        }
       } catch (error) {
-        console.warn("Location error. Showing default region.");
+        console.warn("Location error:", error);
       }
     })();
-  }, []);
+  }, [points.length]);
 
   // 🔍 Search bar
   const handleSearch = async () => {
@@ -177,6 +198,11 @@ export default function MapSelector() {
       <View style={styles.listCard}>
         <Text style={styles.listTitle}>{item.name}</Text>
         <Text style={styles.listAddress}>{item.address}</Text>
+        {item.distance && (
+          <Text style={styles.distanceText}>
+            Distance: {item.distance.toFixed(2)} km
+          </Text>
+        )}
         {pointSchedules.length > 0 ? (
           pointSchedules.map((s, idx) => (
             <TouchableOpacity
@@ -353,7 +379,7 @@ export default function MapSelector() {
               keyExtractor={(item) => item.id}
               renderItem={renderListItem}
               contentContainerStyle={{
-                paddingTop: 180, // Matches the height of the overlay
+                paddingTop: 200,
                 paddingHorizontal: 16,
                 paddingBottom: 16,
               }}
@@ -410,7 +436,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  toggleLabelBox: { marginBottom: 0, },
+  toggleLabelBox: { marginVertical: 10, },
   toggleLabel: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
   toggleOption: {
     flex: 1,
@@ -451,6 +477,12 @@ const styles = StyleSheet.create({
   },
   listAddress: {
     fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+    marginBottom: 6,
+  },
+  distanceText: {
+    fontSize: 13,
     fontFamily: "Poppins_400Regular",
     color: "#333",
     marginBottom: 6,
