@@ -181,7 +181,7 @@ const handleLogin = async () => {
                 onPress={() => setPasswordVisible(!passwordVisible)}
               >
                 <Ionicons
-                  name={passwordVisible ? "eye-off" : "eye"}
+                  name={passwordVisible ? "eye" : "eye-off"}
                   size={20}
                   color="#555"
                 />

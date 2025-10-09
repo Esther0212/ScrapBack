@@ -254,7 +254,7 @@ export default function MapSelector() {
                 onSubmitEditing={handleSearch}
               />
             </View>
-  
+
             {/* Toggle Buttons */}
             <View style={styles.toggleContainer}>
               <View style={styles.toggleButtons}>
@@ -274,7 +274,7 @@ export default function MapSelector() {
                     Map
                   </Text>
                 </TouchableOpacity>
-  
+
                 <TouchableOpacity
                   style={[
                     styles.toggleOption,
@@ -285,7 +285,8 @@ export default function MapSelector() {
                   <Text
                     style={[
                       styles.toggleOptionText,
-                      selectedView === "list" && styles.toggleOptionTextSelected,
+                      selectedView === "list" &&
+                        styles.toggleOptionTextSelected,
                     ]}
                   >
                     List
@@ -297,7 +298,7 @@ export default function MapSelector() {
               </View>
             </View>
           </View>
-  
+
           {/* Map or List */}
           {selectedView === "map" ? (
             <MapView
@@ -306,12 +307,7 @@ export default function MapSelector() {
               ref={mapRef}
               onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
             >
-              <UrlTile
-                urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                maximumZ={19}
-              />
-  
-              {/* User marker */}
+
               {marker && (
                 <Marker coordinate={marker}>
                   <Callout>
@@ -319,59 +315,16 @@ export default function MapSelector() {
                   </Callout>
                 </Marker>
               )}
-  
-              {/* Collection Points */}
-              {points.map((p) => {
-                let pointSchedules = schedules.filter((s) => s.pointId === p.id);
-                pointSchedules = sortSchedules(pointSchedules);
-                return (
-                  <Marker
-                    key={p.id}
-                    coordinate={{ latitude: p.lat, longitude: p.lng }}
-                    title={p.name}
-                    description={p.address}
-                    image={collectionPointMarker}
-                  >
-                    <Callout>
-                      <View style={{ width: 200 }}>
-                        <Text style={{ fontWeight: "bold" }}>{p.name}</Text>
-                        <Text>{p.address}</Text>
-                        {pointSchedules.length > 0 ? (
-                          pointSchedules.map((s, idx) => (
-                            <TouchableOpacity
-                              key={s.id}
-                              style={[
-                                styles.scheduleRow,
-                                {
-                                  backgroundColor:
-                                    idx % 2 === 0 ? "#FFFFFF" : "#E3F6E3",
-                                },
-                              ]}
-                              onPress={() =>
-                                openGoogleMaps(p.lat, p.lng, p.name)
-                              }
-                            >
-                              <Text>
-                                {formatFullDate(s.collectionDate)},{" "}
-                                {formatTime12h(s.collectionTime)}
-                              </Text>
-                              <StatusBadge status={s.status} />
-                              <Feather
-                                name="arrow-up-right"
-                                size={20}
-                                color="black"
-                                style={{ marginLeft: "auto" }}
-                              />
-                            </TouchableOpacity>
-                          ))
-                        ) : (
-                          <Text>No schedules</Text>
-                        )}
-                      </View>
-                    </Callout>
-                  </Marker>
-                );
-              })}
+
+              {points.map((p) => (
+                <Marker
+                  key={p.id}
+                  coordinate={{ latitude: p.lat, longitude: p.lng }}
+                  title={p.name}
+                  description={p.address}
+                  image={collectionPointMarker}
+                />
+              ))}
             </MapView>
           ) : (
             <FlatList
@@ -436,7 +389,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  toggleLabelBox: { marginVertical: 10, },
+  toggleLabelBox: { marginVertical: 10 },
   toggleLabel: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
   toggleOption: {
     flex: 1,
