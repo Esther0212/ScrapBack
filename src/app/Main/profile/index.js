@@ -150,7 +150,7 @@ const Profile = () => {
                   </>
                 ) : (
                   <>
-                    <Text style={styles.pointsText}>
+                    <Text style={[styles.pointsText, { color: "red" }]}>
                       - {log.points || 0} points
                     </Text>
                     <Text style={styles.categoryText}>

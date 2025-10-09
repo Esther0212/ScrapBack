@@ -191,6 +191,7 @@ const AccountInfo = () => {
             <View style={styles.container}>
               <View style={styles.imageWrapper}>
                 <TouchableOpacity
+                  disabled={!editMode}
                   onPress={() => editMode && setProfileModalVisible(true)}
                 >
                   <Image
@@ -328,7 +329,7 @@ const AccountInfo = () => {
               {/* Address */}
               <Text style={styles.label}>Address</Text>
               <InputField
-                label="Street"
+                label="Street Name, Building, House No., etc."
                 value={street}
                 setValue={setStreet}
                 editable={editMode}

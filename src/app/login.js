@@ -1,5 +1,4 @@
-// src/app/Login.jsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -19,19 +18,19 @@ import { registerForPushNotificationsAsync } from "../utils/notifications";
 
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
+import { useUser } from "../context/userContext"; // ✅ import your context
 import { useUser } from "../context/userContext"; // 👈 import context
 
 const { width } = Dimensions.get("window");
 
 const Login = () => {
-  const [firstName, setFirstName] = useState("");
+  const { setUserData } = useUser(); // ✅ context updater
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
-
-  const { setUserData } = useUser(); // 👈 grab setUserData from context
 
   const validateEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,7 +48,18 @@ const Login = () => {
       tempErrors.email = "Enter a valid email address";
       isValid = false;
     }
+    if (!email) {
+      tempErrors.email = "Email is required";
+      isValid = false;
+    } else if (!validateEmail(email)) {
+      tempErrors.email = "Enter a valid email address";
+      isValid = false;
+    }
 
+    if (!password) {
+      tempErrors.password = "Password is required";
+      isValid = false;
+    }
     if (!password) {
       tempErrors.password = "Password is required";
       isValid = false;
@@ -57,7 +67,13 @@ const Login = () => {
 
     setErrors(tempErrors);
     if (!isValid) return;
+    setErrors(tempErrors);
+    if (!isValid) return;
 
+    try {
+      // 🔐 Firebase auth login
+      const { user } = await signInWithEmailAndPassword(auth, email, password);
+      console.log("✅ Logged in:", user.uid);
     try {
       // 🔐 Sign in
       const userCredential = await signInWithEmailAndPassword(
@@ -68,6 +84,15 @@ const Login = () => {
       const user = userCredential.user;
       console.log("✅ Logged in:", user.uid);
 
+      // 🔔 Get push token
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await setDoc(
+          doc(db, "user", user.uid),
+          { expoPushToken: token },
+          { merge: true }
+        );
+      }
       // 🔔 Register device push token
       const token = await registerForPushNotificationsAsync();
       if (token) {
@@ -79,6 +104,32 @@ const Login = () => {
         console.log("🔥 Expo Push Token saved for:", user.uid, token);
       }
 
+      // 🔎 Fetch user profile from Firestore
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const profile = userDocSnap.data();
+
+        // ✅ Update global userContext
+        setUserData({
+          uid: user.uid,
+          email: user.email,
+          ...profile,
+        });
+      } else {
+        console.warn("⚠️ No profile found for user:", user.uid);
+        setUserData({ uid: user.uid, email: user.email });
+      }
+
+      // Remember email/password only (NOT firstName!)
+      if (rememberMe) {
+        await AsyncStorage.setItem("savedEmail", email);
+        await AsyncStorage.setItem("savedPassword", password);
+      } else {
+        await AsyncStorage.removeItem("savedEmail");
+        await AsyncStorage.removeItem("savedPassword");
+      }
       // Load user profile
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -105,6 +156,24 @@ const Login = () => {
     } catch (error) {
       console.error("❌ FULL LOGIN ERROR:", error);
       let message = "Login failed. Please try again.";
+      if (error.code === "auth/invalid-email")
+        message = "Invalid email address.";
+      else if (error.code === "auth/user-not-found")
+        message = "User not found.";
+      else if (error.code === "auth/wrong-password")
+        message = "Incorrect password.";
+      Alert.alert("Login Error", message);
+    }
+  };
+
+  // Auto-load saved creds (if "Remember Me" checked)
+  React.useEffect(() => {
+    const loadSaved = async () => {
+      Alert.alert("Login Success", "You have successfully logged in!");
+      router.replace("/Main");
+    } catch (error) {
+      console.error("❌ FULL LOGIN ERROR:", error);
+      let message = "Login failed. Please try again.";
       if (error.code === "auth/invalid-email") {
         message = "Invalid email address.";
       } else if (error.code === "auth/user-not-found") {
@@ -121,26 +190,16 @@ const Login = () => {
       try {
         const savedEmail = await AsyncStorage.getItem("savedEmail");
         const savedPassword = await AsyncStorage.getItem("savedPassword");
-
         if (savedEmail && savedPassword) {
           setEmail(savedEmail);
           setPassword(savedPassword);
           setRememberMe(true);
         }
       } catch (e) {
-        console.log("Error loading saved credentials:", e);
+        console.log("Error loading saved creds:", e);
       }
     };
-
-    loadSavedCredentials();
-
-    const loadFirstName = async () => {
-      const name = await AsyncStorage.getItem("firstName");
-      if (name) {
-        setFirstName(name);
-      }
-    };
-    loadFirstName();
+    loadSaved();
   }, []);
 
   return (
@@ -150,7 +209,7 @@ const Login = () => {
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Login to your account</Text>
 
-          {/* Email Input */}
+          {/* Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email address</Text>
             <TextInput
@@ -170,7 +229,7 @@ const Login = () => {
             ) : null}
           </View>
 
-          {/* Password Input */}
+          {/* Password */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordWrapper}>
@@ -190,7 +249,7 @@ const Login = () => {
                 onPress={() => setPasswordVisible(!passwordVisible)}
               >
                 <Ionicons
-                  name={passwordVisible ? "eye-off" : "eye"}
+                  name={passwordVisible ? "eye" : "eye-off"}
                   size={20}
                   color="#555"
                 />
@@ -220,7 +279,7 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Login Button */}
+          {/* Login button */}
           <TouchableOpacity
             style={styles.loginButton}
             activeOpacity={0.8}
@@ -229,13 +288,13 @@ const Login = () => {
             <Text style={styles.loginButtonText}>Log in</Text>
           </TouchableOpacity>
 
-          {/* Sign Up Link */}
+          {/* Signup link */}
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => router.push("/signup")}
           >
             <Text style={styles.signupText}>
-              Don't have an account?{" "}
+              Don’t have an account?{" "}
               <Text style={styles.signupTextBold}>Sign up</Text>
             </Text>
           </TouchableOpacity>
@@ -246,14 +305,8 @@ const Login = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: "center",
-  },
+  safeArea: { flex: 1 },
+  container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
   title: {
     fontSize: 34,
     fontFamily: "Poppins_700Bold",
@@ -268,9 +321,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 42,
   },
-  inputContainer: {
-    marginBottom: 24,
-  },
+  inputContainer: { marginBottom: 24 },
   label: {
     fontSize: 17,
     fontFamily: "Poppins_700Bold",
@@ -288,25 +339,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E0D4C3",
   },
-  passwordWrapper: {
-    position: "relative",
-  },
-  eyeIcon: {
-    position: "absolute",
-    right: 16,
-    top: 14,
-    padding: 4,
-  },
+  passwordWrapper: { position: "relative" },
+  eyeIcon: { position: "absolute", right: 16, top: 14, padding: 4 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 42,
   },
-  rememberMe: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  rememberMe: { flexDirection: "row", alignItems: "center" },
   rememberText: {
     marginLeft: 6,
     fontSize: 14,
@@ -336,10 +377,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     letterSpacing: 0.5,
   },
-  signupLink: {
-    marginTop: 24,
-    alignItems: "center",
-  },
+  signupLink: { marginTop: 24, alignItems: "center" },
   signupText: {
     fontSize: 14,
     color: "#3A2E2E",
@@ -349,11 +387,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     textDecorationLine: "underline",
   },
-  errorText: {
-    color: "red",
-    fontSize: 13,
-    marginTop: 4,
-  },
+  errorText: { color: "red", fontSize: 13, marginTop: 4 },
 });
 
 export default Login;

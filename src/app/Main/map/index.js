@@ -22,6 +22,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 
 // Custom marker
 import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
+import closedCollectionPointMarker from "../../../assets/map/closedCollectionPointMarker.png";
 
 // 🔹 Convert 24-hour to 12-hour format
 const formatTime12h = (time24) => {
@@ -39,6 +40,19 @@ const formatFullDate = (dateStr) => {
   const date = new Date(dateStr);
   const options = { year: "numeric", month: "long", day: "numeric" };
   return date.toLocaleDateString(undefined, options);
+};
+
+// 🔹 Distance calculation (Haversine)
+const getDistanceKm = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
 
 // 🔹 Status component
@@ -102,13 +116,12 @@ export default function MapSelector() {
     };
   }, []);
 
-  // 📍 Get user location
+  // 📍 Get user location + compute distances
   useEffect(() => {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
-
         const location = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = location.coords;
         const newRegion = {
@@ -119,11 +132,20 @@ export default function MapSelector() {
         };
         setRegion(newRegion);
         setMarker({ latitude, longitude });
+
+        if (points.length > 0) {
+          const withDistance = points.map((p) => ({
+            ...p,
+            distance: getDistanceKm(latitude, longitude, p.lat, p.lng),
+          }));
+          withDistance.sort((a, b) => a.distance - b.distance); // nearest → farthest
+          setPoints(withDistance);
+        }
       } catch (error) {
-        console.warn("Location error. Showing default region.");
+        console.warn("Location error:", error);
       }
     })();
-  }, []);
+  }, [points.length]);
 
   // 🔍 Search bar
   const handleSearch = async () => {
@@ -177,6 +199,11 @@ export default function MapSelector() {
       <View style={styles.listCard}>
         <Text style={styles.listTitle}>{item.name}</Text>
         <Text style={styles.listAddress}>{item.address}</Text>
+        {item.distance && (
+          <Text style={styles.distanceText}>
+            Distance: {item.distance.toFixed(2)} km
+          </Text>
+        )}
         {pointSchedules.length > 0 ? (
           pointSchedules.map((s, idx) => (
             <TouchableOpacity
@@ -228,7 +255,7 @@ export default function MapSelector() {
                 onSubmitEditing={handleSearch}
               />
             </View>
-  
+
             {/* Toggle Buttons */}
             <View style={styles.toggleContainer}>
               <View style={styles.toggleButtons}>
@@ -248,7 +275,7 @@ export default function MapSelector() {
                     Map
                   </Text>
                 </TouchableOpacity>
-  
+
                 <TouchableOpacity
                   style={[
                     styles.toggleOption,
@@ -259,7 +286,8 @@ export default function MapSelector() {
                   <Text
                     style={[
                       styles.toggleOptionText,
-                      selectedView === "list" && styles.toggleOptionTextSelected,
+                      selectedView === "list" &&
+                        styles.toggleOptionTextSelected,
                     ]}
                   >
                     List
@@ -271,7 +299,7 @@ export default function MapSelector() {
               </View>
             </View>
           </View>
-  
+
           {/* Map or List */}
           {selectedView === "map" ? (
             <MapView
@@ -280,12 +308,7 @@ export default function MapSelector() {
               ref={mapRef}
               onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
             >
-              <UrlTile
-                urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                maximumZ={19}
-              />
-  
-              {/* User marker */}
+
               {marker && (
                 <Marker coordinate={marker}>
                   <Callout>
@@ -293,59 +316,16 @@ export default function MapSelector() {
                   </Callout>
                 </Marker>
               )}
-  
-              {/* Collection Points */}
-              {points.map((p) => {
-                let pointSchedules = schedules.filter((s) => s.pointId === p.id);
-                pointSchedules = sortSchedules(pointSchedules);
-                return (
-                  <Marker
-                    key={p.id}
-                    coordinate={{ latitude: p.lat, longitude: p.lng }}
-                    title={p.name}
-                    description={p.address}
-                    image={collectionPointMarker}
-                  >
-                    <Callout>
-                      <View style={{ width: 200 }}>
-                        <Text style={{ fontWeight: "bold" }}>{p.name}</Text>
-                        <Text>{p.address}</Text>
-                        {pointSchedules.length > 0 ? (
-                          pointSchedules.map((s, idx) => (
-                            <TouchableOpacity
-                              key={s.id}
-                              style={[
-                                styles.scheduleRow,
-                                {
-                                  backgroundColor:
-                                    idx % 2 === 0 ? "#FFFFFF" : "#E3F6E3",
-                                },
-                              ]}
-                              onPress={() =>
-                                openGoogleMaps(p.lat, p.lng, p.name)
-                              }
-                            >
-                              <Text>
-                                {formatFullDate(s.collectionDate)},{" "}
-                                {formatTime12h(s.collectionTime)}
-                              </Text>
-                              <StatusBadge status={s.status} />
-                              <Feather
-                                name="arrow-up-right"
-                                size={20}
-                                color="black"
-                                style={{ marginLeft: "auto" }}
-                              />
-                            </TouchableOpacity>
-                          ))
-                        ) : (
-                          <Text>No schedules</Text>
-                        )}
-                      </View>
-                    </Callout>
-                  </Marker>
-                );
-              })}
+
+              {points.map((p) => (
+                <Marker
+                  key={p.id}
+                  coordinate={{ latitude: p.lat, longitude: p.lng }}
+                  title={p.name}
+                  description={p.address}
+                  image={collectionPointMarker}
+                />
+              ))}
             </MapView>
           ) : (
             <FlatList
@@ -353,7 +333,7 @@ export default function MapSelector() {
               keyExtractor={(item) => item.id}
               renderItem={renderListItem}
               contentContainerStyle={{
-                paddingTop: 180, // Matches the height of the overlay
+                paddingTop: 200,
                 paddingHorizontal: 16,
                 paddingBottom: 16,
               }}
@@ -410,7 +390,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  toggleLabelBox: { marginBottom: 0, },
+  toggleLabelBox: { marginVertical: 10 },
   toggleLabel: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
   toggleOption: {
     flex: 1,
@@ -451,6 +431,12 @@ const styles = StyleSheet.create({
   },
   listAddress: {
     fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+    marginBottom: 6,
+  },
+  distanceText: {
+    fontSize: 13,
     fontFamily: "Poppins_400Regular",
     color: "#333",
     marginBottom: 6,

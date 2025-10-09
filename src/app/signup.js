@@ -392,7 +392,7 @@ const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
         style={styles.eyeIcon}
         onPress={() => setVisible(!visible)}
       >
-        <Ionicons name={visible ? "eye-off" : "eye"} size={20} color="#555" />
+        <Ionicons name={visible ? "eye" : "eye-off"} size={20} color="#555" />
       </TouchableOpacity>
     </View>
   </View>
