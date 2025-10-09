@@ -22,6 +22,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 
 // Custom marker
 import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
+import closedCollectionPointMarker from "../../../assets/map/closedCollectionPointMarker.png";
 
 // 🔹 Convert 24-hour to 12-hour format
 const formatTime12h = (time24) => {
