@@ -151,7 +151,7 @@ const SwitchAccount = () => {
         contact,
         gender,
         dob,
-        userType: "user", // ✅ added here
+        userType: "user",
         address: {
           street,
           region: region.name,
@@ -193,7 +193,6 @@ const SwitchAccount = () => {
     }
 
     setErrors(tempErrors);
-
     if (!isValid) return;
 
     try {
@@ -209,17 +208,38 @@ const SwitchAccount = () => {
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        const firstName = userData.firstName || "";
-        await AsyncStorage.setItem("firstName", firstName);
-      }
 
-      // ✅ Remember Me logic
-      if (rememberMe) {
-        await AsyncStorage.setItem("savedEmail", email);
-        await AsyncStorage.setItem("savedPassword", password);
-      } else {
-        await AsyncStorage.removeItem("savedEmail");
-        await AsyncStorage.removeItem("savedPassword");
+        // Always save to savedUsers (for Switch Account modal)
+        let savedUsers =
+          JSON.parse(await AsyncStorage.getItem("savedUsers")) || [];
+
+        const exists = savedUsers.some((u) => u.uid === user.uid);
+        if (!exists) {
+          savedUsers.push({
+            uid: user.uid,
+            email,
+            password, // (consider encrypting this in future)
+            firstName: userData.firstName || "",
+            lastName: userData.lastName || "",
+            profilePic: userData.profilePic || null,
+          });
+          await AsyncStorage.setItem("savedUsers", JSON.stringify(savedUsers));
+        }
+
+        // Save name for quick access (optional)
+        await AsyncStorage.setItem("firstName", userData.firstName || "");
+
+        // Only store "lastUsedUser" if Remember Me is checked
+        if (rememberMe) {
+          await AsyncStorage.setItem(
+            "lastUsedUser",
+            JSON.stringify({
+              uid: user.uid,
+              email,
+              password,
+            })
+          );
+        }
       }
 
       Alert.alert("Login Success", "You have successfully logged in!");
@@ -337,6 +357,7 @@ const SwitchAccount = () => {
                 value={street}
                 setValue={setStreet}
                 subLabel
+                style={styles.input}
               />
 
               <DropdownField
@@ -418,6 +439,7 @@ const SwitchAccount = () => {
                 value={email}
                 setValue={setEmail}
                 keyboardType="email-address"
+                autoCapitalize="none"
               />
               <PasswordField
                 label="Password"
@@ -534,7 +556,12 @@ const DropdownField = ({
           style={[styles.input, { alignItems: "flex-start" }]}
           onPress={() => !readOnly && setVisible(true)}
         >
-          <Text style={{ color: selected ? "#3A2E2E" : "#777", fontSize: 16 }}>
+          <Text
+            style={[
+              styles.dropdownText,
+              { color: selected ? "#3A2E2E" : "#777" },
+            ]}
+          >
             {selected || `Select ${label}`}
           </Text>
         </TouchableOpacity>
@@ -549,6 +576,11 @@ const DropdownField = ({
             setVisible(false);
           }}
           title={optionKey ? o[optionKey] : o}
+          titleStyle={{
+            fontSize: 15,
+            fontFamily: "Poppins_400Regular",
+            color: "#3A2E2E",
+          }}
         />
       ))}
     </Menu>
@@ -561,15 +593,16 @@ const styles = StyleSheet.create({
   scrollContainer: { flexGrow: 1, paddingHorizontal: 24 },
   container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
   title: {
-    fontSize: 30,
-    fontWeight: "800",
+    fontSize: 34,
+    fontFamily: "Poppins_700Bold",
     color: "#3A2E2E",
     textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 17,
     color: "#555",
+    fontFamily: "Poppins_400Regular",
     textAlign: "center",
     marginBottom: 40,
   },
@@ -577,16 +610,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
   },
   inputContainer: { marginBottom: 16 },
-  label: { fontSize: 17, fontWeight: "700", color: "#3A2E2E", marginBottom: 6 },
+  label: {
+    fontSize: 17,
+    fontFamily: "Poppins_700Bold",
+    color: "#3A2E2E",
+    marginBottom: 6,
+  },
+  subLabel: {
+    fontSize: 13,
+    fontFamily: "Poppins_700Bold",
+    color: "#71695B",
+    marginBottom: 6,
+  },
   input: {
     backgroundColor: "#F1E3D3",
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 18,
-    fontSize: 16,
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
     color: "#3A2E2E",
     borderWidth: 1,
     borderColor: "#E0D4C3",
@@ -595,9 +639,15 @@ const styles = StyleSheet.create({
   passwordWrapper: { position: "relative" },
   eyeIcon: { position: "absolute", right: 16, top: 14, padding: 4 },
   rememberMe: { flexDirection: "row", alignItems: "center" },
-  rememberText: { marginLeft: 6, fontSize: 14, color: "#3A2E2E" },
+  rememberText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+  },
   forgotText: {
     fontSize: 14,
+    fontFamily: "Poppins_400Regular",
     color: "#3A2E2E",
     textDecorationLine: "underline",
   },
@@ -606,13 +656,37 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 14,
     alignItems: "center",
-    marginTop: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 5,
+    elevation: 4,
+    marginTop: 30,
   },
-  loginButtonText: { color: "#FFF", fontSize: 18, fontWeight: "600" },
-  signupLink: { marginTop: 24, alignItems: "center" },
-  signupText: { fontSize: 14, color: "#3A2E2E" },
-  signupTextBold: { fontWeight: "700", textDecorationLine: "underline" },
-  menuContent: { backgroundColor: "#F1E3D3", borderRadius: 12 },
+  loginButtonText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontFamily: "Poppins_700Bold",
+    letterSpacing: 0.5,
+  },
+  signupLink: {
+    marginTop: 24,
+    alignItems: "center",
+  },
+  signupText: {
+    fontSize: 14,
+    color: "#3A2E2E",
+    fontFamily: "Poppins_400Regular",
+  },
+  signupTextBold: {
+    fontFamily: "Poppins_700Bold",
+    textDecorationLine: "underline",
+  },
+  menuContent: { backgroundColor: "#fff", borderRadius: 12 },
+  dropdownText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+  },
 });
 
 export default SwitchAccount;

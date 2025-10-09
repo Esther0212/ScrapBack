@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import CustomBgColor from "../../components/customBgColor";
+import CustomBgColor from "../../../components/customBgColor";
 
 const { width } = Dimensions.get("window");
 
@@ -23,21 +23,21 @@ const rewards = [
     id: 1,
     name: "Rice Sack",
     subtitle: "Redeemable Onsite",
-    icon: require("../../assets/redeem/rice.png"),
+    icon: require("../../../assets/redeem/rice.png"),
     route: "/Main/rewards/rice",
   },
   {
     id: 2,
     name: "Load",
     subtitle: "Redeemable Onsite/Online",
-    icon: require("../../assets/redeem/load.png"),
+    icon: require("../../../assets/redeem/load.png"),
     route: "/Main/rewards/load",
   },
   {
     id: 3,
     name: "GCash",
     subtitle: "Redeemable Online",
-    icon: require("../../assets/redeem/gcash.png"),
+    icon: require("../../../assets/redeem/gcash.png"),
     route: "/Main/rewards/gcash",
   },
 ];
@@ -48,14 +48,6 @@ const RedeemRewards = () => {
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="black" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>🎁 Redeem Rewards</Text>
-          <View style={{ width: 24 }} />
-        </View>
 
         {/* Eco friendly background accents */}
         <Ionicons
@@ -159,7 +151,6 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flexGrow: 1,
-    padding: 16,
   },
   content: {
     alignItems: "center",

@@ -16,6 +16,7 @@ import { getAuth, signOut } from "firebase/auth";
 import { useRouter } from "expo-router";
 import { useUser } from "../../../context/userContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 const Settings = () => {
   const router = useRouter();
@@ -49,11 +50,39 @@ const Settings = () => {
   }, []);
 
   const handleSwitch = async (user) => {
-    Alert.alert(
-      "Switch Account",
-      `Logging in as ${user.firstName} ${user.lastName}`
-    );
-    setModalVisible(false);
+    try {
+      const auth = getAuth();
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        user.email,
+        user.password
+      );
+
+      await AsyncStorage.setItem("lastUsedUser", JSON.stringify(user));
+
+      Alert.alert(
+        "Switch Account",
+        `Now logged in as ${user.firstName} ${user.lastName}`
+      );
+
+      setModalVisible(false);
+      router.replace("/Main");
+    } catch (error) {
+      Alert.alert("Switch Failed", error.message);
+    }
+  };
+
+  const handleRemoveAccount = async (uid) => {
+    try {
+      const users = JSON.parse(await AsyncStorage.getItem("savedUsers")) || [];
+      const updatedUsers = users.filter((u) => u.uid !== uid);
+      await AsyncStorage.setItem("savedUsers", JSON.stringify(updatedUsers));
+      setSavedUsers(updatedUsers);
+      Alert.alert("Removed", "Account has been removed from switch list.");
+    } catch (err) {
+      console.error("Error removing user:", err);
+      Alert.alert("Error", "Failed to remove account. Please try again.");
+    }
   };
 
   // helper: profile image fallback
@@ -183,12 +212,11 @@ const Settings = () => {
               {savedUsers
                 .filter((u) => u.uid !== userData?.uid)
                 .map((user, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={styles.modalItem}
-                    onPress={() => handleSwitch(user)}
-                  >
-                    <View style={styles.modalItemLeft}>
+                  <View key={i} style={styles.modalItem}>
+                    <TouchableOpacity
+                      style={styles.modalItemLeft}
+                      onPress={() => handleSwitch(user)}
+                    >
                       <Image
                         source={getProfileImageSource(user.profilePic)}
                         style={styles.modalProfileImage}
@@ -196,8 +224,28 @@ const Settings = () => {
                       <Text style={styles.modalItemText}>
                         {user.firstName} {user.lastName}
                       </Text>
-                    </View>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+
+                    {/* 🗑 Remove Button */}
+                    <TouchableOpacity
+                      onPress={() =>
+                        Alert.alert(
+                          "Remove Account",
+                          `Remove ${user.firstName} ${user.lastName} from list?`,
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                              text: "Remove",
+                              style: "destructive",
+                              onPress: () => handleRemoveAccount(user.uid),
+                            },
+                          ]
+                        )
+                      }
+                    >
+                      <Feather name="trash-2" size={20} color="#b00020" />
+                    </TouchableOpacity>
+                  </View>
                 ))}
 
               {/* Add Account */}
@@ -312,10 +360,8 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 
-  // ✅ Bigger profile image in modal
-  modalProfileImage: { width: 40, height: 40, borderRadius: 20 },
 
-  // ✅ Add Account button circle same size as modal profile
+  modalProfileImage: { width: 40, height: 40, borderRadius: 20 },
   addAccount: {
     flexDirection: "row",
     alignItems: "center",
@@ -334,6 +380,14 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     fontSize: 15,
     color: "#008243",
+  },
+  modalItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#ddd",
   },
 });
 
