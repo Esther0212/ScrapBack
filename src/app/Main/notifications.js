@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,7 +15,6 @@ import { auth, db } from "../../../firebase";
 import {
   collection,
   query,
-  where,
   onSnapshot,
   getDocs,
   writeBatch,
@@ -29,33 +29,34 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState([]);
   const router = useRouter();
 
+  // 🔹 Real-time notifications
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const q = query(
-      collection(db, "userNotifications"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
+    const notifRef = collection(
+      db,
+      "notifications",
+      user.uid,
+      "userNotifications"
     );
+    const q = query(notifRef, orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const toMillis = (c) => {
-        if (!c) return 0;
-        if (typeof c === "number") return c; // epoch millis
-        if (c.toDate) return c.toDate().getTime(); // Firestore Timestamp
-        if (c.seconds != null)
-          return c.seconds * 1000 + Math.floor((c.nanoseconds || 0) / 1e6);
-        return 0;
-      };
-
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
 
-      // Safe sort
-      data.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+      data.sort((a, b) => {
+        const getTime = (d) =>
+          d?.createdAt?.toDate
+            ? d.createdAt.toDate().getTime()
+            : typeof d?.createdAt === "number"
+            ? d.createdAt
+            : 0;
+        return getTime(b) - getTime(a);
+      });
 
       setNotifications(data);
     });
@@ -63,111 +64,141 @@ export default function NotificationsScreen() {
     return unsubscribe;
   }, []);
 
+  // 🔹 Mark all as read
   const markAllAsRead = async () => {
     const user = auth.currentUser;
     if (!user) return;
     try {
-      const q = query(
-        collection(db, "userNotifications"),
-        where("userId", "==", user.uid),
-        where("read", "==", false)
+      const notifRef = collection(
+        db,
+        "notifications",
+        user.uid,
+        "userNotifications"
       );
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocs(notifRef);
       if (snapshot.empty) return;
+
       const batch = writeBatch(db);
       snapshot.forEach((docSnap) => {
-        batch.update(docSnap.ref, { read: true });
+        if (!docSnap.data().read) batch.update(docSnap.ref, { read: true });
       });
       await batch.commit();
     } catch (err) {
-      console.error("Failed to mark as read:", err);
+      console.error("Failed to mark all as read:", err);
     }
   };
 
+  // 🔹 Mark one as read
   const markOneAsRead = async (notifId) => {
+    const user = auth.currentUser;
+    if (!user) return;
     try {
-      const notifRef = doc(db, "userNotifications", notifId);
+      const notifRef = doc(
+        db,
+        "notifications",
+        user.uid,
+        "userNotifications",
+        notifId
+      );
       await updateDoc(notifRef, { read: true });
     } catch (err) {
       console.error("Failed to mark single notif as read:", err);
     }
   };
 
+  // 🔹 Handle notification tap (with confirmation prompts)
   const handleNotificationPress = (item) => {
-    if (!item.read) {
-      markOneAsRead(item.id);
-    }
+    if (!item.read) markOneAsRead(item.id);
 
     if (item.title?.includes("Collection Point")) {
       Alert.alert(
-        "Go to Collection Point?",
+        "Go to Collection Points?",
         "Do you want to view the collection points page?",
         [
           { text: "No", style: "cancel" },
-          {
-            text: "Yes",
-            onPress: () => router.push("/Main/map"),
-          },
+          { text: "Yes", onPress: () => router.push("/Main/map") },
         ]
       );
-    } else if (
-      item.title?.includes("Pickup Request Created") ||
-      item.title?.includes("Pickup Request Updated")
-    ) {
+    } else if (item.type === "pickupStatus") {
       Alert.alert(
-        "Go to Pickup Requests?",
+        "Pickup Request Update",
         "Do you want to view your pickup requests?",
         [
           { text: "No", style: "cancel" },
-          {
-            text: "Yes",
-            onPress: () => router.push("/Main/requestPickup"),
-          },
+          { text: "Yes", onPress: () => router.push("/Main/requestPickup") },
         ]
       );
     }
   };
 
+  // 🔹 Render each notification card
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={[styles.card, !item.read && styles.cardUnread]}
       onPress={() => handleNotificationPress(item)}
+      activeOpacity={0.9}
     >
       {!item.read && <View style={styles.unreadBar} />}
 
-      <Ionicons
-        name={item.read ? "notifications-outline" : "notifications"}
-        size={20}
-        color={item.read ? "gray" : "#F5A25D"}
-        style={{ marginRight: 8 }}
-      />
-      <View style={{ flex: 1 }}>
+      {/* 🔸 Title Row */}
+      <View style={styles.titleRow}>
+        <Ionicons
+          name={item.read ? "notifications-outline" : "notifications"}
+          size={22}
+          color={item.read ? "gray" : "#F5A25D"}
+          style={{ marginRight: 8 }}
+        />
         <Text style={[styles.title, !item.read && styles.titleUnread]}>
           {item.title}
         </Text>
-        <Text
-          style={[styles.body, !item.read && styles.bodyUnread]}
-          numberOfLines={2}
-        >
-          {item.body}
-        </Text>
-        <Text style={styles.date}>
-          {(() => {
-            const c = item.createdAt;
-            if (!c) return "";
-            if (c.toDate) return c.toDate().toLocaleString();
-            if (typeof c === "number") return new Date(c).toLocaleString();
-            return "";
-          })()}
-        </Text>
       </View>
+
+      {/* 🔸 Body and optional thumbnail */}
+      {item.photoUrl ? (
+        <View style={styles.rowWithImage}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text
+              style={[styles.body, !item.read && styles.bodyUnread]}
+              numberOfLines={10}
+            >
+              {item.body}
+            </Text>
+          </View>
+
+          <Image
+            source={{ uri: item.photoUrl }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+          />
+        </View>
+      ) : (
+        <View>
+          <Text
+            style={[styles.body, !item.read && styles.bodyUnread]}
+            numberOfLines={10}
+          >
+            {item.body}
+          </Text>
+        </View>
+      )}
+
+      {/* 🔸 Date */}
+      <Text style={styles.date}>
+        {(() => {
+          const c = item.createdAt;
+          if (!c) return "";
+          if (c.toDate) return c.toDate().toLocaleString();
+          if (typeof c === "number") return new Date(c).toLocaleString();
+          return "";
+        })()}
+      </Text>
     </TouchableOpacity>
   );
 
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.container}>
-        {/* Header */}
+        {/* 🔹 Header */}
         <View style={styles.topHeader}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={24} color="black" />
@@ -180,6 +211,7 @@ export default function NotificationsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* 🔹 List */}
         {notifications.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>No notifications yet</Text>
@@ -216,8 +248,10 @@ const styles = StyleSheet.create({
     color: "#008243",
     fontFamily: "Poppins_400Regular",
   },
+
   card: {
-    flexDirection: "row",
+    flexDirection: "column",
+    alignItems: "flex-start",
     backgroundColor: "white",
     padding: 12,
     borderRadius: 10,
@@ -227,9 +261,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 3,
-    minHeight: 65,
     borderWidth: 1,
     borderColor: "#E3F6E3",
+    width: "100%",
   },
   cardUnread: { backgroundColor: "#F4FBF4" },
   unreadBar: {
@@ -242,20 +276,42 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 10,
     borderBottomLeftRadius: 10,
   },
+
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  rowWithImage: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+
   title: { fontSize: 14, fontFamily: "Poppins_700Bold", color: "#2E7D32" },
   titleUnread: { fontFamily: "Poppins_800ExtraBold", color: "#008243" },
-  body: {
-    fontSize: 13,
-    fontFamily: "Poppins_400Regular",
-    color: "#333",
-    marginTop: 2,
-  },
+ body: {
+  fontSize: 13,
+  fontFamily: "Poppins_400Regular",
+  color: "#333",
+  marginTop: 4,
+  marginHorizontal: 4, // ✅ added small side margin
+  textAlign: "justify", // ✅ justified text
+},
+
   bodyUnread: { color: "#004d26" },
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
   date: {
     fontSize: 11,
     color: "#666",
     fontFamily: "Poppins_400Regular",
-    marginTop: 2,
+    marginTop: 6,
   },
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { fontSize: 14, color: "#888" },

@@ -6,10 +6,9 @@ import {
   View,
   Image,
   ScrollView,
-  Pressable,
-  Dimensions,
   TouchableOpacity,
   Platform,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../components/customBgColor";
@@ -56,7 +55,6 @@ async function registerForPushNotificationsAsync() {
   console.log("Expo push token:", token);
 
   if (Platform.OS === "android") {
-    // Make sure the channel exists and has high importance for heads-up banners
     await Notifications.setNotificationChannelAsync("default", {
       name: "default",
       importance: Notifications.AndroidImportance.MAX,
@@ -79,7 +77,7 @@ const Home = () => {
   const [collapsedCategories, setCollapsedCategories] = useState({});
   const router = useRouter();
 
-  // Save Expo push token to Firestore (merge-safe)
+  // ✅ Save Expo Push Token to Firestore
   useEffect(() => {
     const saveToken = async () => {
       const user = auth.currentUser;
@@ -96,19 +94,16 @@ const Home = () => {
     saveToken();
   }, []);
 
-  // Realtime badge for user notifications
+  // ✅ Real-time badge for nested notifications path
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const q = query(
-      collection(db, "userNotifications"),
-      where("userId", "==", user.uid)
-    );
+    const notifRef = collection(db, "notifications", user.uid, "userNotifications");
+    const q = query(notifRef, where("read", "==", false));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map((doc) => doc.data());
-      const unread = docs.filter((d) => !d.read).length;
+      const unread = snapshot.docs.length;
       setUnreadCount(unread);
       setHasNewNotification(unread > 0);
     });
@@ -116,7 +111,7 @@ const Home = () => {
     return unsubscribe;
   }, []);
 
-  // recycling types
+  // 🔹 Recycling types (educational)
   useEffect(() => {
     if (educationalContent && educationalContent.length > 0) {
       const types = educationalContent.map((item) => item.type);
@@ -124,7 +119,7 @@ const Home = () => {
     }
   }, [educationalContent]);
 
-  // fetch conversion rates
+  // 🔹 Fetch conversion rates
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, "wasteConversionRates"),
@@ -139,7 +134,7 @@ const Home = () => {
     return () => unsub();
   }, []);
 
-  // group by category
+  // 🔹 Group conversion rates by category
   const groupedRates = conversionRates.reduce((acc, item) => {
     if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
@@ -173,9 +168,7 @@ const Home = () => {
                 name="notifications-outline"
                 size={28}
                 color="black"
-                onPress={() => {
-                  router.push("/Main/notifications");
-                }}
+                onPress={() => router.push("/Main/notifications")}
               />
               {hasNewNotification && (
                 <View style={styles.badgeNumber}>
@@ -193,7 +186,7 @@ const Home = () => {
             Every action counts—start recycling today!
           </Text>
 
-          {/* Points */}
+          {/* Points Section */}
           <View style={styles.pointsContainer}>
             <View style={styles.leftContainer}>
               <Text style={styles.pointsLabel}>Your Total Points</Text>
@@ -251,27 +244,22 @@ const Home = () => {
 
           {/* Conversion Rates */}
           <Text style={styles.sectionTitle}>Conversion Rates</Text>
-
-       
           {Object.keys(groupedRates)
             .slice(0, 5)
             .map((category, catIdx) => {
               const rows = groupedRates[category];
               const firstRow = rows[0];
-
               return (
                 <TouchableOpacity
                   key={catIdx}
                   onPress={() => router.push("/Main/conversionTable")}
                 >
                   <View style={styles.card}>
-                    {/* Header Bar */}
                     <View style={styles.headerBar}>
                       <Text style={styles.category}>{category} Conversion</Text>
                       <Ionicons name="chevron-forward" size={20} color="#fff" />
                     </View>
 
-                    {/* Table preview with only first row */}
                     <View style={styles.table}>
                       <View style={styles.tableHeader}>
                         <Text style={[styles.cellHeader, { flex: 2 }]}>
@@ -279,7 +267,6 @@ const Home = () => {
                         </Text>
                         <Text style={styles.cellHeader}>Points/kg</Text>
                       </View>
-
                       {firstRow && (
                         <View
                           style={[styles.row, { backgroundColor: "#FFFFFF" }]}
@@ -287,7 +274,9 @@ const Home = () => {
                           <Text style={[styles.cell, { flex: 2 }]}>
                             {firstRow.type}
                           </Text>
-                          <Text style={styles.cell}>{firstRow.points} pts</Text>
+                          <Text style={styles.cell}>
+                            {firstRow.points} pts
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -388,8 +377,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "bold",
   },
-
-  // conversion cards (same as staff styling)
   card: {
     backgroundColor: "#F6F8F0",
     borderRadius: 14,

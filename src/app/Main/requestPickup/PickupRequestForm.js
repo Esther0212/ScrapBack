@@ -412,15 +412,6 @@ export default function PickupRequestForm() {
           updatedAt: serverTimestamp(),
         });
 
-        // ✅ Save notification for the user
-        await addDoc(collection(db, "userNotifications"), {
-          userId: user.uid,
-          title: "Pickup Request Updated",
-          body: `Your pickup request at ${pickupAddress} was updated.`,
-          createdAt: serverTimestamp(),
-          read: false,
-        });
-
         // ✅ Save notification for admins
         await addDoc(collection(db, "adminNotifications"), {
           title: "Pickup Request Updated",
@@ -452,15 +443,6 @@ export default function PickupRequestForm() {
           status: "pending",
           seenByAdmin: false,
           createdAt: serverTimestamp(),
-        });
-
-        // ✅ Save notification for the user
-        await addDoc(collection(db, "userNotifications"), {
-          userId: user.uid,
-          title: "Pickup Request Created",
-          body: `You created a pickup request for ${pickupAddress}.`,
-          createdAt: serverTimestamp(),
-          read: false,
         });
 
         // ✅ Save notification for admins
