@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
-  Alert,
+  ActivityIndicator, // ✅ import spinner
+  ToastAndroid,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -14,7 +15,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ToastAndroid } from "react-native";
 
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
@@ -28,75 +28,76 @@ const Login = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false); // ✅ loading state
 
   const validateEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
   };
 
-const handleLogin = async () => {
-  let tempErrors = { email: "", password: "" };
-  let isValid = true;
+  const handleLogin = async () => {
+    let tempErrors = { email: "", password: "" };
+    let isValid = true;
 
-  if (!email) {
-    tempErrors.email = "Email is required";
-    isValid = false;
-  } else if (!validateEmail(email)) {
-    tempErrors.email = "Enter a valid email address";
-    isValid = false;
-  }
-
-  if (!password) {
-    tempErrors.password = "Password is required";
-    isValid = false;
-  }
-
-  setErrors(tempErrors);
-
-  if (!isValid) return;
-
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-
-    const userDocRef = doc(db, "user", user.uid);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-      const userData = userDocSnap.data();
-      const firstName = userData.firstName || "";
-      await AsyncStorage.setItem("firstName", firstName);
+    if (!email) {
+      tempErrors.email = "Email is required";
+      isValid = false;
+    } else if (!validateEmail(email)) {
+      tempErrors.email = "Enter a valid email address";
+      isValid = false;
     }
 
-    if (rememberMe) {
-      await AsyncStorage.setItem("savedEmail", email);
-      await AsyncStorage.setItem("savedPassword", password);
-    } else {
-      await AsyncStorage.removeItem("savedEmail");
-      await AsyncStorage.removeItem("savedPassword");
+    if (!password) {
+      tempErrors.password = "Password is required";
+      isValid = false;
     }
 
-    // ✅ Use Toast instead of Alert
-    ToastAndroid.show("Login successful!", ToastAndroid.SHORT);
-    router.replace("/Main");
-  } catch (error) {
-    let message = "Login failed. Please try again.";
+    setErrors(tempErrors);
+    if (!isValid) return;
 
-    if (error.code === "auth/invalid-email") {
-      message = "Invalid email address.";
-    } else if (error.code === "auth/user-not-found") {
-      message = "User not found.";
-    } else if (error.code === "auth/wrong-password") {
-      message = "Incorrect password.";
-    } else if (error.code === "auth/network-request-failed") {
-      message = "No internet connection. Please check your network.";
+    try {
+      setLoading(true); // ✅ start loading
+
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        const firstName = userData.firstName || "";
+        await AsyncStorage.setItem("firstName", firstName);
+      }
+
+      if (rememberMe) {
+        await AsyncStorage.setItem("savedEmail", email);
+        await AsyncStorage.setItem("savedPassword", password);
+      } else {
+        await AsyncStorage.removeItem("savedEmail");
+        await AsyncStorage.removeItem("savedPassword");
+      }
+
+      ToastAndroid.show("Login successful!", ToastAndroid.SHORT);
+      router.replace("/Main");
+    } catch (error) {
+      let message = "Login failed. Please try again.";
+
+      if (error.code === "auth/invalid-email") {
+        message = "Invalid email address.";
+      } else if (error.code === "auth/user-not-found") {
+        message = "User not found.";
+      } else if (error.code === "auth/wrong-password") {
+        message = "Incorrect password.";
+      } else if (error.code === "auth/network-request-failed") {
+        message = "No internet connection. Please check your network.";
+      }
+
+      ToastAndroid.show(message, ToastAndroid.LONG);
+    } finally {
+      setLoading(false); // ✅ stop loading
     }
-
-    // ✅ Show toast for errors
-    ToastAndroid.show(message, ToastAndroid.LONG);
-  }
-};
-
+  };
 
   useEffect(() => {
     const loadSavedCredentials = async () => {
@@ -132,6 +133,7 @@ const handleLogin = async () => {
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Login to your account</Text>
 
+          {/* Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email address</Text>
             <TextInput
@@ -151,6 +153,7 @@ const handleLogin = async () => {
             ) : null}
           </View>
 
+          {/* Password */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordWrapper}>
@@ -181,6 +184,7 @@ const handleLogin = async () => {
             ) : null}
           </View>
 
+          {/* Remember / Forgot */}
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.rememberMe}
@@ -199,14 +203,21 @@ const handleLogin = async () => {
             </TouchableOpacity>
           </View>
 
+          {/* ✅ Login Button with Loading Spinner */}
           <TouchableOpacity
-            style={styles.loginButton}
+            style={[styles.loginButton, loading && { opacity: 0.7 }]}
             activeOpacity={0.8}
             onPress={handleLogin}
+            disabled={loading}
           >
-            <Text style={styles.loginButtonText}>Log in</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Log in</Text>
+            )}
           </TouchableOpacity>
 
+          {/* Signup Link */}
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => router.push("/signup")}
@@ -223,14 +234,8 @@ const handleLogin = async () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: "center",
-  },
+  safeArea: { flex: 1 },
+  container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
   title: {
     fontSize: 34,
     fontFamily: "Poppins_700Bold",
@@ -245,9 +250,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 42,
   },
-  inputContainer: {
-    marginBottom: 24,
-  },
+  inputContainer: { marginBottom: 24 },
   label: {
     fontSize: 17,
     fontFamily: "Poppins_700Bold",
@@ -265,25 +268,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E0D4C3",
   },
-  passwordWrapper: {
-    position: "relative",
-  },
-  eyeIcon: {
-    position: "absolute",
-    right: 16,
-    top: 14,
-    padding: 4,
-  },
+  passwordWrapper: { position: "relative" },
+  eyeIcon: { position: "absolute", right: 16, top: 14, padding: 4 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 42,
   },
-  rememberMe: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  rememberMe: { flexDirection: "row", alignItems: "center" },
   rememberText: {
     marginLeft: 6,
     fontSize: 14,
@@ -313,10 +306,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     letterSpacing: 0.5,
   },
-  signupLink: {
-    marginTop: 24,
-    alignItems: "center",
-  },
+  signupLink: { marginTop: 24, alignItems: "center" },
   signupText: {
     fontSize: 14,
     color: "#3A2E2E",
@@ -326,11 +316,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     textDecorationLine: "underline",
   },
-  errorText: {
-    color: "red",
-    fontSize: 13,
-    marginTop: 4,
-  },
+  errorText: { color: "red", fontSize: 13, marginTop: 4 },
 });
 
 export default Login;
