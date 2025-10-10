@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ToastAndroid } from "react-native";
 
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
@@ -33,69 +34,69 @@ const Login = () => {
     return regex.test(email);
   };
 
-  const handleLogin = async () => {
-    let tempErrors = { email: "", password: "" };
-    let isValid = true;
+const handleLogin = async () => {
+  let tempErrors = { email: "", password: "" };
+  let isValid = true;
 
-    if (!email) {
-      tempErrors.email = "Email is required";
-      isValid = false;
-    } else if (!validateEmail(email)) {
-      tempErrors.email = "Enter a valid email address";
-      isValid = false;
+  if (!email) {
+    tempErrors.email = "Email is required";
+    isValid = false;
+  } else if (!validateEmail(email)) {
+    tempErrors.email = "Enter a valid email address";
+    isValid = false;
+  }
+
+  if (!password) {
+    tempErrors.password = "Password is required";
+    isValid = false;
+  }
+
+  setErrors(tempErrors);
+
+  if (!isValid) return;
+
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    const userDocRef = doc(db, "user", user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (userDocSnap.exists()) {
+      const userData = userDocSnap.data();
+      const firstName = userData.firstName || "";
+      await AsyncStorage.setItem("firstName", firstName);
     }
 
-    if (!password) {
-      tempErrors.password = "Password is required";
-      isValid = false;
+    if (rememberMe) {
+      await AsyncStorage.setItem("savedEmail", email);
+      await AsyncStorage.setItem("savedPassword", password);
+    } else {
+      await AsyncStorage.removeItem("savedEmail");
+      await AsyncStorage.removeItem("savedPassword");
     }
 
-    setErrors(tempErrors);
+    // ✅ Use Toast instead of Alert
+    ToastAndroid.show("Login successful!", ToastAndroid.SHORT);
+    router.replace("/Main");
+  } catch (error) {
+    let message = "Login failed. Please try again.";
 
-    if (!isValid) return;
-
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
-
-      const userDocRef = doc(db, "user", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        const firstName = userData.firstName || "";
-        await AsyncStorage.setItem("firstName", firstName);
-      }
-
-      // ✅ Remember Me logic
-      if (rememberMe) {
-        await AsyncStorage.setItem("savedEmail", email);
-        await AsyncStorage.setItem("savedPassword", password);
-      } else {
-        await AsyncStorage.removeItem("savedEmail");
-        await AsyncStorage.removeItem("savedPassword");
-      }
-
-      Alert.alert("Login Success", "You have successfully logged in!");
-      router.replace("/Main");
-    } catch (error) {
-      let message = "Login failed. Please try again.";
-
-      if (error.code === "auth/invalid-email") {
-        message = "Invalid email address.";
-      } else if (error.code === "auth/user-not-found") {
-        message = "User not found.";
-      } else if (error.code === "auth/wrong-password") {
-        message = "Incorrect password.";
-      }
-
-      Alert.alert("Login Error", message);
+    if (error.code === "auth/invalid-email") {
+      message = "Invalid email address.";
+    } else if (error.code === "auth/user-not-found") {
+      message = "User not found.";
+    } else if (error.code === "auth/wrong-password") {
+      message = "Incorrect password.";
+    } else if (error.code === "auth/network-request-failed") {
+      message = "No internet connection. Please check your network.";
     }
-  };
+
+    // ✅ Show toast for errors
+    ToastAndroid.show(message, ToastAndroid.LONG);
+  }
+};
+
 
   useEffect(() => {
     const loadSavedCredentials = async () => {

@@ -5,9 +5,9 @@ import {
   View,
   TouchableOpacity,
   TextInput,
-  Alert,
   ScrollView,
   Dimensions,
+  ToastAndroid,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -108,64 +108,76 @@ const Signup = () => {
     preloadAddressData();
   }, []);
 
-  const handleSignup = async () => {
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !password ||
-      !contact ||
-      !confirmPassword ||
-      !gender ||
-      !dob ||
-      !street ||
-      !region ||
-      !province ||
-      !city ||
-      !barangay
-    ) {
-      Alert.alert("Please fill in all fields");
-      return;
+const handleSignup = async () => {
+  if (
+    !firstName ||
+    !lastName ||
+    !email ||
+    !password ||
+    !contact ||
+    !confirmPassword ||
+    !gender ||
+    !dob ||
+    !street ||
+    !region ||
+    !province ||
+    !city ||
+    !barangay
+  ) {
+    ToastAndroid.show("Please fill in all fields", ToastAndroid.LONG);
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    ToastAndroid.show("Passwords do not match", ToastAndroid.LONG);
+    return;
+  }
+
+  try {
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+    const uid = userCredential.user.uid;
+
+    await setDoc(doc(db, "user", uid), {
+      firstName,
+      lastName,
+      email,
+      contact,
+      gender,
+      dob,
+      userType: "user",
+      address: {
+        street,
+        region: region.name,
+        province: province.name,
+        city: city.name,
+        barangay: barangay.name,
+        postalCode,
+      },
+      createdAt: new Date(),
+    });
+
+    ToastAndroid.show("Account created successfully!", ToastAndroid.SHORT);
+    router.push("/");
+  } catch (error) {
+    let message = "Signup failed. Please try again.";
+
+    if (error.code === "auth/email-already-in-use") {
+      message = "This email is already in use.";
+    } else if (error.code === "auth/invalid-email") {
+      message = "Invalid email address.";
+    } else if (error.code === "auth/weak-password") {
+      message = "Password should be at least 6 characters.";
+    } else if (error.code === "auth/network-request-failed") {
+      message = "No internet connection. Please check your network.";
     }
 
-    if (password !== confirmPassword) {
-      Alert.alert("Passwords do not match");
-      return;
-    }
-
-    try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const uid = userCredential.user.uid;
-
-      await setDoc(doc(db, "user", uid), {
-        firstName,
-        lastName,
-        email,
-        contact,
-        gender,
-        dob,
-        userType: "user", // ✅ added here
-        address: {
-          street,
-          region: region.name,
-          province: province.name,
-          city: city.name,
-          barangay: barangay.name,
-          postalCode,
-        },
-        createdAt: new Date(),
-      });
-
-      Alert.alert("Account created successfully!");
-      router.push("/");
-    } catch (error) {
-      Alert.alert("Signup Error", error.message);
-    }
-  };
+    ToastAndroid.show(message, ToastAndroid.LONG);
+  }
+};
 
   return (
     <PaperProvider>
