@@ -241,7 +241,11 @@ const Signup = () => {
                   onPress={() => setDatePickerVisible(true)}
                 >
                   <Text
-                    style={{ color: dob ? "#3A2E2E" : "#777", fontSize: 16 }}
+                    style={{
+                      color: dob ? "#3A2E2E" : "#777",
+                      fontSize: 15,
+                      fontFamily: "Poppins_400Regular",
+                    }}
                   >
                     {dob ? new Date(dob).toLocaleDateString() : "Select Date"}
                   </Text>
@@ -265,6 +269,7 @@ const Signup = () => {
                 value={street}
                 setValue={setStreet}
                 subLabel
+                style={styles.input}
               />
 
               <DropdownField
@@ -415,7 +420,12 @@ const DropdownField = ({
           style={[styles.input, { alignItems: "flex-start" }]}
           onPress={() => !readOnly && setVisible(true)}
         >
-          <Text style={{ color: selected ? "#3A2E2E" : "#777", fontSize: 16 }}>
+          <Text
+            style={[
+              styles.dropdownText,
+              { color: selected ? "#3A2E2E" : "#777" }, 
+            ]}
+          >
             {selected || `Select ${label}`}
           </Text>
         </TouchableOpacity>
@@ -430,6 +440,11 @@ const DropdownField = ({
             setVisible(false);
           }}
           title={optionKey ? o[optionKey] : o}
+          titleStyle={{
+            fontSize: 15,
+            fontFamily: "Poppins_400Regular",
+            color: "#3A2E2E",
+          }}
         />
       ))}
     </Menu>
@@ -442,7 +457,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
   title: {
     fontSize: 30,
-    fontWeight: "800",
+    fontFamily: "Poppins_700Bold",
     color: "#3A2E2E",
     textAlign: "center",
     marginBottom: 8,
@@ -450,6 +465,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
+    fontFamily: "Poppins_400Regular",
     color: "#555",
     textAlign: "center",
     marginBottom: 40,
@@ -458,13 +474,13 @@ const styles = StyleSheet.create({
   inputContainer: { marginBottom: 16 },
   label: {
     fontSize: 17,
-    fontWeight: "700",
+    fontFamily: "Poppins_700Bold",
     color: "#3A2E2E",
     marginBottom: 6,
   },
   subLabel: {
     fontSize: 13,
-    fontWeight: "600",
+    fontFamily: "Poppins_700Bold",
     color: "#71695B",
     marginBottom: 6,
   },
@@ -473,7 +489,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 18,
-    fontSize: 16,
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
     color: "#3A2E2E",
     borderWidth: 1,
     borderColor: "#E0D4C3",
@@ -481,7 +498,7 @@ const styles = StyleSheet.create({
   },
   passwordWrapper: { position: "relative" },
   eyeIcon: { position: "absolute", right: 16, top: 14, padding: 4 },
-  menuContent: { backgroundColor: "#F1E3D3", borderRadius: 12 },
+  menuContent: { backgroundColor: "#fff", borderRadius: 12 },
   signupButton: {
     backgroundColor: "#008243",
     paddingVertical: 18,
@@ -496,13 +513,25 @@ const styles = StyleSheet.create({
   },
   signupButtonText: {
     color: "#FFFFFF",
+    fontFamily: "Poppins_700Bold",
     fontSize: 18,
     fontWeight: "600",
     letterSpacing: 0.5,
   },
   loginLink: { marginTop: 26, alignItems: "center", marginBottom: 30 },
-  loginText: { fontSize: 14, color: "#3A2E2E" },
-  loginTextBold: { fontWeight: "700", textDecorationLine: "underline" },
+  loginText: {
+    fontSize: 14,
+    color: "#3A2E2E",
+    fontFamily: "Poppins_400Regular",
+  },
+  loginTextBold: {
+    fontFamily: "Poppins_700Bold",
+    textDecorationLine: "underline",
+  },
+  dropdownText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+  },
 });
 
 export default Signup;

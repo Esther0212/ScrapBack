@@ -211,8 +211,14 @@ export default function MapSelector() {
     <CustomBgColor>
       <SafeAreaView style={{ flex: 1, paddingTop: 25, flexGrow: 1 }}>
         <View style={styles.container}>
-          {/* Top Overlay: Search */}
-          <View style={styles.topOverlay}>
+          {/* Top Overlay: Search, Map/List Tabs, and Drop-off Stations */}
+          <View
+            style={[
+              styles.topOverlayContainer,
+              selectedView === "list" && styles.listTabBackground, // Apply background only in List tab
+            ]}
+          >
+            {/* Search Box */}
             <View style={styles.searchBox}>
               <TextInput
                 style={styles.searchInput}
@@ -222,50 +228,50 @@ export default function MapSelector() {
                 onSubmitEditing={handleSearch}
               />
             </View>
-          </View>
-
-          {/* Toggle buttons + Label */}
-          <View style={styles.toggleContainer}>
-            <View style={styles.toggleButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.toggleOption,
-                  selectedView === "map" && styles.toggleSelected,
-                ]}
-                onPress={() => setSelectedView("map")}
-              >
-                <Text
+  
+            {/* Toggle Buttons */}
+            <View style={styles.toggleContainer}>
+              <View style={styles.toggleButtons}>
+                <TouchableOpacity
                   style={[
-                    styles.toggleOptionText,
-                    selectedView === "map" && styles.toggleOptionTextSelected,
+                    styles.toggleOption,
+                    selectedView === "map" && styles.toggleSelected,
                   ]}
+                  onPress={() => setSelectedView("map")}
                 >
-                  Map
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.toggleOption,
-                  selectedView === "list" && styles.toggleSelected,
-                ]}
-                onPress={() => setSelectedView("list")}
-              >
-                <Text
+                  <Text
+                    style={[
+                      styles.toggleOptionText,
+                      selectedView === "map" && styles.toggleOptionTextSelected,
+                    ]}
+                  >
+                    Map
+                  </Text>
+                </TouchableOpacity>
+  
+                <TouchableOpacity
                   style={[
-                    styles.toggleOptionText,
-                    selectedView === "list" && styles.toggleOptionTextSelected,
+                    styles.toggleOption,
+                    selectedView === "list" && styles.toggleSelected,
                   ]}
+                  onPress={() => setSelectedView("list")}
                 >
-                  List
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.toggleLabelBox}>
-              <Text style={styles.toggleLabel}>Drop-off stations</Text>
+                  <Text
+                    style={[
+                      styles.toggleOptionText,
+                      selectedView === "list" && styles.toggleOptionTextSelected,
+                    ]}
+                  >
+                    List
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.toggleLabelBox}>
+                <Text style={styles.toggleLabel}>Drop-off stations</Text>
+              </View>
             </View>
           </View>
-
+  
           {/* Map or List */}
           {selectedView === "map" ? (
             <MapView
@@ -278,7 +284,7 @@ export default function MapSelector() {
                 urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
                 maximumZ={19}
               />
-
+  
               {/* User marker */}
               {marker && (
                 <Marker coordinate={marker}>
@@ -287,12 +293,10 @@ export default function MapSelector() {
                   </Callout>
                 </Marker>
               )}
-
+  
               {/* Collection Points */}
               {points.map((p) => {
-                let pointSchedules = schedules.filter(
-                  (s) => s.pointId === p.id
-                );
+                let pointSchedules = schedules.filter((s) => s.pointId === p.id);
                 pointSchedules = sortSchedules(pointSchedules);
                 return (
                   <Marker
@@ -348,7 +352,11 @@ export default function MapSelector() {
               data={points}
               keyExtractor={(item) => item.id}
               renderItem={renderListItem}
-              contentContainerStyle={styles.listContainer}
+              contentContainerStyle={{
+                paddingTop: 180, // Matches the height of the overlay
+                paddingHorizontal: 16,
+                paddingBottom: 16,
+              }}
             />
           )}
         </View>
@@ -359,12 +367,16 @@ export default function MapSelector() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  topOverlay: {
+  topOverlayContainer: {
     position: "absolute",
-    top: 30,
-    left: 20,
-    right: 20,
-    zIndex: 10,
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10, // Ensures it stays above the FlatList
+    paddingBottom: 0, // Adds spacing below the overlay
+  },
+  listTabBackground: {
+    backgroundColor: "#F0F1C5", // Background color for the List tab
   },
   searchBox: {
     backgroundColor: "white",
@@ -378,18 +390,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    marginHorizontal: 20,
+    marginTop: 30,
   },
-  searchInput: { flex: 1, fontSize: 16 },
+  searchInput: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
   toggleContainer: {
-    position: "absolute",
-    top: 90,
-    left: 20,
-    right: 20,
-    zIndex: 10,
+    marginHorizontal: 20,
     marginTop: 10,
   },
-  toggleLabelBox: { marginBottom: 8 },
-  toggleLabel: { fontSize: 16, fontWeight: "bold", color: "#333" },
   toggleButtons: {
     flexDirection: "row",
     backgroundColor: "#ccc",
@@ -402,6 +410,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
+  toggleLabelBox: { marginBottom: 0, },
+  toggleLabel: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
   toggleOption: {
     flex: 1,
     paddingVertical: 10,
@@ -409,8 +419,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#ccc",
   },
   toggleSelected: { backgroundColor: "white" },
-  toggleOptionText: { fontSize: 16, color: "#555" },
-  toggleOptionTextSelected: { color: "#117D2E", fontWeight: "bold" },
+  toggleOptionText: {
+    fontSize: 16,
+    color: "#555",
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+  },
+  toggleOptionTextSelected: {
+    color: "#117D2E",
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+  },
   listContainer: { paddingTop: 180, paddingHorizontal: 16, paddingBottom: 16 },
   listCard: {
     backgroundColor: "white",
