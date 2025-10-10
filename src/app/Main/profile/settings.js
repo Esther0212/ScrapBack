@@ -24,6 +24,7 @@ const Settings = () => {
   const { userData } = useUser();
   const [modalVisible, setModalVisible] = useState(false);
   const [savedUsers, setSavedUsers] = useState([]);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -164,7 +165,7 @@ const Settings = () => {
           <SettingsItem
             icon={<Ionicons name="log-out-outline" size={22} color="#333" />}
             label="Logout"
-            onPress={handleLogout}
+            onPress={() => setLogoutModalVisible(true)}
           />
         </View>
 
@@ -265,6 +266,47 @@ const Settings = () => {
           </View>
         </View>
       </Modal>
+      {/* Logout Confirmation Modal */}
+      <Modal
+        visible={logoutModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLogoutModalVisible(false)}
+      >
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModal}>
+            <Ionicons
+              name="log-out-outline"
+              size={40}
+              color="#008243"
+              style={{ marginBottom: 10 }}
+            />
+            <Text style={styles.logoutTitle}>Logout</Text>
+            <Text style={styles.logoutText}>
+              Are you sure you want to log out?
+            </Text>
+
+            <View style={styles.logoutButtons}>
+              <TouchableOpacity
+                style={[styles.cancelButton, { flex: 0.45 }]}
+                onPress={() => setLogoutModalVisible(false)}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmButton, { flex: 0.45 }]}
+                onPress={async () => {
+                  setLogoutModalVisible(false);
+                  await handleLogout();
+                }}
+              >
+                <Text style={styles.confirmText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </CustomBgColor>
   );
 };
@@ -360,7 +402,6 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 
-
   modalProfileImage: { width: 40, height: 40, borderRadius: 20 },
   addAccount: {
     flexDirection: "row",
@@ -388,6 +429,62 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 0.5,
     borderBottomColor: "#ddd",
+  },
+  logoutOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  logoutModal: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    width: "90%",
+    elevation: 10,
+  },
+  logoutTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins_700Bold",
+    color: "#3A2E2E",
+    marginBottom: 6,
+  },
+  logoutText: {
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  logoutButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  cancelButton: {
+    backgroundColor: "#888",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  confirmButton: {
+    backgroundColor: "#008243",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  cancelText: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 14,
+  },
+  confirmText: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 14,
   },
 });
 
