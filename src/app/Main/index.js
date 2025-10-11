@@ -75,7 +75,30 @@ const Home = () => {
   const [recyclingTypes, setRecyclingTypes] = useState([]);
   const [conversionRates, setConversionRates] = useState([]);
   const [collapsedCategories, setCollapsedCategories] = useState({});
+  const [userPoints, setUserPoints] = useState(0);
   const router = useRouter();
+
+  // ✅ Fetch and listen to user's current points dynamically
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const userRef = doc(db, "user", user.uid);
+    const unsub = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const points =
+          typeof data.points === "number" && !isNaN(data.points)
+            ? parseFloat(data.points.toFixed(2))
+            : 0;
+        setUserPoints(points);
+      } else {
+        setUserPoints(0);
+      }
+    });
+
+    return unsub;
+  }, []);
 
   // ✅ Save Expo Push Token to Firestore
   useEffect(() => {
@@ -186,7 +209,7 @@ const Home = () => {
             Every action counts—start recycling today!
           </Text>
 
-          {/* Points Section */}
+          {/* ✅ Points Section (Dynamic Firestore Data) */}
           <View style={styles.pointsContainer}>
             <View style={styles.leftContainer}>
               <Text style={styles.pointsLabel}>Your Total Points</Text>
@@ -196,7 +219,9 @@ const Home = () => {
                   style={styles.lettermarkLogo}
                   resizeMode="cover"
                 />
-                <Text style={styles.pointsValueText}>500</Text>
+                <Text style={styles.pointsValueText}>
+                  {userPoints?.toFixed(2) || "0.00"}
+                </Text>
               </View>
             </View>
 
@@ -316,9 +341,9 @@ const styles = StyleSheet.create({
   },
   leftContainer: { width: "50%", justifyContent: "flex-end" },
   pointsLabel: {
-    fontSize: 14,
-    color: "#444",
-    fontFamily: "Poppins_400Regular",
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
   },
   rowContainer: {
     flexDirection: "row",
