@@ -6,7 +6,6 @@ import {
   View,
   Image,
   ScrollView,
-  Pressable,
   Dimensions,
   TouchableOpacity,
 } from "react-native";
@@ -14,7 +13,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+} from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useUser } from "../../context/userContext";
 import { useEducational } from "../../context/educationalContext";
@@ -28,10 +33,9 @@ const Home = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [pressedIndex, setPressedIndex] = useState(null);
   const [recyclingTypes, setRecyclingTypes] = useState([]);
-
-  // conversion rates
   const [conversionRates, setConversionRates] = useState([]);
   const [collapsedCategories, setCollapsedCategories] = useState({});
+  const [userPoints, setUserPoints] = useState(0); // 🔹 dynamic points
   const router = useRouter();
 
   // 🔔 Realtime listener for user notifications
@@ -47,12 +51,28 @@ const Home = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map((doc) => doc.data());
       const unread = docs.filter((d) => !d.read).length;
-
       setUnreadCount(unread);
       setHasNewNotification(unread > 0);
     });
 
     return unsubscribe;
+  }, []);
+
+  // 🔹 Fetch user points in real time from Firestore (user collection)
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const unsub = onSnapshot(doc(db, "user", user.uid), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserPoints(data.points || 0);
+      } else {
+        setUserPoints(0);
+      }
+    });
+
+    return () => unsub();
   }, []);
 
   // recycling types
@@ -112,9 +132,7 @@ const Home = () => {
                 name="notifications-outline"
                 size={28}
                 color="black"
-                onPress={() => {
-                  router.push("/Main/notifications");
-                }}
+                onPress={() => router.push("/Main/notifications")}
               />
               {hasNewNotification && (
                 <View style={styles.badgeNumber}>
@@ -142,7 +160,15 @@ const Home = () => {
                   style={styles.lettermarkLogo}
                   resizeMode="cover"
                 />
-                <Text style={styles.pointsValueText}>500</Text>
+                {/* 🔹 Flexible font size for big numbers */}
+                <Text
+                  style={styles.pointsValueText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.5}
+                >
+                  {userPoints}
+                </Text>
               </View>
             </View>
 
@@ -181,8 +207,6 @@ const Home = () => {
                 onPress={() => {
                   setSelectedType(type);
                   router.push("/Main/recyclingGuide/guides");
-                  setSelectedType(type);
-                  router.push("/Main/recyclingGuide/guides");
                 }}
               >
                 <Text style={styles.typeButtonText}>{type}</Text>
@@ -211,7 +235,7 @@ const Home = () => {
                       <Ionicons name="chevron-forward" size={20} color="#fff" />
                     </View>
 
-                    {/* Table preview with only first row */}
+                    {/* Table preview */}
                     <View style={styles.table}>
                       <View style={styles.tableHeader}>
                         <Text style={[styles.cellHeader, { flex: 2 }]}>
@@ -227,7 +251,9 @@ const Home = () => {
                           <Text style={[styles.cell, { flex: 2 }]}>
                             {firstRow.type}
                           </Text>
-                          <Text style={styles.cell}>{firstRow.points} pts</Text>
+                          <Text style={styles.cell}>
+                            {firstRow.points} pts
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -283,6 +309,7 @@ const styles = StyleSheet.create({
     color: "#2E7D32",
     fontFamily: "Poppins_800ExtraBold",
     lineHeight: 32,
+    maxWidth: 150, // 🔹 prevents overflow
   },
   rightContainer: { width: "50%" },
   redeemButton: {
@@ -328,8 +355,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "bold",
   },
-
-  // conversion cards (same as staff styling)
   card: {
     backgroundColor: "#F6F8F0",
     borderRadius: 14,

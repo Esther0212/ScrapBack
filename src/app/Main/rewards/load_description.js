@@ -1,4 +1,3 @@
-// src/app/Main/rewards/load_description.js
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -9,30 +8,40 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import CustomBgColor from "../../../components/customBgColor";
 
-// ✅ Firestore
-import { db } from "../../../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+// ✅ Firebase
+import { db, auth } from "../../../../firebase";
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
+} from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 const LoadDescription = () => {
   const router = useRouter();
-  const { id } = useLocalSearchParams(); 
+  const { id } = useLocalSearchParams(); // Firestore reward doc ID
   const [reward, setReward] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false); // ✅ success modal
+  const [failedModalVisible, setFailedModalVisible] = useState(false); // ✅ failed modal
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
 
+  // ✅ Fetch reward by ID
   useEffect(() => {
     const fetchReward = async () => {
       try {
         const docRef = doc(db, "reward", id);
         const docSnap = await getDoc(docRef);
-
         if (docSnap.exists()) {
           setReward({ id: docSnap.id, ...docSnap.data() });
         } else {
@@ -44,10 +53,90 @@ const LoadDescription = () => {
         setLoading(false);
       }
     };
-
     if (id) fetchReward();
   }, [id]);
 
+  // Small helper to ensure we have a signed-in user
+  const getCurrentUser = () =>
+    new Promise((resolve) => {
+      if (auth.currentUser) return resolve(auth.currentUser);
+      const unsub = onAuthStateChanged(auth, (u) => {
+        unsub();
+        resolve(u || null);
+      });
+    });
+
+  // ✅ Handle Redeem — with processing + fail modal
+  const handleRedeem = async () => {
+    setIsSubmitting(true);
+
+    // Step 1: simulate processing delay
+    setTimeout(async () => {
+      try {
+        // 2) Ensure user is logged in
+        const user = await getCurrentUser();
+        if (!user) {
+          setIsSubmitting(false);
+          Alert.alert("Login Required", "Please log in to redeem rewards.");
+          return;
+        }
+
+        // 3) Ensure reward exists
+        if (!reward) {
+          setIsSubmitting(false);
+          Alert.alert("Error", "Reward not found.");
+          return;
+        }
+
+        // 4) Fetch user profile
+        const userDocRef = doc(db, "user", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (!userDocSnap.exists()) {
+          setIsSubmitting(false);
+          Alert.alert("Error", "User profile not found.");
+          return;
+        }
+
+        const userProfile = userDocSnap.data();
+        setUserProfile(userProfile);
+
+        const userPoints = Number(userProfile.totalPoints || 0);
+        const requiredPoints = Number(reward.points || 0);
+
+        // ✅ Not enough points — show PACAFACO-style fail modal
+        if (userPoints < requiredPoints) {
+          setIsSubmitting(false);
+          setFailedModalVisible(true);
+          return;
+        }
+
+        // ✅ Proceed normally if enough points
+        const formattedPoints = parseFloat(requiredPoints).toFixed(2);
+        await addDoc(collection(db, "redemptionRequest"), {
+          userId: user.uid,
+          name: `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim(),
+          contact: userProfile.contact || "N/A",
+          rewardId: reward.id,
+          rewardName: reward.title || "Reward",
+          points: formattedPoints,
+          status: "Pending",
+          createdAt: serverTimestamp(),
+        });
+
+        setModalVisible(true);
+      } catch (error) {
+        console.error("Error during redemption:", error);
+        Alert.alert(
+          "Error",
+          error?.message || "Failed to send redemption request. Try again later."
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+    }, 1500);
+  };
+
+  // ✅ Loading state
   if (loading) {
     return (
       <CustomBgColor>
@@ -68,6 +157,7 @@ const LoadDescription = () => {
     );
   }
 
+  // ✅ UI rendering
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
@@ -78,14 +168,14 @@ const LoadDescription = () => {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Image with gradient */}
+          {/* Image */}
           <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
             {reward.image && (
               <Image source={{ uri: reward.image }} style={styles.image} />
             )}
           </LinearGradient>
 
-          {/* Card Content */}
+          {/* Card */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.text}>
@@ -107,26 +197,27 @@ const LoadDescription = () => {
               2. Show your QR code from the ScrapBack app to the staff.{"\n"}
               3. Staff will scan your QR and validate your points.{"\n"}
               4. Choose your reward and confirm redemption.{"\n"}
-              5. Receive your reward on the spot or be notified for scheduled claiming.{"\n\n"}
+              5. Once approved, receive your reward on the spot or be notified for scheduled claiming.{"\n\n"}
               <Text style={styles.bold}>
                 Note: Ensure you meet the minimum points required before attempting to redeem.
               </Text>
             </Text>
 
-            {/* CTA Button */}
+            {/* ✅ Redeem Button */}
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => setModalVisible(true)}
-              style={styles.ctaButtonSolid}
+              onPress={handleRedeem}
+              disabled={isSubmitting}
+              style={[styles.ctaButtonSolid, isSubmitting && { opacity: 0.7 }]}
             >
               <Text style={styles.ctaText}>
-                Redeem for {reward.points} Points
+                {isSubmitting ? "Processing..." : `Redeem for ${reward.points} Points`}
               </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
 
-        {/* Modal */}
+        {/* ✅ Success Modal */}
         <Modal
           visible={modalVisible}
           transparent
@@ -140,7 +231,32 @@ const LoadDescription = () => {
               </Text>
               <TouchableOpacity
                 style={styles.okButton}
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  setModalVisible(false);
+                  router.back();
+                }}
+              >
+                <Text style={styles.okButtonText}>OKAY</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ❌ Failed Modal (PACAFACO style) */}
+        <Modal
+          visible={failedModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFailedModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={[styles.modalText, { color: "#B00020", fontWeight: "600" }]}>
+                Processing Failed — Not Enough Points
+              </Text>
+              <TouchableOpacity
+                style={[styles.okButton, { backgroundColor: "#B00020" }]}
+                onPress={() => setFailedModalVisible(false)}
               >
                 <Text style={styles.okButtonText}>OKAY</Text>
               </TouchableOpacity>
@@ -177,11 +293,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
   },
   image: {
     width: "100%",
@@ -213,7 +324,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 12,
   },
-  bold: { fontFamily: "Poppins_700Bold" },
+  bold: {
+    fontFamily: "Poppins_700Bold",
+  },
   ctaButtonSolid: {
     backgroundColor: "#008243",
     borderRadius: 10,

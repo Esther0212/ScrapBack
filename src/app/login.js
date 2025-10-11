@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -18,12 +18,12 @@ import { registerForPushNotificationsAsync } from "../utils/notifications";
 
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
-import { useUser } from "../context/userContext"; // ✅ import your context
+import { useUser } from "../context/userContext";
 
 const { width } = Dimensions.get("window");
 
 const Login = () => {
-  const { setUserData } = useUser(); // ✅ context updater
+  const { setUserData } = useUser();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,20 +54,24 @@ const Login = () => {
     if (!isValid) return;
 
     try {
-      // 🔐 Firebase auth login
+      // 🔐 Firebase login
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
 
-      // 🚨 ADD THIS CHECK FOR EMAIL VERIFICATION
-      if (!user.emailVerified) {
+      // 🔎 Check if the user already exists in Firestore
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      // 🔒 If it's a new user (no document yet) but not verified, block login
+      if (!userDocSnap.exists() && !user.emailVerified) {
         Alert.alert(
           "Email not verified",
           "Please verify your email before logging in. Check your inbox for the verification link."
         );
-        return; // ⛔ stop login if not verified
+        return;
       }
 
-      // 🔔 Get push token
+      // 🔔 Register push token
       const token = await registerForPushNotificationsAsync();
       if (token) {
         await setDoc(
@@ -77,25 +81,20 @@ const Login = () => {
         );
       }
 
-      // 🔎 Fetch user profile from Firestore
-      const userDocRef = doc(db, "user", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
+      // ✅ If Firestore doc exists, load profile
+      let profile = {};
       if (userDocSnap.exists()) {
-        const profile = userDocSnap.data();
-
-        // ✅ Update global userContext
-        setUserData({
-          uid: user.uid,
-          email: user.email,
-          ...profile,
-        });
-      } else {
-        console.warn("⚠️ No profile found for user:", user.uid);
-        setUserData({ uid: user.uid, email: user.email });
+        profile = userDocSnap.data();
       }
 
-      // Remember email/password only (NOT firstName!)
+      // ✅ Update user context
+      setUserData({
+        uid: user.uid,
+        email: user.email,
+        ...profile,
+      });
+
+      // 💾 Remember Me
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", email);
         await AsyncStorage.setItem("savedPassword", password);
@@ -119,8 +118,8 @@ const Login = () => {
     }
   };
 
-  // Auto-load saved creds (if "Remember Me" checked)
-  React.useEffect(() => {
+  // Auto-load saved credentials
+  useEffect(() => {
     const loadSaved = async () => {
       try {
         const savedEmail = await AsyncStorage.getItem("savedEmail");
@@ -144,7 +143,7 @@ const Login = () => {
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Login to your account</Text>
 
-          {/* Email */}
+          {/* Email Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email address</Text>
             <TextInput
@@ -164,7 +163,7 @@ const Login = () => {
             ) : null}
           </View>
 
-          {/* Password */}
+          {/* Password Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordWrapper}>
@@ -214,7 +213,7 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Login button */}
+          {/* Login Button */}
           <TouchableOpacity
             style={styles.loginButton}
             activeOpacity={0.8}
@@ -223,7 +222,7 @@ const Login = () => {
             <Text style={styles.loginButtonText}>Log in</Text>
           </TouchableOpacity>
 
-          {/* Signup link */}
+          {/* Signup Link */}
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => router.push("/signup")}

@@ -1,4 +1,3 @@
-// src/app/Main/rewards/gcash_description.js
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -9,45 +8,117 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import CustomBgColor from "../../../components/customBgColor";
-
-// ✅ Firestore
-import { db } from "../../../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "../../../../firebase";
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const GcashDescription = () => {
   const router = useRouter();
-  const { id } = useLocalSearchParams(); // Firestore document id
+  const { id } = useLocalSearchParams(); // Firestore reward doc ID
+
   const [reward, setReward] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false); // ✅ success modal
+  const [failedModalVisible, setFailedModalVisible] = useState(false); // ✅ failed modal
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
 
-  // ✅ Fetch reward by ID from Firestore
+  // ✅ Fetch reward details
   useEffect(() => {
     const fetchReward = async () => {
       try {
         const docRef = doc(db, "reward", id);
         const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          setReward({ id: docSnap.id, ...docSnap.data() });
-        } else {
-          setReward(null);
-        }
+        if (docSnap.exists()) setReward({ id: docSnap.id, ...docSnap.data() });
       } catch (err) {
         console.error("Error fetching reward:", err);
       } finally {
         setLoading(false);
       }
     };
-
     if (id) fetchReward();
   }, [id]);
+
+  // ✅ Fetch user data
+  useEffect(() => {
+    const fetchUser = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      try {
+        const userDoc = await getDoc(doc(db, "user", user.uid));
+        if (userDoc.exists()) setUserProfile({ id: user.uid, ...userDoc.data() });
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  // ✅ Handle Redeem
+  const handleRedeem = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Login Required", "Please log in to redeem rewards.");
+      return;
+    }
+    if (!reward || !userProfile) {
+      Alert.alert("Error", "Missing user or reward data.");
+      return;
+    }
+
+    const userPoints = Number(userProfile.totalPoints || 0);
+    const requiredPoints = Number(reward.points || 0);
+
+    setIsSubmitting(true);
+
+    // simulate "Processing..." animation
+    setTimeout(async () => {
+      if (userPoints < requiredPoints) {
+        setIsSubmitting(false);
+        setFailedModalVisible(true); // ✅ show PACAFACO-style modal
+        return;
+      }
+
+      try {
+        const formattedPoints = parseFloat(reward.points).toFixed(2);
+        await addDoc(collection(db, "redemptionRequest"), {
+          userId: user.uid,
+          name: `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim(),
+          contact: userProfile.contact || "N/A",
+          rewardId: reward.id,
+          rewardName: reward.title || "Reward",
+          points: formattedPoints,
+          status: "Pending",
+          adminNote: "",
+          action: "Archive",
+          createdAt: serverTimestamp(),
+        });
+
+        setModalVisible(true);
+      } catch (error) {
+        console.error("Error saving redemption request:", error);
+        Alert.alert("Error", "Failed to send redemption request. Try again later.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    }, 1500);
+  };
+
+  const canRedeem =
+    userProfile && reward
+      ? Number(userProfile.totalPoints || 0) >= Number(reward.points || 0)
+      : false;
 
   if (loading) {
     return (
@@ -79,14 +150,14 @@ const GcashDescription = () => {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Image with gradient background */}
+          {/* Image */}
           <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
             {reward.image && (
               <Image source={{ uri: reward.image }} style={styles.image} />
             )}
           </LinearGradient>
 
-          {/* Card Content */}
+          {/* Card */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.text}>
@@ -103,30 +174,34 @@ const GcashDescription = () => {
             <Text style={styles.sectionTitle}>Points Required</Text>
             <Text style={styles.text}>{reward.points} pts</Text>
 
-            <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
-            <Text style={styles.text}>
-              1. Go to any designated PACAFACO collection point.{"\n"}
-              2. Show your QR code from the ScrapBack app to the staff.{"\n"}
-              3. Staff will scan your QR and validate your points.{"\n"}
-              4. Choose your reward and confirm redemption.{"\n"}
-              5. Once approved, receive your reward on the spot or be notified for scheduled claiming.{"\n\n"}
-              <Text style={styles.bold}>
-                Note: Ensure you meet the minimum points required before attempting to redeem.
-              </Text>
+            <Text style={styles.sectionTitle}>Your Points</Text>
+            <Text
+              style={[
+                styles.text,
+                { color: canRedeem ? "#2E7D32" : "#999", fontWeight: "bold" },
+              ]}
+            >
+              {userProfile ? userProfile.totalPoints || 0 : "—"} pts
             </Text>
 
-            {/* CTA Button */}
+            {/* Redeem Button */}
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => setModalVisible(true)}
-              style={styles.ctaButtonSolid}
+              onPress={handleRedeem}
+              disabled={isSubmitting}
+              style={[
+                styles.ctaButtonSolid,
+                isSubmitting && { opacity: 0.8 },
+              ]}
             >
-              <Text style={styles.ctaText}>Redeem for {reward.points} Points</Text>
+              <Text style={styles.ctaText}>
+                {isSubmitting ? "Processing..." : `Redeem for ${reward.points} Points`}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
 
-        {/* Modal */}
+        {/* ✅ SUCCESS MODAL */}
         <Modal
           visible={modalVisible}
           transparent
@@ -140,7 +215,32 @@ const GcashDescription = () => {
               </Text>
               <TouchableOpacity
                 style={styles.okButton}
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  setModalVisible(false);
+                  router.back();
+                }}
+              >
+                <Text style={styles.okButtonText}>OKAY</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ❌ FAILED MODAL (PACAFACO STYLE) */}
+        <Modal
+          visible={failedModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFailedModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={[styles.modalText, { color: "#B00020", fontWeight: "600" }]}>
+                Processing Failed — Not Enough Points
+              </Text>
+              <TouchableOpacity
+                style={[styles.okButton, { backgroundColor: "#B00020" }]}
+                onPress={() => setFailedModalVisible(false)}
               >
                 <Text style={styles.okButtonText}>OKAY</Text>
               </TouchableOpacity>
@@ -177,11 +277,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
   },
   image: {
     width: "100%",
@@ -232,6 +327,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
+    textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
