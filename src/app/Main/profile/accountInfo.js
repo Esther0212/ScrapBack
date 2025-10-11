@@ -329,7 +329,7 @@ const AccountInfo = () => {
               {/* Address */}
               <Text style={styles.label}>Address</Text>
               <InputField
-                label="Street"
+                label="Street Name, Building, House No., etc."
                 value={street}
                 setValue={setStreet}
                 editable={editMode}

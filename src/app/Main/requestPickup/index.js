@@ -11,6 +11,8 @@ import {
   Alert,
   ToastAndroid,
   Platform,
+  TextInput,
+  Modal,
 } from "react-native";
 import * as Animatable from "react-native-animatable";
 import { Ionicons } from "@expo/vector-icons";
@@ -34,7 +36,12 @@ const RequestPickup = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState({});
-  const [menuOpen, setMenuOpen] = useState(null); // track which menu is open
+  const [menuOpen, setMenuOpen] = useState(null);
+
+  // cancel modal
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelTargetId, setCancelTargetId] = useState(null);
 
   // Load current user's pickup requests
   useEffect(() => {
@@ -48,20 +55,20 @@ const RequestPickup = () => {
     );
 
     const unsub = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const data = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
       }));
 
-      // ✅ Sort client-side by createdAt (newest first)
-      const sorted = data
-        .filter((d) => !d.archived) // hide archived requests
+      // ✅ keep ALL requests (only filter archived)
+      const active = data
+        .filter((d) => !d.archived)
         .sort(
           (a, b) =>
             (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
         );
 
-      setRequests(sorted);
+      setRequests(active);
       setLoading(false);
     });
 
@@ -95,28 +102,34 @@ const RequestPickup = () => {
     }
   };
 
+  const confirmCancel = async () => {
+    if (!cancelReason.trim()) {
+      Alert.alert(
+        "Reason Required",
+        "Please provide a reason for cancellation."
+      );
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "pickupRequests", cancelTargetId), {
+        status: "cancelled",
+        cancelReason,
+        reasonBy: "user",
+      });
+      showToast("Pickup request cancelled.");
+      setCancelReason("");
+      setCancelTargetId(null);
+      setCancelModalVisible(false);
+    } catch (err) {
+      console.error("Error cancelling request:", err);
+      showToast("Failed to cancel request.");
+    }
+  };
+
   const handleCancel = (id) => {
-    Alert.alert(
-      "Cancel Pickup",
-      "Are you sure you want to cancel this request?",
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Yes",
-          onPress: async () => {
-            try {
-              await updateDoc(doc(db, "pickupRequests", id), {
-                status: "cancelled",
-              });
-              showToast("Pickup request cancelled.");
-            } catch (err) {
-              console.error("Error cancelling request:", err);
-              showToast("Failed to cancel request.");
-            }
-          },
-        },
-      ]
-    );
+    setCancelTargetId(id);
+    setCancelModalVisible(true);
   };
 
   const handleEdit = (item) => {
@@ -160,6 +173,11 @@ const RequestPickup = () => {
     const imageUrl = item.photoUrl || null;
     const isCollapsed = collapsed[item.id];
     const isMenuOpen = menuOpen === item.id;
+
+    // ✅ disable buttons for completed/cancelled/not approved
+    const disableActions = ["completed", "cancelled", "not approved"].includes(
+      item.status?.toLowerCase()
+    );
 
     return (
       <Animatable.View animation="fadeInUp" duration={600} style={styles.card}>
@@ -225,7 +243,7 @@ const RequestPickup = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Details (hidden if collapsed) */}
+        {/* Details */}
         {!isCollapsed && (
           <>
             <View style={styles.cardContent}>
@@ -245,23 +263,34 @@ const RequestPickup = () => {
                 <Text style={styles.bold}>Address:</Text>{" "}
                 {item.pickupAddress || "N/A"}
               </Text>
+              {/* ✅ Show reason only if provided */}
+              {(item.reason || item.cancelReason) && (
+                <Text style={styles.cardText}>
+                  <Text style={styles.bold}>Reason:</Text>{" "}
+                  {item.reason || item.cancelReason}{" "}
+                  {item.reasonBy &&
+                    `(${item.reasonBy === "admin" ? "by Admin" : "by You"})`}
+                </Text>
+              )}
             </View>
 
-            {/* Buttons */}
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => handleCancel(item.id)}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.editBtn}
-                onPress={() => handleEdit(item)}
-              >
-                <Text style={styles.editText}>Edit</Text>
-              </TouchableOpacity>
-            </View>
+            {/* ✅ Hide cancel/edit buttons if final status */}
+            {!disableActions && (
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => handleCancel(item.id)}
+                >
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => handleEdit(item)}
+                >
+                  <Text style={styles.editText}>Edit</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         )}
       </Animatable.View>
@@ -279,18 +308,6 @@ const RequestPickup = () => {
             renderItem={({ item }) => renderCard(item)}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 16 }}
-            ListHeaderComponent={
-              <View style={styles.statusBar}>
-                <Text style={styles.statusBarText}>Pickup Requests</Text>
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push("Main/requestPickup/RequestHistory")
-                  }
-                >
-                  <Text style={styles.link}>Go to Archive</Text>
-                </TouchableOpacity>
-              </View>
-            }
             ListEmptyComponent={
               <Text
                 style={{
@@ -306,6 +323,39 @@ const RequestPickup = () => {
             }
           />
         )}
+
+        {/* Cancel Modal */}
+        <Modal visible={cancelModalVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Cancel Pickup</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter reason for cancellation"
+                value={cancelReason}
+                onChangeText={setCancelReason}
+                multiline
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalBtnCancel}
+                  onPress={() => {
+                    setCancelModalVisible(false);
+                    setCancelReason("");
+                  }}
+                >
+                  <Text style={styles.modalBtnTextCancel}>Close</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalBtnConfirm}
+                  onPress={confirmCancel}
+                >
+                  <Text style={styles.modalBtnTextConfirm}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Floating Action Button */}
         <TouchableOpacity
@@ -323,21 +373,6 @@ export default RequestPickup;
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  statusBar: {
-    backgroundColor: "#7ac47f",
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  statusBarText: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#fff" },
-  link: {
-    color: "#fff",
-    textDecorationLine: "underline",
-    fontSize: 15,
-    fontFamily: "Poppins_400Regular",
-  },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -392,10 +427,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Poppins_700Bold",
   },
-  toggleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  toggleBtn: { flexDirection: "row", alignItems: "center" },
   toggleText: {
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
@@ -443,5 +475,58 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
+    marginBottom: 12,
+    color: "#333",
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    minHeight: 60,
+    textAlignVertical: "top",
+    marginBottom: 16,
+  },
+  modalActions: { flexDirection: "row", justifyContent: "flex-end" },
+  modalBtnCancel: {
+    backgroundColor: "#ccc",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  modalBtnTextCancel: {
+    color: "#333",
+    fontFamily: "Poppins_700Bold",
+  },
+  modalBtnConfirm: {
+    backgroundColor: "#d9534f",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  modalBtnTextConfirm: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
   },
 });

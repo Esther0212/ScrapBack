@@ -41,7 +41,25 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 export default function PickupRequestForm() {
   const [wasteCategories, setWasteCategories] = useState([]);
   const [selectedTypes, setSelectedTypes] = useState([]);
-  const [weight, setWeight] = useState("");
+
+  // only one estimated weight (total)
+  const [weights, setWeights] = useState({});
+  // put this near your state declarations
+  const totalWeight = selectedTypes.reduce(
+    (sum, t) => sum + (parseFloat(weights[t]) || 0),
+    0
+  );
+
+  // 💡 compute estimated points
+  const totalPoints = selectedTypes.reduce((sum, t) => {
+    const category = wasteCategories.find((c) =>
+      c.items.some((item) => item.type === t)
+    );
+    const item = category?.items.find((i) => i.type === t);
+    const ptsPerKg = item?.points || 0;
+    return sum + (parseFloat(weights[t]) || 0) * ptsPerKg;
+  }, 0);
+
   const [pickupDateTime, setPickupDateTime] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
@@ -92,9 +110,28 @@ export default function PickupRequestForm() {
   }, []);
 
   const toggleType = (type) => {
-    setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
+    setSelectedTypes((prev) => {
+      if (prev.includes(type)) {
+        // Deselect → remove from selectedTypes
+        const newTypes = prev.filter((t) => t !== type);
+
+        // Also remove from weights
+        setWeights((w) => {
+          const updated = { ...w };
+          delete updated[type];
+          return updated;
+        });
+
+        return newTypes;
+      } else {
+        // Select → add type and initialize weight to "0"
+        setWeights((w) => ({
+          ...w,
+          [type]: w[type] || "0", // ensure there's always a value
+        }));
+        return [...prev, type];
+      }
+    });
   };
 
   const pickImage = async () => {
@@ -172,6 +209,7 @@ export default function PickupRequestForm() {
       setAddressName("Unknown location");
     }
   };
+
   // 👇 fetch existing request if editing
   useEffect(() => {
     const loadRequest = async () => {
@@ -183,8 +221,16 @@ export default function PickupRequestForm() {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setSelectedTypes(data.types || []);
-          setWeight(data.estimatedWeight?.toString() || "");
+          const types = data.types || [];
+          const w = data.weights || {};
+
+          // ✅ keep only weights for selected types
+          const cleaned = Object.fromEntries(
+            Object.entries(w).filter(([k]) => types.includes(k))
+          );
+
+          setSelectedTypes(types);
+          setWeights(cleaned);
           setPickupDateTime(data.pickupDateTime || "");
           setPickupAddress(data.pickupAddress || "");
           setMarkerCoords(data.coords || null);
@@ -322,13 +368,18 @@ export default function PickupRequestForm() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedTypes.length || !weight || !pickupDateTime || !pickupAddress) {
+    if (
+      !selectedTypes.length ||
+      !totalWeight ||
+      !pickupDateTime ||
+      !pickupAddress
+    ) {
       Alert.alert("Please fill in all fields.");
       return;
     }
 
     try {
-      setSubmitting(true); // ⬅️ FIXED
+      setSubmitting(true);
       const auth = getAuth();
       const user = auth.currentUser;
       if (!user) return;
@@ -336,10 +387,12 @@ export default function PickupRequestForm() {
       if (requestId) {
         await updateDoc(doc(db, "pickupRequests", requestId), {
           types: selectedTypes,
-          estimatedWeight: weight,
+          weights: weights, // 👈 save per-type
+          estimatedWeight: totalWeight, // 👈 save total
           pickupDateTime,
           pickupAddress,
           pickupDate: date,
+          estimatedPoints: totalPoints,
           coords: markerCoords,
           photoUrl: photo || null,
           updatedAt: serverTimestamp(),
@@ -349,9 +402,11 @@ export default function PickupRequestForm() {
         await addDoc(collection(db, "pickupRequests"), {
           userId: user.uid,
           types: selectedTypes,
-          estimatedWeight: weight,
+          weights: weights, // 👈 save per-type
+          estimatedWeight: totalWeight, // 👈 save total
           pickupDateTime,
-          pickupDate: date, // 👈 save actual Date object
+          pickupDate: date, // save actual Date object
+          estimatedPoints: totalPoints, // ✅ add this
           pickupAddress,
           coords: markerCoords,
           photoUrl: photo || null,
@@ -364,7 +419,7 @@ export default function PickupRequestForm() {
       console.error("Error saving request:", err);
       Alert.alert("Failed to save request.");
     } finally {
-      setSubmitting(false); // ⬅️ FIXED
+      setSubmitting(false);
     }
   };
 
@@ -418,14 +473,15 @@ export default function PickupRequestForm() {
           })}
 
           {/* Weight */}
-          <Text style={styles.label}>Estimated weight (kg)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Value"
-            keyboardType="numeric"
-            value={weight}
-            onChangeText={setWeight}
-          />
+          <Text style={styles.label}>Total Estimated Weight (kg)</Text>
+          <View style={styles.infoBox}>
+            <Text style={styles.infoTitle}>{totalWeight} kg</Text>
+          </View>
+
+          <Text style={styles.label}>Estimated Points</Text>
+          <View style={styles.infoBox}>
+            <Text style={styles.infoTitle}>{totalPoints} pts</Text>
+          </View>
 
           {/* Waste photo */}
           <Text style={styles.label}>Waste Picture</Text>
@@ -606,25 +662,81 @@ export default function PickupRequestForm() {
                       onPress={() => toggleType(item.type)}
                       style={[
                         styles.wasteOption,
-                        isSelected && styles.wasteOptionSelected, // ✅ background/border change
+                        isSelected && styles.wasteOptionSelected,
                       ]}
+                      activeOpacity={0.9}
                     >
-                      <Text
-                        style={[
-                          styles.wasteText,
-                          isSelected && styles.wasteTextSelected, // ✅ text change
-                        ]}
-                      >
-                        {item.type}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.wastePoints,
-                          isSelected && { color: "#0E9247", fontWeight: "700" }, // ✅ points color change too
-                        ]}
-                      >
-                        {item.points} pts/kg
-                      </Text>
+                      <View style={styles.wasteRow}>
+                        <View style={styles.wasteInfo}>
+                          <Text
+                            style={[
+                              styles.wasteText,
+                              isSelected && styles.wasteTextSelected,
+                            ]}
+                            numberOfLines={2}
+                            ellipsizeMode="tail"
+                          >
+                            {item.type}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.wastePoints,
+                              isSelected && {
+                                color: "#0E9247",
+                                fontWeight: "700",
+                              },
+                            ]}
+                          >
+                            {item.points} pts/kg
+                          </Text>
+                        </View>
+
+                        {isSelected && (
+                          <View style={styles.controls}>
+                            <TouchableOpacity
+                              style={styles.stepperBtn}
+                              onPress={() =>
+                                setWeights((prev) => ({
+                                  ...prev,
+                                  [item.type]: Math.max(
+                                    (parseFloat(prev[item.type]) || 0) - 1,
+                                    0
+                                  ).toString(),
+                                }))
+                              }
+                            >
+                              <Text style={styles.stepperText}>-</Text>
+                            </TouchableOpacity>
+
+                            <TextInput
+                              style={styles.weightInput}
+                              placeholder="kg"
+                              keyboardType="numeric"
+                              value={weights[item.type] || ""}
+                              onChangeText={(val) =>
+                                setWeights((prev) => ({
+                                  ...prev,
+                                  [item.type]: val,
+                                }))
+                              }
+                            />
+
+                            <TouchableOpacity
+                              style={styles.stepperBtn}
+                              onPress={() =>
+                                setWeights((prev) => ({
+                                  ...prev,
+                                  [item.type]: (
+                                    (parseFloat(prev[item.type]) || 0) + 1
+                                  ).toString(),
+                                }))
+                              }
+                            >
+                              <Text style={styles.stepperText}>+</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -741,8 +853,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  searchOverlay: { flex: 1, fontSize: 15,
-    fontFamily: "Poppins_400Regular", },
+  searchOverlay: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
   footerOverlay: {
     position: "absolute",
     bottom: 40,
@@ -809,5 +920,46 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     fontSize: 15,
+  },
+  weightInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    width: 70,
+    textAlign: "right",
+    fontSize: 14,
+    marginLeft: 10,
+    backgroundColor: "#fff",
+  },
+  stepperBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 5,
+    backgroundColor: "#f5f5f5",
+  },
+  stepperText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  wasteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  wasteInfo: {
+    flex: 1,
+    minWidth: 0, // allows text to shrink/truncate
+    paddingRight: 8,
+  },
+  controls: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 0, // keep controls visible
   },
 });

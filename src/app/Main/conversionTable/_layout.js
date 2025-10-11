@@ -17,7 +17,7 @@ export default function ScannerLayout() {
       <Stack.Screen
         name="index"
         options={{
-          title: "Conversion Rates",
+          title: "Points Conversion Table",
           headerShown: true,
         }}
       />
