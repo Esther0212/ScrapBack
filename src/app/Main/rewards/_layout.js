@@ -15,19 +15,19 @@ export default function RewardsLayout() {
         headerTitleStyle: { fontFamily: "Poppins_700Bold", fontSize: 18 },
       }}
     >
-    <Stack.Screen
-      name="[category]"
-      options={{
-        title: "Rice Offer",
-        headerShown: true,
-        headerBackVisible: false,
-        headerLeft: () => (
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="chevron-back-outline" size={24} color="black" />
-          </TouchableOpacity>
-        ),
-      }}
-    />
+      <Stack.Screen
+        name="[category]"
+        options={{
+          title: "Rice Offer",
+          headerShown: true,
+          headerBackVisible: false,
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="chevron-back-outline" size={24} color="black" />
+            </TouchableOpacity>
+          ),
+        }}
+      />
       <Stack.Screen
         name="index"
         options={{

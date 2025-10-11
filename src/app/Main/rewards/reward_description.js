@@ -142,7 +142,9 @@ const RewardDescription = () => {
                 onPress={() => router.push("Main/map")}
                 style={styles.ctaButtonSolid}
               >
-                <Text style={styles.ctaText}>Go to Nearest PACAFACO Point</Text>
+                <Text style={styles.ctaText}>
+                  See Available Collection Points
+                </Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
