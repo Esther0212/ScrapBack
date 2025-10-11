@@ -20,6 +20,7 @@ import { Entypo } from "@expo/vector-icons";
 import { db } from "../../../../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
+import closedCollectionPointMarker from "../../../assets/map/closedCollectionPointMarker.png";
 import { useUser } from "../../../context/userContext";
 
 // 🔹 Convert 24-hour to 12-hour format
@@ -376,16 +377,32 @@ export default function MapSelector() {
                 />
               )}
 
-              {points.map((p) => (
-                <Marker
-                  key={p.id}
-                  coordinate={{ latitude: p.lat, longitude: p.lng }}
-                  title={p.name}
-                  description={p.address}
-                  image={collectionPointMarker}
-                  onPress={() => openGoogleMaps(p.lat, p.lng)}
-                />
-              ))}
+              {/* ✅ Updated Marker Mapping with Status-Based Icon */}
+              {points.map((p) => {
+                // find the latest schedule for this point
+                const sched = schedules.find((s) => s.pointId === p.id);
+
+                // if schedule found, use its status
+                const isClosed = sched?.status?.toLowerCase() === "closed";
+
+                return (
+                  <Marker
+                    key={p.id}
+                    coordinate={{ latitude: p.lat, longitude: p.lng }}
+                    title={p.name}
+                    description={
+                      sched
+                        ? `${p.address}\nStatus: ${sched.status}\nDate: ${sched.collectionDate} ${sched.collectionTime}`
+                        : p.address
+                    }
+                    image={
+                      isClosed
+                        ? closedCollectionPointMarker
+                        : collectionPointMarker
+                    } // ✅ dynamic icon
+                  />
+                );
+              })}
             </MapView>
           ) : (
             <FlatList

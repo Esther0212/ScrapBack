@@ -116,45 +116,46 @@ const RewardDescription = () => {
           </LinearGradient>
 
           {/* Card Content */}
- <View style={styles.card}>
-  <Text style={styles.sectionTitle}>About this Reward</Text>
-  <Text style={styles.text}>{reward.description}</Text>
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>About this Reward</Text>
+            <Text style={styles.text}>{reward.description}</Text>
 
-  <Text style={styles.sectionTitle}>Points Required</Text>
-  <Text style={styles.text}>{reward.points} pts</Text>
+            <Text style={styles.sectionTitle}>Points Required</Text>
+            <Text style={styles.text}>{reward.points} pts</Text>
 
-  <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
-  <Text style={styles.text}>
-    {reward.howToRedeem
-      ? reward.howToRedeem
-      : "Redemption instructions are not available at the moment."}
-  </Text>
+            <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
+            <Text style={styles.text}>
+              {reward.howToRedeem
+                ? reward.howToRedeem
+                : "Redemption instructions are not available at the moment."}
+            </Text>
 
-  <Text style={styles.bold}>
-    Note: Ensure you meet the minimum points required before redeeming.
-  </Text>
+            <Text style={styles.bold}>
+              Note: Ensure you meet the minimum points required before
+              redeeming.
+            </Text>
 
-  {/* CTA Button */}
-  {reward.category === "sack" ? (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() => router.push("Main/map/MapSelector")}
-      style={styles.ctaButtonSolid}
-    >
-      <Text style={styles.ctaText}>Go to Nearest PACAFACO Point</Text>
-    </TouchableOpacity>
-  ) : (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() => setModalVisible(true)}
-      style={styles.ctaButtonSolid}
-    >
-      <Text style={styles.ctaText}>
-        Redeem for {reward.points} Points
-      </Text>
-    </TouchableOpacity>
-  )}
-</View>
+            {/* CTA Button */}
+            {reward.category === "sack" ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push("Main/map")}
+                style={styles.ctaButtonSolid}
+              >
+                <Text style={styles.ctaText}>Go to Nearest PACAFACO Point</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setModalVisible(true)}
+                style={styles.ctaButtonSolid}
+              >
+                <Text style={styles.ctaText}>
+                  Redeem for {reward.points} Points
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </ScrollView>
 
         {/* Modal */}
