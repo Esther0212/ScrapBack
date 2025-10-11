@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+// src/app/Main/map/MapSelector.jsx
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,17 +13,13 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
-import MapView, { UrlTile, Marker, Callout } from "react-native-maps";
+import MapView, { Marker, Callout } from "react-native-maps";
 import CustomBgColor from "../../../components/customBgColor";
-import Feather from "@expo/vector-icons/Feather";
-
-// Firebase
+import { Ionicons } from "@expo/vector-icons";
+import { Entypo } from "@expo/vector-icons";
 import { db } from "../../../../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
-
-// Custom marker
 import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
-import closedCollectionPointMarker from "../../../assets/map/closedCollectionPointMarker.png";
 
 // 🔹 Convert 24-hour to 12-hour format
 const formatTime12h = (time24) => {
@@ -34,7 +31,7 @@ const formatTime12h = (time24) => {
   return `${hour}:${minute} ${ampm}`;
 };
 
-// 🔹 Convert date to full form
+// 🔹 Convert date to readable form
 const formatFullDate = (dateStr) => {
   if (!dateStr) return "";
   const date = new Date(dateStr);
@@ -42,7 +39,7 @@ const formatFullDate = (dateStr) => {
   return date.toLocaleDateString(undefined, options);
 };
 
-// 🔹 Distance calculation (Haversine)
+// 🔹 Distance (Haversine)
 const getDistanceKm = (lat1, lon1, lat2, lon2) => {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -55,16 +52,14 @@ const getDistanceKm = (lat1, lon1, lat2, lon2) => {
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
 
-// 🔹 Status component
+// 🔹 Badge component
 const StatusBadge = ({ status }) => {
   const isOpen = status === "Open";
   return (
     <View
       style={[
         styles.statusBadge,
-        {
-          backgroundColor: isOpen ? "#B9F8CF" : "#FFC9C9",
-        },
+        { backgroundColor: isOpen ? "#B9F8CF" : "#FFC9C9" },
       ]}
     >
       <Text
@@ -82,6 +77,7 @@ const StatusBadge = ({ status }) => {
 export default function MapSelector() {
   const router = useRouter();
   const mapRef = useRef(null);
+
   const [searchText, setSearchText] = useState("");
   const [selectedView, setSelectedView] = useState("map");
   const [region, setRegion] = useState({
@@ -90,18 +86,16 @@ export default function MapSelector() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
-  const [marker, setMarker] = useState(null); // user location
+  const [marker, setMarker] = useState(null);
   const [points, setPoints] = useState([]);
   const [schedules, setSchedules] = useState([]);
+  const [flattenedData, setFlattenedData] = useState([]);
 
-  // 🔥 Load Firestore points + schedules
+  // 🔥 Load Firestore data
   useEffect(() => {
-    const unsubPoints = onSnapshot(
-      collection(db, "collectionPoint"),
-      (snap) => {
-        setPoints(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      }
-    );
+    const unsubPoints = onSnapshot(collection(db, "collectionPoint"), (snap) => {
+      setPoints(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
 
     const unsubSchedules = onSnapshot(
       collection(db, "collectionSchedule"),
@@ -116,12 +110,13 @@ export default function MapSelector() {
     };
   }, []);
 
-  // 📍 Get user location + compute distances
+  // 📍 User location + distances
   useEffect(() => {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
+
         const location = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = location.coords;
         const newRegion = {
@@ -132,25 +127,65 @@ export default function MapSelector() {
         };
         setRegion(newRegion);
         setMarker({ latitude, longitude });
-
-        if (points.length > 0) {
-          const withDistance = points.map((p) => ({
-            ...p,
-            distance: getDistanceKm(latitude, longitude, p.lat, p.lng),
-          }));
-          withDistance.sort((a, b) => a.distance - b.distance); // nearest → farthest
-          setPoints(withDistance);
-        }
       } catch (error) {
         console.warn("Location error:", error);
       }
     })();
-  }, [points.length]);
+  }, []);
+
+  // Combine schedules with their corresponding point data
+  useEffect(() => {
+    if (!points.length || !schedules.length) return;
+
+    const flattened = schedules.map((s) => {
+      const point = points.find((p) => p.id === s.pointId);
+      if (!point) return null;
+
+      const dist =
+        marker && point.lat && point.lng
+          ? getDistanceKm(marker.latitude, marker.longitude, point.lat, point.lng)
+          : null;
+
+      return {
+        id: s.id,
+        pointId: s.pointId,
+        name: point.name,
+        address: point.address,
+        lat: point.lat,
+        lng: point.lng,
+        collectionDate: s.collectionDate,
+        collectionTime: s.collectionTime,
+        status: s.status,
+        distance: dist,
+      };
+    });
+
+    const filtered = flattened.filter(Boolean);
+    filtered.sort((a, b) => (a.distance || 9999) - (b.distance || 9999));
+    setFlattenedData(filtered);
+  }, [points, schedules, marker]);
+
+  // 🔹 Alternate color but group by pointId
+  const getGroupedColors = useMemo(() => {
+    const colors = {};
+    let lastColor = "#8CA34A";
+    let lastPointId = null;
+
+    flattenedData.forEach((item) => {
+      if (item.pointId !== lastPointId) {
+        // Alternate color when new pointId appears
+        lastColor = lastColor === "#8CA34A" ? "#C79E4B" : "#8CA34A";
+      }
+      colors[item.pointId] = lastColor;
+      lastPointId = item.pointId;
+    });
+
+    return colors;
+  }, [flattenedData]);
 
   // 🔍 Search bar
   const handleSearch = async () => {
     if (!searchText) return;
-
     try {
       const results = await Location.geocodeAsync(searchText);
       if (results.length > 0) {
@@ -171,81 +206,75 @@ export default function MapSelector() {
     }
   };
 
-  // Sort schedules by time AM → PM
-  const sortSchedules = (scheds) => {
-    return scheds
-      .slice()
-      .sort(
-        (a, b) =>
-          parseInt(a.collectionTime.replace(":", ""), 10) -
-          parseInt(b.collectionTime.replace(":", ""), 10)
-      );
-  };
-
-  // 🔗 Open Google Maps with origin + destination
-  const openGoogleMaps = (destLat, destLng, label) => {
-    if (!marker) return; // make sure we have user location
+  // Open Google Maps navigation
+  const openGoogleMaps = (lat, lng) => {
+    if (!marker) return;
     const { latitude, longitude } = marker;
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${latitude},${longitude}&destination=${destLat},${destLng}&travelmode=driving`;
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${latitude},${longitude}&destination=${lat},${lng}&travelmode=driving`;
     Linking.openURL(url);
   };
 
-  // 📋 Render list item
-  const renderListItem = ({ item }) => {
-    let pointSchedules = schedules.filter((s) => s.pointId === item.id);
-    pointSchedules = sortSchedules(pointSchedules);
+  // 🔹 Render each schedule card (with consistent color per collectionPoint)
+  const renderScheduleCard = ({ item }) => {
+    const borderColor = getGroupedColors[item.pointId] || "#8CA34A";
 
     return (
-      <View style={styles.listCard}>
-        <Text style={styles.listTitle}>{item.name}</Text>
-        <Text style={styles.listAddress}>{item.address}</Text>
-        {item.distance && (
-          <Text style={styles.distanceText}>
-            Distance: {item.distance.toFixed(2)} km
+      <TouchableOpacity
+        key={item.id}
+        style={[styles.scheduleCard, { borderLeftColor: borderColor }]}
+        onPress={() => openGoogleMaps(item.lat, item.lng)}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>{item.name}</Text>
+          <StatusBadge status={item.status} />
+        </View>
+
+        <Text style={styles.cardAddress}>{item.address}</Text>
+
+        {/* Lat/Lng */}
+        <View style={styles.iconRow}>
+          <Ionicons name="pin" size={20} color="#008243" style={{ marginRight: 6 }} />
+          <Text style={styles.cardLatLng}>
+            {item.lat.toFixed(4)}, {item.lng.toFixed(4)}
           </Text>
+        </View>
+
+        {/* Schedule */}
+        <View style={styles.cardScheduleBox}>
+          <View style={styles.iconRow}>
+            <Ionicons name="today" size={20} color="#008243" style={{ marginRight: 6 }} />
+            <Text style={styles.cardSchedule}>{formatFullDate(item.collectionDate)}</Text>
+          </View>
+
+          <View style={styles.iconRow}>
+            <Ionicons name="time" size={20} color="#008243" style={{ marginRight: 6 }} />
+            <Text style={styles.cardSchedule}>{formatTime12h(item.collectionTime)}</Text>
+          </View>
+        </View>
+
+        {item.distance && (
+          <View style={styles.iconRow}>
+            <Entypo name="ruler" size={20} color="#008243" style={{ marginRight: 6 }} />
+            <Text style={styles.cardDistance}>
+              Distance: {item.distance.toFixed(2)} km
+            </Text>
+          </View>
         )}
-        {pointSchedules.length > 0 ? (
-          pointSchedules.map((s, idx) => (
-            <TouchableOpacity
-              key={s.id}
-              style={[
-                styles.scheduleRow,
-                { backgroundColor: idx % 2 === 0 ? "#E3F6E3" : "#FFFFFF" },
-              ]}
-              onPress={() => openGoogleMaps(item.lat, item.lng, item.name)}
-            >
-              <Text style={styles.scheduleText}>
-                {formatFullDate(s.collectionDate)},{" "}
-                {formatTime12h(s.collectionTime)}
-              </Text>
-              <StatusBadge status={s.status} />
-              <Feather
-                name="arrow-up-right"
-                size={20}
-                color="black"
-                style={{ marginLeft: "auto" }}
-              />
-            </TouchableOpacity>
-          ))
-        ) : (
-          <Text style={styles.noSchedule}>No schedules</Text>
-        )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
     <CustomBgColor>
-      <SafeAreaView style={{ flex: 1, paddingTop: 25, flexGrow: 1 }}>
+      <SafeAreaView style={{ flex: 1, paddingTop: 25 }}>
         <View style={styles.container}>
-          {/* Top Overlay: Search, Map/List Tabs, and Drop-off Stations */}
+          {/* Top Controls */}
           <View
             style={[
               styles.topOverlayContainer,
-              selectedView === "list" && styles.listTabBackground, // Apply background only in List tab
+              selectedView === "list" && styles.listTabBackground,
             ]}
           >
-            {/* Search Box */}
             <View style={styles.searchBox}>
               <TextInput
                 style={styles.searchInput}
@@ -256,7 +285,6 @@ export default function MapSelector() {
               />
             </View>
 
-            {/* Toggle Buttons */}
             <View style={styles.toggleContainer}>
               <View style={styles.toggleButtons}>
                 <TouchableOpacity
@@ -286,8 +314,7 @@ export default function MapSelector() {
                   <Text
                     style={[
                       styles.toggleOptionText,
-                      selectedView === "list" &&
-                        styles.toggleOptionTextSelected,
+                      selectedView === "list" && styles.toggleOptionTextSelected,
                     ]}
                   >
                     List
@@ -295,20 +322,14 @@ export default function MapSelector() {
                 </TouchableOpacity>
               </View>
               <View style={styles.toggleLabelBox}>
-                <Text style={styles.toggleLabel}>Drop-off stations</Text>
+                <Text style={styles.toggleLabel}>Drop-off Schedules</Text>
               </View>
             </View>
           </View>
 
           {/* Map or List */}
           {selectedView === "map" ? (
-            <MapView
-              style={{ flex: 1 }}
-              region={region}
-              ref={mapRef}
-              onLongPress={(e) => setMarker(e.nativeEvent.coordinate)}
-            >
-
+            <MapView style={{ flex: 1 }} region={region} ref={mapRef}>
               {marker && (
                 <Marker coordinate={marker}>
                   <Callout>
@@ -316,7 +337,6 @@ export default function MapSelector() {
                   </Callout>
                 </Marker>
               )}
-
               {points.map((p) => (
                 <Marker
                   key={p.id}
@@ -329,13 +349,13 @@ export default function MapSelector() {
             </MapView>
           ) : (
             <FlatList
-              data={points}
+              data={flattenedData}
               keyExtractor={(item) => item.id}
-              renderItem={renderListItem}
+              renderItem={renderScheduleCard}
               contentContainerStyle={{
                 paddingTop: 200,
                 paddingHorizontal: 16,
-                paddingBottom: 16,
+                paddingBottom: 20,
               }}
             />
           )}
@@ -345,6 +365,9 @@ export default function MapSelector() {
   );
 }
 
+/* =======================
+   STYLES
+======================= */
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topOverlayContainer: {
@@ -352,12 +375,9 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 10, // Ensures it stays above the FlatList
-    paddingBottom: 0, // Adds spacing below the overlay
+    zIndex: 10,
   },
-  listTabBackground: {
-    backgroundColor: "#F0F1C5", // Background color for the List tab
-  },
+  listTabBackground: { backgroundColor: "#F0F1C5" },
   searchBox: {
     backgroundColor: "white",
     borderRadius: 10,
@@ -366,29 +386,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
     marginHorizontal: 20,
     marginTop: 30,
   },
   searchInput: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
-  toggleContainer: {
-    marginHorizontal: 20,
-    marginTop: 10,
-  },
+  toggleContainer: { marginHorizontal: 20, marginTop: 10 },
   toggleButtons: {
     flexDirection: "row",
     backgroundColor: "#ccc",
     borderRadius: 10,
     overflow: "hidden",
     marginBottom: 10,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
   toggleLabelBox: { marginVertical: 10 },
   toggleLabel: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
@@ -400,73 +408,74 @@ const styles = StyleSheet.create({
   },
   toggleSelected: { backgroundColor: "white" },
   toggleOptionText: {
-    fontSize: 16,
-    color: "#555",
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
+    color: "#555",
   },
   toggleOptionTextSelected: {
     color: "#117D2E",
-    fontSize: 15,
     fontFamily: "Poppins_700Bold",
   },
-  listContainer: { paddingTop: 180, paddingHorizontal: 16, paddingBottom: 16 },
-  listCard: {
+
+  scheduleCard: {
     backgroundColor: "white",
     borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 14,
+    marginBottom: 14,
+    borderLeftWidth: 6,
   },
-  listTitle: {
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  cardTitle: {
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
-    color: "#333",
     color: "#117D2E",
-    marginBottom: 10,
   },
-  listAddress: {
-    fontSize: 15,
+  cardAddress: {
+    fontSize: 14,
     fontFamily: "Poppins_400Regular",
     color: "#333",
+    marginTop: 4,
+  },
+  iconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  cardLatLng: {
+    fontSize: 13,
+    fontFamily: "Poppins_400Regular",
+    color: "#555",
+  },
+  cardScheduleBox: {
+    marginTop: 10,
+    backgroundColor: "#E6F4EA",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     marginBottom: 6,
   },
-  distanceText: {
+  cardSchedule: {
+    fontSize: 14,
+    fontFamily: "Poppins_500Medium",
+    color: "#333",
+  },
+  cardDistance: {
     fontSize: 13,
     fontFamily: "Poppins_400Regular",
     color: "#333",
-    marginBottom: 6,
-  },
-  scheduleText: {
-    fontSize: 15,
-    fontFamily: "Poppins_400Regular",
-    color: "#333",
-  },
-  noSchedule: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
-  scheduleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 6,
   },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    marginLeft: 6,
-    alignSelf: "flex-start", // keeps it snug to the content
   },
   statusBadgeText: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Poppins_400Regular",
-    color: "#333",
-    textAlign: "center", // horizontal centering
-    textAlignVertical: "center", // vertical centering (Android only)
+    textAlign: "center",
   },
 });
