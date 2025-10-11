@@ -20,6 +20,7 @@ import { Entypo } from "@expo/vector-icons";
 import { db } from "../../../../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
+import { useUser } from "../../../context/userContext";
 
 // 🔹 Convert 24-hour to 12-hour format
 const formatTime12h = (time24) => {
@@ -75,6 +76,8 @@ const StatusBadge = ({ status }) => {
 };
 
 export default function MapSelector() {
+  const { userData } = useUser();
+
   const router = useRouter();
   const mapRef = useRef(null);
 
@@ -93,9 +96,12 @@ export default function MapSelector() {
 
   // 🔥 Load Firestore data
   useEffect(() => {
-    const unsubPoints = onSnapshot(collection(db, "collectionPoint"), (snap) => {
-      setPoints(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
+    const unsubPoints = onSnapshot(
+      collection(db, "collectionPoint"),
+      (snap) => {
+        setPoints(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      }
+    );
 
     const unsubSchedules = onSnapshot(
       collection(db, "collectionSchedule"),
@@ -143,7 +149,12 @@ export default function MapSelector() {
 
       const dist =
         marker && point.lat && point.lng
-          ? getDistanceKm(marker.latitude, marker.longitude, point.lat, point.lng)
+          ? getDistanceKm(
+              marker.latitude,
+              marker.longitude,
+              point.lat,
+              point.lng
+            )
           : null;
 
       return {
@@ -233,7 +244,12 @@ export default function MapSelector() {
 
         {/* Lat/Lng */}
         <View style={styles.iconRow}>
-          <Ionicons name="pin" size={20} color="#008243" style={{ marginRight: 6 }} />
+          <Ionicons
+            name="pin"
+            size={20}
+            color="#008243"
+            style={{ marginRight: 6 }}
+          />
           <Text style={styles.cardLatLng}>
             {item.lat.toFixed(4)}, {item.lng.toFixed(4)}
           </Text>
@@ -242,19 +258,38 @@ export default function MapSelector() {
         {/* Schedule */}
         <View style={styles.cardScheduleBox}>
           <View style={styles.iconRow}>
-            <Ionicons name="today" size={20} color="#008243" style={{ marginRight: 6 }} />
-            <Text style={styles.cardSchedule}>{formatFullDate(item.collectionDate)}</Text>
+            <Ionicons
+              name="today"
+              size={20}
+              color="#008243"
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.cardSchedule}>
+              {formatFullDate(item.collectionDate)}
+            </Text>
           </View>
 
           <View style={styles.iconRow}>
-            <Ionicons name="time" size={20} color="#008243" style={{ marginRight: 6 }} />
-            <Text style={styles.cardSchedule}>{formatTime12h(item.collectionTime)}</Text>
+            <Ionicons
+              name="time"
+              size={20}
+              color="#008243"
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.cardSchedule}>
+              {formatTime12h(item.collectionTime)}
+            </Text>
           </View>
         </View>
 
         {item.distance && (
           <View style={styles.iconRow}>
-            <Entypo name="ruler" size={20} color="#008243" style={{ marginRight: 6 }} />
+            <Entypo
+              name="ruler"
+              size={20}
+              color="#008243"
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.cardDistance}>
               Distance: {item.distance.toFixed(2)} km
             </Text>
@@ -314,7 +349,8 @@ export default function MapSelector() {
                   <Text
                     style={[
                       styles.toggleOptionText,
-                      selectedView === "list" && styles.toggleOptionTextSelected,
+                      selectedView === "list" &&
+                        styles.toggleOptionTextSelected,
                     ]}
                   >
                     List
@@ -331,12 +367,15 @@ export default function MapSelector() {
           {selectedView === "map" ? (
             <MapView style={{ flex: 1 }} region={region} ref={mapRef}>
               {marker && (
-                <Marker coordinate={marker}>
-                  <Callout>
-                    <Text>Your Location</Text>
-                  </Callout>
-                </Marker>
+                <Marker
+                  coordinate={marker}
+                  title={`${
+                    userData?.firstName ? userData.firstName : "Guest"
+                  }'s Location`}
+                  description="This is where you are."
+                />
               )}
+
               {points.map((p) => (
                 <Marker
                   key={p.id}
@@ -344,6 +383,7 @@ export default function MapSelector() {
                   title={p.name}
                   description={p.address}
                   image={collectionPointMarker}
+                  onPress={() => openGoogleMaps(p.lat, p.lng)}
                 />
               ))}
             </MapView>

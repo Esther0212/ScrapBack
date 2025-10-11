@@ -32,12 +32,16 @@ const RewardItem = ({ category }) => {
         const filteredRewards = querySnapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
           .filter((r) => {
-  if (category === "others") {
-    // ✅ Collect all rewards that are NOT gcash, load, or sack
-    return r.category !== "gcash" && r.category !== "load" && r.category !== "sack";
-  }
-  return r.category === category;
-});
+            if (category === "others") {
+              // ✅ Collect all rewards that are NOT gcash, load, or sack
+              return (
+                r.category !== "gcash" &&
+                r.category !== "load" &&
+                r.category !== "sack"
+              );
+            }
+            return r.category === category;
+          });
 
         setOffers(filteredRewards);
       } catch (err) {
@@ -54,7 +58,11 @@ const RewardItem = ({ category }) => {
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
         {loading ? (
-          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 30 }} />
+          <ActivityIndicator
+            size="large"
+            color="#2E7D32"
+            style={{ marginTop: 30 }}
+          />
         ) : (
           <ScrollView contentContainerStyle={styles.scrollView}>
             <View style={styles.cardContainer}>
@@ -73,7 +81,10 @@ const RewardItem = ({ category }) => {
                   {/* Image */}
                   <View style={styles.imageWrapper}>
                     {offer.image && (
-                      <Image source={{ uri: offer.image }} style={styles.image} />
+                      <Image
+                        source={{ uri: offer.image }}
+                        style={styles.image}
+                      />
                     )}
                     <LinearGradient
                       colors={["rgba(0,0,0,0.3)", "transparent"]}

@@ -15,6 +15,19 @@ export default function RewardsLayout() {
         headerTitleStyle: { fontFamily: "Poppins_700Bold", fontSize: 18 },
       }}
     >
+    <Stack.Screen
+      name="[category]"
+      options={{
+        title: "Rice Offer",
+        headerShown: true,
+        headerBackVisible: false,
+        headerLeft: () => (
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="chevron-back-outline" size={24} color="black" />
+          </TouchableOpacity>
+        ),
+      }}
+    />
       <Stack.Screen
         name="index"
         options={{
@@ -29,7 +42,7 @@ export default function RewardsLayout() {
         }}
       />
       <Stack.Screen
-        name="rice"
+        name="reward_description"
         options={{
           title: "List of Rice Rewards",
           headerShown: true,
@@ -42,74 +55,9 @@ export default function RewardsLayout() {
         }}
       />
       <Stack.Screen
-        name="rice_description"
+        name="reward_item"
         options={{
           title: "Rice Offer",
-          headerShown: true,
-          headerBackVisible: false,
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="chevron-back-outline" size={24} color="black" />
-            </TouchableOpacity>
-          ),
-        }}
-      />
-      <Stack.Screen
-        name="load"
-        options={{
-          title: "List of Load Offers",
-          headerShown: true,
-          headerBackVisible: false,
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="chevron-back-outline" size={24} color="black" />
-            </TouchableOpacity>
-          ),
-        }}
-      />
-      <Stack.Screen
-        name="load_description"
-        options={{
-          title: "Load Offer",
-          headerShown: true,
-          headerBackVisible: false,
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="chevron-back-outline" size={24} color="black" />
-            </TouchableOpacity>
-          ),
-        }}
-      />
-      <Stack.Screen
-        name="gcash"
-        options={{
-          title: "List of Gcash Offers",
-          headerShown: true,
-          headerBackVisible: false,
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="chevron-back-outline" size={24} color="black" />
-            </TouchableOpacity>
-          ),
-        }}
-      />
-      <Stack.Screen
-        name="gcash_description"
-        options={{
-          title: "Gcash Offer",
-          headerShown: true,
-          headerBackVisible: false,
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="chevron-back-outline" size={24} color="black" />
-            </TouchableOpacity>
-          ),
-        }}
-      />
-      <Stack.Screen
-        name="map"
-        options={{
-          title: "Map",
           headerShown: true,
           headerBackVisible: false,
           headerLeft: () => (
