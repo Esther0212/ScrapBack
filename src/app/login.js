@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
-  Alert,
+  ActivityIndicator, // ✅ import spinner
+  ToastAndroid,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -29,6 +30,7 @@ const Login = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false); // ✅ loading state
 
   // 🔹 Email format validator
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -55,7 +57,8 @@ const Login = () => {
     if (!isValid) return;
 
     try {
-      // 🔐 Firebase sign in
+      setLoading(true); // ✅ start loading
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       console.log("✅ Logged in:", user.uid);
@@ -89,15 +92,25 @@ const Login = () => {
         await AsyncStorage.removeItem("savedPassword");
       }
 
-      Alert.alert("Login Success", "You have successfully logged in!");
+      ToastAndroid.show("Login successful!", ToastAndroid.SHORT);
       router.replace("/Main");
     } catch (error) {
       console.error("❌ FULL LOGIN ERROR:", error);
       let message = "Login failed. Please try again.";
-      if (error.code === "auth/invalid-email") message = "Invalid email address.";
-      else if (error.code === "auth/user-not-found") message = "User not found.";
-      else if (error.code === "auth/wrong-password") message = "Incorrect password.";
-      Alert.alert("Login Error", message);
+
+      if (error.code === "auth/invalid-email") {
+        message = "Invalid email address.";
+      } else if (error.code === "auth/user-not-found") {
+        message = "User not found.";
+      } else if (error.code === "auth/wrong-password") {
+        message = "Incorrect password.";
+      } else if (error.code === "auth/network-request-failed") {
+        message = "No internet connection. Please check your network.";
+      }
+
+      ToastAndroid.show(message, ToastAndroid.LONG);
+    } finally {
+      setLoading(false); // ✅ stop loading
     }
   };
 
@@ -173,7 +186,7 @@ const Login = () => {
             {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
           </View>
 
-          {/* Remember Me + Forgot Password */}
+          {/* Remember / Forgot */}
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.rememberMe}
@@ -192,16 +205,21 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Login button */}
+          {/* ✅ Login Button with Loading Spinner */}
           <TouchableOpacity
-            style={styles.loginButton}
+            style={[styles.loginButton, loading && { opacity: 0.7 }]}
             activeOpacity={0.8}
             onPress={handleLogin}
+            disabled={loading}
           >
-            <Text style={styles.loginButtonText}>Log in</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Log in</Text>
+            )}
           </TouchableOpacity>
 
-          {/* Signup link */}
+          {/* Signup Link */}
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => router.push("/signup")}

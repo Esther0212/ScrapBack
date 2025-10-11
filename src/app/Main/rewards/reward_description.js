@@ -1,4 +1,4 @@
-// src/app/Main/rewards/gcash_description.js
+// src/app/Main/rewards/reward_description.js
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -12,22 +12,36 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
 
 // ✅ Firestore
 import { db } from "../../../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 
-const GcashDescription = () => {
+const RewardDescription = () => {
   const router = useRouter();
-  const { id } = useLocalSearchParams(); // Firestore document id
+  const { id } = useLocalSearchParams(); // Reward document ID
   const [reward, setReward] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // ✅ Fetch reward by ID from Firestore
+  // ✅ Determine header title based on reward category
+  const getHeaderTitle = (category) => {
+    switch (category) {
+      case "gcash":
+        return "Gcash Offer";
+      case "load":
+        return "Load Offer";
+      case "sack":
+        return "Rice Offer";
+      default:
+        return "Reward Details";
+    }
+  };
+
+  // ✅ Fetch reward by ID
   useEffect(() => {
     const fetchReward = async () => {
       try {
@@ -49,21 +63,29 @@ const GcashDescription = () => {
     if (id) fetchReward();
   }, [id]);
 
+  // ✅ Loading state
   if (loading) {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 40 }} />
+          <ActivityIndicator
+            size="large"
+            color="#2E7D32"
+            style={{ marginTop: 40 }}
+          />
         </SafeAreaView>
       </CustomBgColor>
     );
   }
 
+  // ✅ No reward found
   if (!reward) {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <Text style={styles.notFoundText}>No description found for this reward.</Text>
+          <Text style={styles.notFoundText}>
+            No description found for this reward.
+          </Text>
         </SafeAreaView>
       </CustomBgColor>
     );
@@ -71,6 +93,9 @@ const GcashDescription = () => {
 
   return (
     <CustomBgColor>
+      {/* ✅ Dynamic header title */}
+      <Stack.Screen options={{ title: getHeaderTitle(reward?.category) }} />
+
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -78,52 +103,58 @@ const GcashDescription = () => {
           <View style={{ width: 24 }} />
         </View>
 
+        {/* Content */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Image with gradient background */}
-          <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
+          {/* Image */}
+          <LinearGradient
+            colors={["#E8F5E9", "#FFFFFF"]}
+            style={styles.imageWrapper}
+          >
             {reward.image && (
               <Image source={{ uri: reward.image }} style={styles.image} />
             )}
           </LinearGradient>
 
           {/* Card Content */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.text}>
-              <Text style={styles.bold}>ABOUT ScrapBack{"\n"}</Text>
-              ScrapBack is a digital recycling rewards system developed for PACAFACO
-              residents. It encourages proper waste disposal by converting recyclable
-              materials into reward points which users can redeem for goods like rice,
-              mobile load, or GCash.
-            </Text>
+ <View style={styles.card}>
+  <Text style={styles.sectionTitle}>About this Reward</Text>
+  <Text style={styles.text}>{reward.description}</Text>
 
-            <Text style={styles.sectionTitle}>About this Reward</Text>
-            <Text style={styles.text}>{reward.description}</Text>
+  <Text style={styles.sectionTitle}>Points Required</Text>
+  <Text style={styles.text}>{reward.points} pts</Text>
 
-            <Text style={styles.sectionTitle}>Points Required</Text>
-            <Text style={styles.text}>{reward.points} pts</Text>
+  <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
+  <Text style={styles.text}>
+    {reward.howToRedeem
+      ? reward.howToRedeem
+      : "Redemption instructions are not available at the moment."}
+  </Text>
 
-            <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
-            <Text style={styles.text}>
-              1. Go to any designated PACAFACO collection point.{"\n"}
-              2. Show your QR code from the ScrapBack app to the staff.{"\n"}
-              3. Staff will scan your QR and validate your points.{"\n"}
-              4. Choose your reward and confirm redemption.{"\n"}
-              5. Once approved, receive your reward on the spot or be notified for scheduled claiming.{"\n\n"}
-              <Text style={styles.bold}>
-                Note: Ensure you meet the minimum points required before attempting to redeem.
-              </Text>
-            </Text>
+  <Text style={styles.bold}>
+    Note: Ensure you meet the minimum points required before redeeming.
+  </Text>
 
-            {/* CTA Button */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => setModalVisible(true)}
-              style={styles.ctaButtonSolid}
-            >
-              <Text style={styles.ctaText}>Redeem for {reward.points} Points</Text>
-            </TouchableOpacity>
-          </View>
+  {/* CTA Button */}
+  {reward.category === "sack" ? (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => router.push("Main/map/MapSelector")}
+      style={styles.ctaButtonSolid}
+    >
+      <Text style={styles.ctaText}>Go to Nearest PACAFACO Point</Text>
+    </TouchableOpacity>
+  ) : (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => setModalVisible(true)}
+      style={styles.ctaButtonSolid}
+    >
+      <Text style={styles.ctaText}>
+        Redeem for {reward.points} Points
+      </Text>
+    </TouchableOpacity>
+  )}
+</View>
         </ScrollView>
 
         {/* Modal */}
@@ -152,7 +183,7 @@ const GcashDescription = () => {
   );
 };
 
-export default GcashDescription;
+export default RewardDescription;
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
@@ -213,15 +244,16 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 12,
   },
-  bold: {
-    fontFamily: "Poppins_700Bold",
-  },
+  bold: { fontFamily: "Poppins_700Bold" },
   ctaButtonSolid: {
     backgroundColor: "#008243",
     borderRadius: 10,
     paddingVertical: 14,
     marginTop: 24,
     alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    width: "90%",
     shadowColor: "#008243",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

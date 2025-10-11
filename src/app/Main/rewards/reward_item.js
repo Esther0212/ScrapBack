@@ -1,4 +1,4 @@
-// src/app/Main/rewards/rice.js
+// src/app/Main/rewards/reward_item.js
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -12,17 +12,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../../components/customBgColor";
-import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-
-// ✅ Firestore imports
 import { db } from "../../../../firebase";
 import { collection, getDocs } from "firebase/firestore";
 
 const { width } = Dimensions.get("window");
 
-const Rice = () => {
+const RewardItem = ({ category }) => {
   const router = useRouter();
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,11 +29,17 @@ const Rice = () => {
     const fetchRewards = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "reward"));
-        const sackRewards = querySnapshot.docs
+        const filteredRewards = querySnapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((r) => r.category === "sack"); 
+          .filter((r) => {
+  if (category === "others") {
+    // ✅ Collect all rewards that are NOT gcash, load, or sack
+    return r.category !== "gcash" && r.category !== "load" && r.category !== "sack";
+  }
+  return r.category === category;
+});
 
-        setOffers(sackRewards);
+        setOffers(filteredRewards);
       } catch (err) {
         console.error("Error fetching rewards:", err);
       } finally {
@@ -45,19 +48,13 @@ const Rice = () => {
     };
 
     fetchRewards();
-  }, []);
+  }, [category]);
 
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
-
-        {/* Content */}
         {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#2E7D32"
-            style={{ marginTop: 30 }}
-          />
+          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 30 }} />
         ) : (
           <ScrollView contentContainerStyle={styles.scrollView}>
             <View style={styles.cardContainer}>
@@ -66,25 +63,23 @@ const Rice = () => {
                   key={offer.id}
                   style={styles.card}
                   activeOpacity={0.85}
-                  onPress={() => {
+                  onPress={() =>
                     router.push({
-                      pathname: "/Main/rewards/rice_description",
-                      params: { id: offer.id },
-                    });
-                  }}
+                      pathname: "/Main/rewards/reward_description",
+                      params: { id: offer.id }, // ✅ universal description page
+                    })
+                  }
                 >
-                  {/* Image with Gradient Overlay */}
+                  {/* Image */}
                   <View style={styles.imageWrapper}>
                     {offer.image && (
-                      <Image
-                        source={{ uri: offer.image }} 
-                        style={styles.image}
-                      />
+                      <Image source={{ uri: offer.image }} style={styles.image} />
                     )}
                     <LinearGradient
                       colors={["rgba(0,0,0,0.3)", "transparent"]}
                       style={styles.imageOverlay}
                     />
+
                     {/* Points Badge */}
                     <View style={styles.pointsBadge}>
                       <Image
@@ -107,25 +102,11 @@ const Rice = () => {
   );
 };
 
-export default Rice;
+export default RewardItem;
 
-// ✅ Styles
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontFamily: "Poppins_700Bold",
-  },
-  scrollView: {
-    paddingHorizontal: 14,
-    paddingBottom: 30,
-  },
+  scrollView: { paddingHorizontal: 14, paddingBottom: 30 },
   cardContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
