@@ -58,6 +58,15 @@ const Login = () => {
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
 
+      // 🚨 ADD THIS CHECK FOR EMAIL VERIFICATION
+      if (!user.emailVerified) {
+        Alert.alert(
+          "Email not verified",
+          "Please verify your email before logging in. Check your inbox for the verification link."
+        );
+        return; // ⛔ stop login if not verified
+      }
+
       // 🔔 Get push token
       const token = await registerForPushNotificationsAsync();
       if (token) {

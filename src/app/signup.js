@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth"; // ✅ added sendEmailVerification
 import { setDoc, doc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
@@ -60,9 +60,7 @@ const Signup = () => {
   useEffect(() => {
     const preloadAddressData = async () => {
       try {
-        const regionRes = await axios.get(
-          "https://psgc.gitlab.io/api/regions/"
-        );
+        const regionRes = await axios.get("https://psgc.gitlab.io/api/regions/");
         setRegions(regionRes.data);
 
         // Default selections
@@ -134,21 +132,22 @@ const Signup = () => {
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const uid = userCredential.user.uid;
+      // ✅ Create user with Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      await setDoc(doc(db, "user", uid), {
+      // ✅ Send actual email verification to provided email
+      await sendEmailVerification(user);
+
+      // ✅ Save user info in Firestore
+      await setDoc(doc(db, "user", user.uid), {
         firstName,
         lastName,
         email,
         contact,
         gender,
         dob,
-        userType: "user", // ✅ added here
+        userType: "user", // ✅ role
         address: {
           street,
           region: region.name,
@@ -160,9 +159,15 @@ const Signup = () => {
         createdAt: new Date(),
       });
 
-      Alert.alert("Account created successfully!");
-      router.push("/");
+      // ✅ Notify user
+      Alert.alert(
+        "Verification email sent!",
+        "A verification link has been sent to your email. Please verify your account before logging in."
+      );
+
+      router.push("/login");
     } catch (error) {
+      console.error("Signup Error:", error);
       Alert.alert("Signup Error", error.message);
     }
   };
@@ -174,9 +179,7 @@ const Signup = () => {
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
               <Text style={styles.title}>Sign up to earn points!</Text>
-              <Text style={styles.subtitle}>
-                Create your ScrapBack account now
-              </Text>
+              <Text style={styles.subtitle}>Create your ScrapBack account now</Text>
 
               {/* First Name & Last Name side by side */}
               <View style={styles.row}>
@@ -269,7 +272,6 @@ const Signup = () => {
                 value={street}
                 setValue={setStreet}
                 subLabel
-                style={styles.input}
               />
 
               <DropdownField
@@ -319,11 +321,7 @@ const Signup = () => {
 
               <View style={styles.inputContainer}>
                 <Text style={styles.subLabel}>Postal Code</Text>
-                <TextInput
-                  value={postalCode}
-                  editable={false}
-                  style={styles.input}
-                />
+                <TextInput value={postalCode} editable={false} style={styles.input} />
               </View>
 
               <TouchableOpacity
@@ -351,16 +349,8 @@ const Signup = () => {
   );
 };
 
-// InputField
-const InputField = ({
-  label,
-  value,
-  setValue,
-  keyboardType,
-  containerStyle,
-  subLabel,
-  ...props
-}) => (
+// ✅ Input, Password, Dropdown components remain unchanged
+const InputField = ({ label, value, setValue, keyboardType, containerStyle, subLabel, ...props }) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
     <TextInput
@@ -375,7 +365,6 @@ const InputField = ({
   </View>
 );
 
-// PasswordField
 const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
   <View style={styles.inputContainer}>
     <Text style={styles.label}>{label}</Text>
@@ -398,7 +387,6 @@ const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
   </View>
 );
 
-// DropdownField
 const DropdownField = ({
   label,
   visible,
@@ -423,7 +411,7 @@ const DropdownField = ({
           <Text
             style={[
               styles.dropdownText,
-              { color: selected ? "#3A2E2E" : "#777" }, 
+              { color: selected ? "#3A2E2E" : "#777" },
             ]}
           >
             {selected || `Select ${label}`}
