@@ -6,8 +6,9 @@ import {
   View,
   Image,
   ScrollView,
-  Dimensions,
   TouchableOpacity,
+  Platform,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../components/customBgColor";
@@ -18,13 +19,52 @@ import {
   query,
   where,
   onSnapshot,
+  setDoc,
   doc,
 } from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useUser } from "../../context/userContext";
 import { useEducational } from "../../context/educationalContext";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
 
 const { width } = Dimensions.get("window");
+
+async function registerForPushNotificationsAsync() {
+  if (!Device.isDevice) {
+    alert("Must use physical device for Push Notifications");
+    return null;
+  }
+
+  let { status } = await Notifications.getPermissionsAsync();
+  if (status !== "granted") {
+    const { status: newStatus } = await Notifications.requestPermissionsAsync();
+    status = newStatus;
+  }
+  if (status !== "granted") {
+    alert("Push notification permissions not granted!");
+    return null;
+  }
+
+  const projectId =
+    Constants?.expoConfig?.extra?.eas?.projectId ??
+    Constants?.easConfig?.projectId;
+
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  console.log("Expo push token:", token);
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF231F7C",
+    });
+  }
+
+  return token;
+}
 
 const Home = () => {
   const { userData } = useUser();
@@ -35,22 +75,58 @@ const Home = () => {
   const [recyclingTypes, setRecyclingTypes] = useState([]);
   const [conversionRates, setConversionRates] = useState([]);
   const [collapsedCategories, setCollapsedCategories] = useState({});
-  const [userPoints, setUserPoints] = useState(0); // 🔹 dynamic points
+  const [userPoints, setUserPoints] = useState(0);
   const router = useRouter();
 
-  // 🔔 Realtime listener for user notifications
+  // ✅ Fetch and listen to user's current points dynamically
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const q = query(
-      collection(db, "userNotifications"),
-      where("userId", "==", user.uid)
-    );
+    const userRef = doc(db, "user", user.uid);
+    const unsub = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const points =
+          typeof data.points === "number" && !isNaN(data.points)
+            ? parseFloat(data.points.toFixed(2))
+            : 0;
+        setUserPoints(points);
+      } else {
+        setUserPoints(0);
+      }
+    });
+
+    return unsub;
+  }, []);
+
+  // ✅ Save Expo Push Token to Firestore
+  useEffect(() => {
+    const saveToken = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await setDoc(
+          doc(db, "user", user.uid),
+          { expoPushToken: token },
+          { merge: true }
+        );
+      }
+    };
+    saveToken();
+  }, []);
+
+  // ✅ Real-time badge for nested notifications path
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const notifRef = collection(db, "notifications", user.uid, "userNotifications");
+    const q = query(notifRef, where("read", "==", false));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map((doc) => doc.data());
-      const unread = docs.filter((d) => !d.read).length;
+      const unread = snapshot.docs.length;
       setUnreadCount(unread);
       setHasNewNotification(unread > 0);
     });
@@ -58,24 +134,7 @@ const Home = () => {
     return unsubscribe;
   }, []);
 
-  // 🔹 Fetch user points in real time from Firestore (user collection)
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const unsub = onSnapshot(doc(db, "user", user.uid), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setUserPoints(data.points || 0);
-      } else {
-        setUserPoints(0);
-      }
-    });
-
-    return () => unsub();
-  }, []);
-
-  // recycling types
+  // 🔹 Recycling types (educational)
   useEffect(() => {
     if (educationalContent && educationalContent.length > 0) {
       const types = educationalContent.map((item) => item.type);
@@ -83,7 +142,7 @@ const Home = () => {
     }
   }, [educationalContent]);
 
-  // fetch conversion rates
+  // 🔹 Fetch conversion rates
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, "wasteConversionRates"),
@@ -98,7 +157,7 @@ const Home = () => {
     return () => unsub();
   }, []);
 
-  // group by category
+  // 🔹 Group conversion rates by category
   const groupedRates = conversionRates.reduce((acc, item) => {
     if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
@@ -150,7 +209,7 @@ const Home = () => {
             Every action counts—start recycling today!
           </Text>
 
-          {/* Points */}
+          {/* ✅ Points Section (Dynamic Firestore Data) */}
           <View style={styles.pointsContainer}>
             <View style={styles.leftContainer}>
               <Text style={styles.pointsLabel}>Your Total Points</Text>
@@ -160,14 +219,8 @@ const Home = () => {
                   style={styles.lettermarkLogo}
                   resizeMode="cover"
                 />
-                {/* 🔹 Flexible font size for big numbers */}
-                <Text
-                  style={styles.pointsValueText}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.5}
-                >
-                  {userPoints}
+                <Text style={styles.pointsValueText}>
+                  {userPoints?.toFixed(2) || "0.00"}
                 </Text>
               </View>
             </View>
@@ -216,26 +269,22 @@ const Home = () => {
 
           {/* Conversion Rates */}
           <Text style={styles.sectionTitle}>Conversion Rates</Text>
-
           {Object.keys(groupedRates)
             .slice(0, 5)
             .map((category, catIdx) => {
               const rows = groupedRates[category];
               const firstRow = rows[0];
-
               return (
                 <TouchableOpacity
                   key={catIdx}
                   onPress={() => router.push("/Main/conversionTable")}
                 >
                   <View style={styles.card}>
-                    {/* Header Bar */}
                     <View style={styles.headerBar}>
                       <Text style={styles.category}>{category} Conversion</Text>
                       <Ionicons name="chevron-forward" size={20} color="#fff" />
                     </View>
 
-                    {/* Table preview */}
                     <View style={styles.table}>
                       <View style={styles.tableHeader}>
                         <Text style={[styles.cellHeader, { flex: 2 }]}>
@@ -243,7 +292,6 @@ const Home = () => {
                         </Text>
                         <Text style={styles.cellHeader}>Points/kg</Text>
                       </View>
-
                       {firstRow && (
                         <View
                           style={[styles.row, { backgroundColor: "#FFFFFF" }]}
@@ -293,9 +341,9 @@ const styles = StyleSheet.create({
   },
   leftContainer: { width: "50%", justifyContent: "flex-end" },
   pointsLabel: {
-    fontSize: 14,
-    color: "#444",
-    fontFamily: "Poppins_400Regular",
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
   },
   rowContainer: {
     flexDirection: "row",

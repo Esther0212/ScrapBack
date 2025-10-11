@@ -6,6 +6,8 @@ import {
   FlatList,
   StyleSheet,
   TouchableOpacity,
+  Alert,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,116 +15,203 @@ import { auth, db } from "../../../firebase";
 import {
   collection,
   query,
-  where,
   onSnapshot,
   getDocs,
   writeBatch,
   doc,
   updateDoc,
+  orderBy,
 } from "firebase/firestore";
 import CustomBgColor from "../../components/customBgColor";
+import { useRouter } from "expo-router";
 
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState([]);
+  const router = useRouter();
 
+  // 🔹 Real-time notifications
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    // 🔔 Realtime listener for notifications for this user
-    const q = query(
-      collection(db, "userNotifications"),
-      where("userId", "==", user.uid)
+    const notifRef = collection(
+      db,
+      "notifications",
+      user.uid,
+      "userNotifications"
     );
+    const q = query(notifRef, orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      // Sort newest first
-      setNotifications(data.sort((a, b) => b.createdAt - a.createdAt));
+
+      data.sort((a, b) => {
+        const getTime = (d) =>
+          d?.createdAt?.toDate
+            ? d.createdAt.toDate().getTime()
+            : typeof d?.createdAt === "number"
+            ? d.createdAt
+            : 0;
+        return getTime(b) - getTime(a);
+      });
+
+      setNotifications(data);
     });
 
     return unsubscribe;
   }, []);
 
-  // ✅ Mark all as read
+  // 🔹 Mark all as read
   const markAllAsRead = async () => {
     const user = auth.currentUser;
     if (!user) return;
-
     try {
-      const q = query(
-        collection(db, "userNotifications"),
-        where("userId", "==", user.uid),
-        where("read", "==", false)
+      const notifRef = collection(
+        db,
+        "notifications",
+        user.uid,
+        "userNotifications"
       );
-
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocs(notifRef);
       if (snapshot.empty) return;
 
       const batch = writeBatch(db);
       snapshot.forEach((docSnap) => {
-        batch.update(docSnap.ref, { read: true });
+        if (!docSnap.data().read) batch.update(docSnap.ref, { read: true });
       });
-
       await batch.commit();
-      console.log("✅ All notifications marked as read");
     } catch (err) {
-      console.error("Failed to mark as read:", err);
+      console.error("Failed to mark all as read:", err);
     }
   };
 
-  // ✅ Mark one notification as read
+  // 🔹 Mark one as read
   const markOneAsRead = async (notifId) => {
+    const user = auth.currentUser;
+    if (!user) return;
     try {
-      const notifRef = doc(db, "userNotifications", notifId);
+      const notifRef = doc(
+        db,
+        "notifications",
+        user.uid,
+        "userNotifications",
+        notifId
+      );
       await updateDoc(notifRef, { read: true });
-      console.log(`✅ Notification ${notifId} marked as read`);
     } catch (err) {
       console.error("Failed to mark single notif as read:", err);
     }
   };
 
+  // 🔹 Handle notification tap (with confirmation prompts)
+  const handleNotificationPress = (item) => {
+    if (!item.read) markOneAsRead(item.id);
+
+    if (item.title?.includes("Collection Point")) {
+      Alert.alert(
+        "Go to Collection Points?",
+        "Do you want to view the collection points page?",
+        [
+          { text: "No", style: "cancel" },
+          { text: "Yes", onPress: () => router.push("/Main/map") },
+        ]
+      );
+    } else if (item.type === "pickupStatus") {
+      Alert.alert(
+        "Pickup Request Update",
+        "Do you want to view your pickup requests?",
+        [
+          { text: "No", style: "cancel" },
+          { text: "Yes", onPress: () => router.push("/Main/requestPickup") },
+        ]
+      );
+    }
+  };
+
+  // 🔹 Render each notification card
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={[styles.card, !item.read && styles.cardUnread]}
-      onPress={() => !item.read && markOneAsRead(item.id)}
+      onPress={() => handleNotificationPress(item)}
+      activeOpacity={0.9}
     >
-      {/* Accent bar for unread */}
       {!item.read && <View style={styles.unreadBar} />}
 
-      <Ionicons
-        name={item.read ? "notifications-outline" : "notifications"}
-        size={24}
-        color={item.read ? "gray" : "#0047AB"}
-        style={{ marginRight: 10 }}
-      />
-      <View style={{ flex: 1 }}>
+      {/* 🔸 Title Row */}
+      <View style={styles.titleRow}>
+        <Ionicons
+          name={item.read ? "notifications-outline" : "notifications"}
+          size={22}
+          color={item.read ? "gray" : "#F5A25D"}
+          style={{ marginRight: 8 }}
+        />
         <Text style={[styles.title, !item.read && styles.titleUnread]}>
           {item.title}
         </Text>
-        <Text style={[styles.body, !item.read && styles.bodyUnread]}>
-          {item.body}
-        </Text>
-        <Text style={styles.date}>
-          {new Date(item.createdAt).toLocaleString()}
-        </Text>
       </View>
+
+      {/* 🔸 Body and optional thumbnail */}
+      {item.photoUrl ? (
+        <View style={styles.rowWithImage}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text
+              style={[styles.body, !item.read && styles.bodyUnread]}
+              numberOfLines={10}
+            >
+              {item.body}
+            </Text>
+          </View>
+
+          <Image
+            source={{ uri: item.photoUrl }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+          />
+        </View>
+      ) : (
+        <View>
+          <Text
+            style={[styles.body, !item.read && styles.bodyUnread]}
+            numberOfLines={10}
+          >
+            {item.body}
+          </Text>
+        </View>
+      )}
+
+      {/* 🔸 Date */}
+      <Text style={styles.date}>
+        {(() => {
+          const c = item.createdAt;
+          if (!c) return "";
+          if (c.toDate) return c.toDate().toLocaleString();
+          if (typeof c === "number") return new Date(c).toLocaleString();
+          return "";
+        })()}
+      </Text>
     </TouchableOpacity>
   );
 
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerText}>Notifications</Text>
+        {/* 🔹 Header */}
+        <View style={styles.topHeader}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color="black" />
+          </TouchableOpacity>
+
+          <Text style={styles.topHeaderText}>Notifications</Text>
+
           <TouchableOpacity onPress={markAllAsRead}>
             <Text style={styles.clearBtn}>Mark all as read</Text>
           </TouchableOpacity>
         </View>
 
+        {/* 🔹 List */}
         {notifications.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>No notifications yet</Text>
@@ -141,53 +230,89 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  header: {
+  container: { flex: 1, padding: 12 },
+  topHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+    justifyContent: "space-between",
   },
-  headerText: { fontSize: 20, fontFamily: "Poppins_700Bold" },
-  clearBtn: { color: "#0047AB", fontFamily: "Poppins_400Regular" },
+  backBtn: { padding: 4, marginRight: 8 },
+  topHeaderText: {
+    flex: 1,
+    fontSize: 20,
+    fontFamily: "Poppins_700Bold",
+    color: "black",
+  },
+  clearBtn: {
+    color: "#008243",
+    fontFamily: "Poppins_400Regular",
+  },
+
   card: {
-    flexDirection: "row",
+    flexDirection: "column",
+    alignItems: "flex-start",
     backgroundColor: "white",
     padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
+    borderRadius: 10,
+    marginBottom: 10,
     elevation: 2,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
-    overflow: "hidden",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3,
+    borderWidth: 1,
+    borderColor: "#E3F6E3",
+    width: "100%",
   },
-  cardUnread: {
-    backgroundColor: "#F0F6FF", // light blue for unread
-  },
+  cardUnread: { backgroundColor: "#F4FBF4" },
   unreadBar: {
     position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
     width: 4,
-    backgroundColor: "#1E66F5",
+    backgroundColor: "#008243",
+    borderTopLeftRadius: 10,
+    borderBottomLeftRadius: 10,
   },
-  title: { fontSize: 16, fontFamily: "Poppins_700Bold" },
-  titleUnread: {
-    fontFamily: "Poppins_800ExtraBold",
+
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
   },
-  body: { fontSize: 14, fontFamily: "Poppins_400Regular", color: "#333" },
-  bodyUnread: {
-    color: "#1b3a57",
+  rowWithImage: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+
+  title: { fontSize: 14, fontFamily: "Poppins_700Bold", color: "#2E7D32" },
+  titleUnread: { fontFamily: "Poppins_800ExtraBold", color: "#008243" },
+ body: {
+  fontSize: 13,
+  fontFamily: "Poppins_400Regular",
+  color: "#333",
+  marginTop: 4,
+  marginHorizontal: 4, // ✅ added small side margin
+  textAlign: "justify", // ✅ justified text
+},
+
+  bodyUnread: { color: "#004d26" },
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   date: {
-    fontSize: 12,
-    color: "gray",
+    fontSize: 11,
+    color: "#666",
     fontFamily: "Poppins_400Regular",
-    marginTop: 4,
+    marginTop: 6,
   },
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
-  emptyText: { fontSize: 16, color: "gray" },
+  emptyText: { fontSize: 14, color: "#888" },
 });

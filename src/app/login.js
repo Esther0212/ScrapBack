@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
-  Alert,
+  ActivityIndicator, // ✅ import spinner
+  ToastAndroid,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -15,7 +16,6 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerForPushNotificationsAsync } from "../utils/notifications";
-
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
 import { useUser } from "../context/userContext";
@@ -30,9 +30,12 @@ const Login = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false); // ✅ loading state
 
+  // 🔹 Email format validator
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
+  // 🔹 Handle login
   const handleLogin = async () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
@@ -54,47 +57,33 @@ const Login = () => {
     if (!isValid) return;
 
     try {
-      // 🔐 Firebase login
-      const { user } = await signInWithEmailAndPassword(auth, email, password);
+      setLoading(true); // ✅ start loading
+
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
       console.log("✅ Logged in:", user.uid);
 
-      // 🔎 Check if the user already exists in Firestore
+      // 🔔 Register push notifications
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await setDoc(doc(db, "user", user.uid), { expoPushToken: token }, { merge: true });
+        console.log("🔥 Expo Push Token saved:", token);
+      }
+
+      // 🔎 Get user profile
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
-      // 🔒 If it's a new user (no document yet) but not verified, block login
-      if (!userDocSnap.exists() && !user.emailVerified) {
-        Alert.alert(
-          "Email not verified",
-          "Please verify your email before logging in. Check your inbox for the verification link."
-        );
-        return;
-      }
-
-      // 🔔 Register push token
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        await setDoc(
-          doc(db, "user", user.uid),
-          { expoPushToken: token },
-          { merge: true }
-        );
-      }
-
-      // ✅ If Firestore doc exists, load profile
-      let profile = {};
       if (userDocSnap.exists()) {
-        profile = userDocSnap.data();
+        const userData = userDocSnap.data();
+        await AsyncStorage.setItem("firstName", userData.firstName || "");
+        setUserData({ uid: user.uid, email: user.email, ...userData });
+      } else {
+        console.warn("⚠️ No profile found for user:", user.uid);
+        setUserData({ uid: user.uid, email: user.email });
       }
 
-      // ✅ Update user context
-      setUserData({
-        uid: user.uid,
-        email: user.email,
-        ...profile,
-      });
-
-      // 💾 Remember Me
+      // 💾 Remember credentials
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", email);
         await AsyncStorage.setItem("savedPassword", password);
@@ -103,24 +92,31 @@ const Login = () => {
         await AsyncStorage.removeItem("savedPassword");
       }
 
-      Alert.alert("Login Success", "You have successfully logged in!");
+      ToastAndroid.show("Login successful!", ToastAndroid.SHORT);
       router.replace("/Main");
     } catch (error) {
       console.error("❌ FULL LOGIN ERROR:", error);
       let message = "Login failed. Please try again.";
-      if (error.code === "auth/invalid-email")
+
+      if (error.code === "auth/invalid-email") {
         message = "Invalid email address.";
-      else if (error.code === "auth/user-not-found")
+      } else if (error.code === "auth/user-not-found") {
         message = "User not found.";
-      else if (error.code === "auth/wrong-password")
+      } else if (error.code === "auth/wrong-password") {
         message = "Incorrect password.";
-      Alert.alert("Login Error", message);
+      } else if (error.code === "auth/network-request-failed") {
+        message = "No internet connection. Please check your network.";
+      }
+
+      ToastAndroid.show(message, ToastAndroid.LONG);
+    } finally {
+      setLoading(false); // ✅ stop loading
     }
   };
 
-  // Auto-load saved credentials
+  // 🔹 Auto-load saved credentials
   useEffect(() => {
-    const loadSaved = async () => {
+    const loadSavedCredentials = async () => {
       try {
         const savedEmail = await AsyncStorage.getItem("savedEmail");
         const savedPassword = await AsyncStorage.getItem("savedPassword");
@@ -130,10 +126,10 @@ const Login = () => {
           setRememberMe(true);
         }
       } catch (e) {
-        console.log("Error loading saved creds:", e);
+        console.log("Error loading saved credentials:", e);
       }
     };
-    loadSaved();
+    loadSavedCredentials();
   }, []);
 
   return (
@@ -158,9 +154,7 @@ const Login = () => {
                 setErrors((prev) => ({ ...prev, email: "" }));
               }}
             />
-            {errors.email ? (
-              <Text style={styles.errorText}>{errors.email}</Text>
-            ) : null}
+            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
           </View>
 
           {/* Password Input */}
@@ -189,12 +183,10 @@ const Login = () => {
                 />
               </TouchableOpacity>
             </View>
-            {errors.password ? (
-              <Text style={styles.errorText}>{errors.password}</Text>
-            ) : null}
+            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
           </View>
 
-          {/* Remember Me + Forgot Password */}
+          {/* Remember / Forgot */}
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.rememberMe}
@@ -213,13 +205,18 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Login Button */}
+          {/* ✅ Login Button with Loading Spinner */}
           <TouchableOpacity
-            style={styles.loginButton}
+            style={[styles.loginButton, loading && { opacity: 0.7 }]}
             activeOpacity={0.8}
             onPress={handleLogin}
+            disabled={loading}
           >
-            <Text style={styles.loginButtonText}>Log in</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Log in</Text>
+            )}
           </TouchableOpacity>
 
           {/* Signup Link */}

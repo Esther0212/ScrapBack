@@ -5,9 +5,10 @@ import {
   View,
   TouchableOpacity,
   TextInput,
-  Alert,
   ScrollView,
   Dimensions,
+  ToastAndroid,
+  ActivityIndicator, // ✅ import spinner
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -47,7 +48,7 @@ const Signup = () => {
   const [province, setProvince] = useState(null);
   const [city, setCity] = useState(null);
   const [barangay, setBarangay] = useState(null);
-  const [postalCode, setPostalCode] = useState("9000"); // auto-set
+  const [postalCode, setPostalCode] = useState("9000");
 
   // Address dropdown data
   const [regions, setRegions] = useState([]);
@@ -56,14 +57,15 @@ const Signup = () => {
   const [barangays, setBarangays] = useState([]);
   const [barangayMenu, setBarangayMenu] = useState(false);
 
-  // Preload API data to reduce lag (done at component mount)
+  const [loading, setLoading] = useState(false); // ✅ add loading state
+
+  // Preload API data
   useEffect(() => {
     const preloadAddressData = async () => {
       try {
         const regionRes = await axios.get("https://psgc.gitlab.io/api/regions/");
         setRegions(regionRes.data);
 
-        // Default selections
         const northernMindanao = regionRes.data.find(
           (r) => r.name === "Northern Mindanao"
         );
@@ -122,32 +124,32 @@ const Signup = () => {
       !city ||
       !barangay
     ) {
-      Alert.alert("Please fill in all fields");
+      ToastAndroid.show("Please fill in all fields", ToastAndroid.LONG);
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Passwords do not match");
+      ToastAndroid.show("Passwords do not match", ToastAndroid.LONG);
       return;
     }
 
     try {
-      // ✅ Create user with Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      setLoading(true); // ✅ start spinner
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const uid = userCredential.user.uid;
 
-      // ✅ Send actual email verification to provided email
-      await sendEmailVerification(user);
-
-      // ✅ Save user info in Firestore
-      await setDoc(doc(db, "user", user.uid), {
+      await setDoc(doc(db, "user", uid), {
         firstName,
         lastName,
         email,
         contact,
         gender,
         dob,
-        userType: "user", // ✅ role
+        userType: "user",
         address: {
           street,
           region: region.name,
@@ -159,16 +161,24 @@ const Signup = () => {
         createdAt: new Date(),
       });
 
-      // ✅ Notify user
-      Alert.alert(
-        "Verification email sent!",
-        "A verification link has been sent to your email. Please verify your account before logging in."
-      );
-
-      router.push("/login");
+      ToastAndroid.show("Account created successfully!", ToastAndroid.SHORT);
+      router.push("/");
     } catch (error) {
-      console.error("Signup Error:", error);
-      Alert.alert("Signup Error", error.message);
+      let message = "Signup failed. Please try again.";
+
+      if (error.code === "auth/email-already-in-use") {
+        message = "This email is already in use.";
+      } else if (error.code === "auth/invalid-email") {
+        message = "Invalid email address.";
+      } else if (error.code === "auth/weak-password") {
+        message = "Password should be at least 6 characters.";
+      } else if (error.code === "auth/network-request-failed") {
+        message = "No internet connection. Please check your network.";
+      }
+
+      ToastAndroid.show(message, ToastAndroid.LONG);
+    } finally {
+      setLoading(false); // ✅ stop spinner
     }
   };
 
@@ -181,7 +191,7 @@ const Signup = () => {
               <Text style={styles.title}>Sign up to earn points!</Text>
               <Text style={styles.subtitle}>Create your ScrapBack account now</Text>
 
-              {/* First Name & Last Name side by side */}
+              {/* Form fields */}
               <View style={styles.row}>
                 <InputField
                   label="First Name"
@@ -226,7 +236,6 @@ const Signup = () => {
                 setVisible={setConfirmPasswordVisible}
               />
 
-              {/* Gender Dropdown */}
               <DropdownField
                 label="Gender"
                 visible={genderMenuVisible}
@@ -236,12 +245,12 @@ const Signup = () => {
                 options={["Male", "Female", "Other"]}
               />
 
-              {/* Date of Birth */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Date of Birth</Text>
                 <TouchableOpacity
                   style={styles.input}
                   onPress={() => setDatePickerVisible(true)}
+                  disabled={loading} // ✅ disable while loading
                 >
                   <Text
                     style={{
@@ -266,7 +275,6 @@ const Signup = () => {
 
               {/* Address */}
               <Text style={styles.label}>Address</Text>
-
               <InputField
                 label="Street, Building, House No., etc."
                 value={street}
@@ -307,7 +315,6 @@ const Signup = () => {
                 readOnly
                 subLabel
               />
-
               <DropdownField
                 label="Barangay"
                 visible={barangayMenu}
@@ -324,17 +331,24 @@ const Signup = () => {
                 <TextInput value={postalCode} editable={false} style={styles.input} />
               </View>
 
+              {/* ✅ Sign Up Button with loading spinner */}
               <TouchableOpacity
-                style={styles.signupButton}
+                style={[styles.signupButton, loading && { opacity: 0.7 }]}
                 activeOpacity={0.85}
                 onPress={handleSignup}
+                disabled={loading}
               >
-                <Text style={styles.signupButtonText}>Sign Up</Text>
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.signupButtonText}>Sign Up</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.loginLink}
                 onPress={() => router.push("/login")}
+                disabled={loading} // ✅ disable while loading
               >
                 <Text style={styles.loginText}>
                   Already have an account?{" "}
@@ -349,7 +363,7 @@ const Signup = () => {
   );
 };
 
-// ✅ Input, Password, Dropdown components remain unchanged
+// Reuse input components (unchanged)
 const InputField = ({ label, value, setValue, keyboardType, containerStyle, subLabel, ...props }) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
@@ -387,17 +401,7 @@ const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
   </View>
 );
 
-const DropdownField = ({
-  label,
-  visible,
-  setVisible,
-  selected,
-  setSelected,
-  options,
-  optionKey,
-  readOnly = false,
-  subLabel,
-}) => (
+const DropdownField = ({ label, visible, setVisible, selected, setSelected, options, optionKey, readOnly = false, subLabel }) => (
   <View style={styles.inputContainer}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
     <Menu
@@ -503,23 +507,12 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontFamily: "Poppins_700Bold",
     fontSize: 18,
-    fontWeight: "600",
     letterSpacing: 0.5,
   },
   loginLink: { marginTop: 26, alignItems: "center", marginBottom: 30 },
-  loginText: {
-    fontSize: 14,
-    color: "#3A2E2E",
-    fontFamily: "Poppins_400Regular",
-  },
-  loginTextBold: {
-    fontFamily: "Poppins_700Bold",
-    textDecorationLine: "underline",
-  },
-  dropdownText: {
-    fontSize: 15,
-    fontFamily: "Poppins_400Regular",
-  },
+  loginText: { fontSize: 14, color: "#3A2E2E", fontFamily: "Poppins_400Regular" },
+  loginTextBold: { fontFamily: "Poppins_700Bold", textDecorationLine: "underline" },
+  dropdownText: { fontSize: 15, fontFamily: "Poppins_400Regular" },
 });
 
 export default Signup;

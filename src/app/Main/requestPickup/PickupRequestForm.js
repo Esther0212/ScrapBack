@@ -13,6 +13,7 @@ import {
   SafeAreaView,
   Image,
   ToastAndroid,
+  Animated,
 } from "react-native";
 import MapView, { Marker, UrlTile, Callout } from "react-native-maps";
 import * as Location from "expo-location";
@@ -23,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
 import { useLocalSearchParams } from "expo-router";
+import { InteractionManager } from "react-native";
 
 // 🔥 Firebase
 import { db, storage } from "../../../../firebase";
@@ -81,6 +83,12 @@ export default function PickupRequestForm() {
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const { requestId } = useLocalSearchParams(); // 👈 get passed id
 
+  // Confirmation + Toast
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
   // 📡 Fetch wasteConversionRates
   useEffect(() => {
     const unsub = onSnapshot(
@@ -127,7 +135,7 @@ export default function PickupRequestForm() {
         // Select → add type and initialize weight to "0"
         setWeights((w) => ({
           ...w,
-          [type]: w[type] || "0", // ensure there's always a value
+          [type]: w[type] || "1", // ensure there's always a value
         }));
         return [...prev, type];
       }
@@ -367,6 +375,28 @@ export default function PickupRequestForm() {
     }
   };
 
+const showAnimatedToast = (msg) => {
+  setToastMessage(msg);
+  setToastVisible(true);
+  fadeAnim.setValue(0);
+
+  // ✅ Defer animation until after UI commit to avoid "useInsertionEffect" error
+  InteractionManager.runAfterInteractions(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setTimeout(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => setToastVisible(false));
+      }, 2000);
+    });
+  });
+};
   const handleSubmit = async () => {
     if (
       !selectedTypes.length ||
@@ -374,51 +404,101 @@ export default function PickupRequestForm() {
       !pickupDateTime ||
       !pickupAddress
     ) {
-      Alert.alert("Please fill in all fields.");
-      return;
+      showAnimatedToast("Please fill in all fields.");
+      return false; // ❗ return false so caller knows it failed
     }
 
     try {
       setSubmitting(true);
       const auth = getAuth();
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user) return false;
+
+      // 🔹 Fetch user profile to get full name
+      let displayName = user.email; // fallback if no name
+      try {
+        const userDoc = await getDoc(doc(db, "user", user.uid));
+        if (userDoc.exists()) {
+          const { firstName, lastName } = userDoc.data();
+          displayName = `${firstName || ""} ${lastName || ""}`.trim();
+        }
+      } catch (err) {
+        console.error("Could not fetch user profile:", err);
+      }
 
       if (requestId) {
+        // 🔹 Update existing request
         await updateDoc(doc(db, "pickupRequests", requestId), {
           types: selectedTypes,
-          weights: weights, // 👈 save per-type
-          estimatedWeight: totalWeight, // 👈 save total
+          weights: weights,
+          estimatedWeight: totalWeight,
           pickupDateTime,
           pickupAddress,
           pickupDate: date,
           estimatedPoints: totalPoints,
           coords: markerCoords,
           photoUrl: photo || null,
+          seenByAdmin: false, // 👈 reset so admin sees "UPDATED"
           updatedAt: serverTimestamp(),
         });
-        Alert.alert("Pickup request updated!");
+
+        // ✅ Save notification for admins
+        await addDoc(collection(db, "adminNotifications"), {
+          title: "Pickup Request Updated",
+          body: `User <b>${displayName}</b> updated a request at ${pickupAddress}. Click for more details.`,
+          userId: user.uid,
+          createdAt: serverTimestamp(),
+          read: false,
+          type: "updated",
+          requestId: requestId,
+        });
+
+        // ✅ Consistent alert with routing
+        Alert.alert("Success", "Pickup request updated!", [
+          { text: "OK", onPress: () => router.push("/Main/requestPickup") },
+        ]);
       } else {
-        await addDoc(collection(db, "pickupRequests"), {
+        // 🔹 Create new request
+        const newDoc = await addDoc(collection(db, "pickupRequests"), {
           userId: user.uid,
           types: selectedTypes,
-          weights: weights, // 👈 save per-type
-          estimatedWeight: totalWeight, // 👈 save total
+          weights: weights,
+          estimatedWeight: totalWeight,
           pickupDateTime,
-          pickupDate: date, // save actual Date object
-          estimatedPoints: totalPoints, // ✅ add this
+          pickupDate: date,
+          estimatedPoints: totalPoints,
           pickupAddress,
           coords: markerCoords,
           photoUrl: photo || null,
           status: "pending",
+          seenByAdmin: false,
           createdAt: serverTimestamp(),
         });
-        Alert.alert("Pickup request created!");
+
+        // ✅ Save notification for admins
+        await addDoc(collection(db, "adminNotifications"), {
+          title: "New Pickup Request",
+          body: `User <b>${displayName}</b> created a new request for ${pickupAddress}. Click for more details.`,
+          userId: user.uid,
+          createdAt: serverTimestamp(),
+          type: "new",
+          read: false,
+          requestId: newDoc.id,
+        });
+
+        Alert.alert("Success", "Pickup request created!", [
+          { text: "OK", onPress: () => router.push("/Main/requestPickup") },
+        ]);
+        showAnimatedToast("Pickup request created!");
       }
+
+      return true; // ✅ success
     } catch (err) {
       console.error("Error saving request:", err);
-      Alert.alert("Failed to save request.");
+      showAnimatedToast("Failed to save request.");
+      return false; // ❌ failed
     } finally {
+      setSubmitting(false);
       setSubmitting(false);
     }
   };
@@ -544,7 +624,7 @@ export default function PickupRequestForm() {
           {/* Submit */}
           <TouchableOpacity
             style={[styles.requestButton, submitting && { opacity: 0.6 }]}
-            onPress={handleSubmit}
+            onPress={() => setConfirmModalVisible(true)}
             disabled={submitting}
           >
             {submitting ? (
@@ -552,7 +632,9 @@ export default function PickupRequestForm() {
             ) : (
               <>
                 <FontAwesome name="truck" size={30} color="#fff" />
-                <Text style={styles.requestButtonText}>Request Pickup</Text>
+                <Text style={styles.requestButtonText}>
+                  {requestId ? "Update Request" : "Request Pickup"}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -602,10 +684,6 @@ export default function PickupRequestForm() {
                     fetchAddressName(coords);
                   }}
                 >
-                  <UrlTile
-                    urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                    maximumZ={19}
-                  />
                   {markerCoords && (
                     <Marker
                       coordinate={markerCoords}
@@ -713,12 +791,13 @@ export default function PickupRequestForm() {
                               placeholder="kg"
                               keyboardType="numeric"
                               value={weights[item.type] || ""}
-                              onChangeText={(val) =>
+                              onChangeText={(val) => {
+                                const sanitized = val.replace(/[^0-9.]/g, ""); // ✅ only allow numbers + dot
                                 setWeights((prev) => ({
                                   ...prev,
-                                  [item.type]: val,
-                                }))
-                              }
+                                  [item.type]: sanitized,
+                                }));
+                              }}
                             />
 
                             <TouchableOpacity
@@ -752,6 +831,79 @@ export default function PickupRequestForm() {
             </SafeAreaView>
           </Modal>
         </ScrollView>
+        {/* ✅ Confirmation Modal before submitting */}
+        <Modal
+          visible={confirmModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setConfirmModalVisible(false)}
+        >
+          <View style={styles.overlayCenter}>
+            <View style={styles.confirmModal}>
+              <Ionicons name="help-circle-outline" size={40} color="#0E9247" />
+              <Text style={styles.confirmTitle}>Confirm Request</Text>
+              <Text style={styles.confirmText}>
+                Are you sure all details are correct for your pickup request?
+              </Text>
+
+              <View style={styles.confirmButtons}>
+                <TouchableOpacity
+                  style={[styles.cancelButton, { flex: 0.45 }]}
+                  onPress={() => setConfirmModalVisible(false)}
+                >
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.confirmButton, { flex: 0.45 }]}
+                  onPress={async () => {
+                    setConfirmModalVisible(false);
+                    const success = await handleSubmit(); // ✅ check return value
+                    if (!success) return; // ❌ stop if failed
+
+                    setToastMessage("Pickup request submitted successfully!");
+                    setToastVisible(true);
+                    Animated.timing(fadeAnim, {
+                      toValue: 1,
+                      duration: 300,
+                      useNativeDriver: true,
+                    }).start(() => {
+                      setTimeout(() => {
+                        Animated.timing(fadeAnim, {
+                          toValue: 0,
+                          duration: 300,
+                          useNativeDriver: true,
+                        }).start(() => setToastVisible(false));
+                      }, 2000);
+                    });
+                  }}
+                >
+                  <Text style={styles.confirmTextWhite}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        {toastVisible && (
+          <Animated.View
+            style={[
+              styles.toast,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  {
+                    translateY: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-50, 0], // ✅ slide down from top
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.toastText}>{toastMessage}</Text>
+          </Animated.View>
+        )}
       </SafeAreaView>
     </CustomBgColor>
   );
@@ -961,5 +1113,86 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flexShrink: 0, // keep controls visible
+  },
+  overlayCenter: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  confirmModal: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    alignItems: "center",
+    width: "90%",
+    elevation: 10,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins_700Bold",
+    color: "#3A2E2E",
+    marginTop: 10,
+  },
+  confirmText: {
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+    textAlign: "center",
+    marginVertical: 10,
+  },
+  confirmButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginTop: 10,
+  },
+  cancelButton: {
+    backgroundColor: "#888",
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  confirmButton: {
+    backgroundColor: "#0E9247",
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  cancelText: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 14,
+  },
+  confirmTextWhite: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 14,
+  },
+  toast: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 60 : 40, // ✅ appear near top of screen
+    left: "6%",
+    right: "6%",
+    backgroundColor: "rgba(14,146,71,0.95)",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2000,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+  },
+
+  toastText: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 15,
+    textAlign: "center",
   },
 });

@@ -42,6 +42,11 @@ const RequestPickup = () => {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelTargetId, setCancelTargetId] = useState(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [cancelItemId, setCancelItemId] = useState(null);
+  const [archiveModalVisible, setArchiveModalVisible] = useState(false);
+  const [archiveItemId, setArchiveItemId] = useState(null);
 
   // Load current user's pickup requests
   useEffect(() => {
@@ -133,36 +138,13 @@ const RequestPickup = () => {
   };
 
   const handleEdit = (item) => {
-    Alert.alert("Edit Pickup", "Do you want to edit this pickup request?", [
-      { text: "No", style: "cancel" },
-      {
-        text: "Yes",
-        onPress: () => {
-          router.push({
-            pathname: "Main/requestPickup/PickupRequestForm",
-            params: { requestId: item.id },
-          });
-        },
-      },
-    ]);
+    setSelectedItem(item);
+    setEditModalVisible(true);
   };
 
   const handleArchive = (id) => {
-    Alert.alert("Archive Pickup", "Move this request to archive?", [
-      { text: "No", style: "cancel" },
-      {
-        text: "Yes",
-        onPress: async () => {
-          try {
-            await updateDoc(doc(db, "pickupRequests", id), { archived: true });
-            showToast("Pickup request archived.");
-          } catch (err) {
-            console.error("Error archiving request:", err);
-            showToast("Failed to archive request.");
-          }
-        },
-      },
-    ]);
+    setArchiveItemId(id);
+    setArchiveModalVisible(true);
   };
 
   const toggleCollapse = (id) => {
@@ -252,9 +234,14 @@ const RequestPickup = () => {
                 {item.types?.join(", ") || "N/A"}
               </Text>
               <Text style={styles.cardText}>
-                <Text style={styles.bold}>Weight:</Text>{" "}
+                <Text style={styles.bold}>Estimated Weight:</Text>{" "}
                 {item.estimatedWeight ? `${item.estimatedWeight} kg` : "N/A"}
               </Text>
+              <Text style={styles.cardText}>
+                <Text style={styles.bold}>Estimated Points:</Text>{" "}
+                {item.estimatedPoints ? `${item.estimatedPoints} pts` : "N/A"}
+              </Text>
+
               <Text style={styles.cardText}>
                 <Text style={styles.bold}>Datetime:</Text>{" "}
                 {item.pickupDateTime || "N/A"}
@@ -364,7 +351,116 @@ const RequestPickup = () => {
         >
           <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>
+        {/* ✅ Edit Confirmation Modal */}
+        {editModalVisible && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Ionicons name="create-outline" size={40} color="#0E9247" />
+              <Text style={styles.modalTitle}>Edit Pickup</Text>
+              <Text style={styles.modalText}>
+                Do you want to edit this pickup request?
+              </Text>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalCancelBtn]}
+                  onPress={() => setEditModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelText}>No</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalConfirmBtn]}
+                  onPress={() => {
+                    setEditModalVisible(false);
+                    router.push({
+                      pathname: "Main/requestPickup/PickupRequestForm",
+                      params: { requestId: selectedItem?.id },
+                    });
+                  }}
+                >
+                  <Text style={styles.modalConfirmText}>Yes</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
+      {cancelModalVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Ionicons name="alert-circle-outline" size={40} color="#d9534f" />
+            <Text style={styles.modalTitle}>Cancel Pickup</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to cancel this request?
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn]}
+                onPress={() => setCancelModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalConfirmBtn]}
+                onPress={async () => {
+                  try {
+                    await updateDoc(doc(db, "pickupRequests", cancelItemId), {
+                      status: "cancelled",
+                    });
+                    showToast("Pickup request cancelled.");
+                  } catch (err) {
+                    console.error("Error cancelling request:", err);
+                    showToast("Failed to cancel request.");
+                  } finally {
+                    setCancelModalVisible(false);
+                  }
+                }}
+              >
+                <Text style={styles.modalConfirmText}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+      {archiveModalVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Ionicons name="archive-outline" size={40} color="#9370db" />
+            <Text style={styles.modalTitle}>Archive Pickup</Text>
+            <Text style={styles.modalText}>
+              Do you want to move this request to archive?
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn]}
+                onPress={() => setArchiveModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalConfirmBtn]}
+                onPress={async () => {
+                  try {
+                    await updateDoc(doc(db, "pickupRequests", archiveItemId), {
+                      archived: true,
+                    });
+                    showToast("Pickup request archived.");
+                  } catch (err) {
+                    console.error("Error archiving request:", err);
+                    showToast("Failed to archive request.");
+                  } finally {
+                    setArchiveModalVisible(false);
+                  }
+                }}
+              >
+                <Text style={styles.modalConfirmText}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </CustomBgColor>
   );
 };
@@ -424,42 +520,42 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     color: "#fff",
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Poppins_700Bold",
   },
   toggleBtn: { flexDirection: "row", alignItems: "center" },
   toggleText: {
-    fontSize: 15,
+    fontSize: 12,
     fontFamily: "Poppins_400Regular",
     color: "#ADADAD",
     marginRight: 4,
   },
   cardContent: { marginBottom: 10, marginTop: 10 },
-  cardText: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
-  bold: { flex: 1, fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
+  cardText: { fontSize: 13, fontFamily: "Poppins_400Regular", color: "#333" },
+  bold: { flex: 1, fontSize: 13, fontFamily: "Poppins_700Bold", color: "#333" },
   buttonRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 12,
+    gap: 10, // perfect spacing between buttons
   },
   cancelBtn: {
+    flex: 1,
     backgroundColor: "#888",
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: "center",
-    marginHorizontal: 2,
   },
-  cancelText: { color: "#fff", fontSize: 15, fontFamily: "Poppins_700Bold" },
+  cancelText: { color: "#fff", fontSize: 12, fontFamily: "Poppins_700Bold" },
   editBtn: {
-    backgroundColor: "#7ac47f",
     flex: 1,
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: "#7ac47f",
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: "center",
-    marginHorizontal: 2,
   },
-  editText: { color: "#fff", fontSize: 15, fontFamily: "Poppins_700Bold" },
+  editText: { color: "#fff", fontSize: 12, fontFamily: "Poppins_700Bold" },
   fab: {
     position: "absolute",
     bottom: 24,
@@ -528,5 +624,67 @@ const styles = StyleSheet.create({
   modalBtnTextConfirm: {
     color: "#fff",
     fontFamily: "Poppins_700Bold",
+  },
+  // 🧭 Modal Styles
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  modalBox: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    width: "85%",
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins_700Bold",
+    color: "#222",
+    marginTop: 10,
+  },
+  modalText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+    textAlign: "center",
+    marginVertical: 10,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginTop: 10,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  modalCancelBtn: {
+    backgroundColor: "#888",
+  },
+  modalConfirmBtn: {
+    backgroundColor: "#0E9247",
+  },
+  modalCancelText: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 15,
+  },
+  modalConfirmText: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 15,
   },
 });

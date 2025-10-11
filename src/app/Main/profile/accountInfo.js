@@ -11,18 +11,20 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import CustomBgColor from "../../../components/customBgColor";
-import { Menu, Provider as PaperProvider } from "react-native-paper";
+import { Menu } from "react-native-paper";
 import axios from "axios";
 import { useUser } from "../../../context/userContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, storage } from "../../../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Animated, Easing } from "react-native";
 
 const { width } = Dimensions.get("window");
 
@@ -48,6 +50,12 @@ const AccountInfo = () => {
 
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Toast + Confirmation modal states
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const fetchBarangays = async () => {
@@ -160,11 +168,27 @@ const AccountInfo = () => {
         address: updatedAddress,
       });
 
-      Alert.alert("Success", "Profile updated successfully!");
+      setToastMessage("Profile updated successfully!");
+      setToastVisible(true);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300, // fade-in speed
+        useNativeDriver: true,
+      }).start(() => {
+        setTimeout(() => {
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 300, // fade-out speed
+            useNativeDriver: true,
+          }).start(() => setToastVisible(false));
+        }, 2000); // visible duration before fade-out
+      });
       setEditMode(false);
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Failed to update profile.");
+      setToastMessage("Failed to update profile.");
+      setToastVisible(true);
+      setTimeout(() => setToastVisible(false), 2500);
     }
   };
 
@@ -184,7 +208,6 @@ const AccountInfo = () => {
   };
 
   return (
-    <PaperProvider>
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -253,6 +276,42 @@ const AccountInfo = () => {
                   style={{ marginBottom: 10 }}
                 />
               )}
+              {/* Confirmation Modal */}
+              <Modal
+                visible={confirmModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setConfirmModalVisible(false)}
+              >
+                <View style={styles.modalOverlayCenter}>
+                  <View style={styles.confirmModal}>
+                    <Text style={styles.confirmTitle}>Confirm Changes</Text>
+                    <Text style={styles.confirmText}>
+                      Are you sure you want to save these changes to your
+                      profile?
+                    </Text>
+
+                    <View style={styles.confirmButtons}>
+                      <TouchableOpacity
+                        style={[styles.cancelButton, { flex: 0.45 }]}
+                        onPress={() => setConfirmModalVisible(false)}
+                      >
+                        <Text style={styles.cancelText}>No</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.saveButton, { flex: 0.45 }]}
+                        onPress={async () => {
+                          setConfirmModalVisible(false);
+                          await handleSave();
+                        }}
+                      >
+                        <Text style={styles.saveText}>Yes, Save</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
 
               {/* Fields */}
               <View style={styles.row}>
@@ -387,7 +446,7 @@ const AccountInfo = () => {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.saveButton, { flex: 0.48 }]}
-                    onPress={handleSave}
+                    onPress={() => setConfirmModalVisible(true)}
                   >
                     <Text style={styles.saveText}>Save Changes</Text>
                   </TouchableOpacity>
@@ -402,9 +461,13 @@ const AccountInfo = () => {
               )}
             </View>
           </ScrollView>
+          {toastVisible && (
+            <Animated.View style={[styles.toast, { opacity: fadeAnim }]}>
+              <Text style={styles.toastText}>{toastMessage}</Text>
+            </Animated.View>
+          )}
         </SafeAreaView>
       </CustomBgColor>
-    </PaperProvider>
   );
 };
 
@@ -594,6 +657,63 @@ const styles = StyleSheet.create({
   dropdownText: {
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
+  },
+  modalOverlayCenter: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  confirmModal: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    width: "90%",
+    alignItems: "center",
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins_700Bold",
+    color: "#3A2E2E",
+    marginBottom: 10,
+  },
+  confirmText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  confirmButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  toast: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 60 : 40, // ✅ appear near top of screen
+    left: "6%",
+    right: "6%",
+    backgroundColor: "rgba(14,146,71,0.95)",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2000,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+  },
+
+  toastText: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 15,
+    textAlign: "center",
   },
 });
 
