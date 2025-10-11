@@ -19,10 +19,10 @@ export default function RedeemRewardsQR() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ⏳ countdown state
-    const [timeLeft, setTimeLeft] = useState(9999999999999 * 60); // 9999999999999 minutes
+  // countdown state
+  const [timeLeft, setTimeLeft] = useState(5 * 60); // 5 minutes
   const [expiryTimestamp, setExpiryTimestamp] = useState(
-    Date.now() + 9999999999999 * 60 * 1000
+    Date.now() + 5 * 60 * 1000
   );
 
   // countdown logic
