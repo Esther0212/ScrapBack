@@ -13,6 +13,10 @@ import { useCallback, useEffect } from "react";
 import { UserProvider } from "../context/userContext";
 import { EducationalProvider } from "../context/educationalContext";
 import * as Notifications from "expo-notifications";
+// 🔹 Track user online/offline in Firestore
+import { AppState } from "react-native";
+import { auth, db } from "../../firebase";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 // 👇 Ensure foreground shows the SMALL system banner (toast-style)
 Notifications.setNotificationHandler({
@@ -46,6 +50,43 @@ export default function Layout() {
   useEffect(() => {
     onLayoutRootView();
   }, [fontsLoaded]);
+
+  useEffect(() => {
+    // Track online/offline dynamically based on login state
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (!user) return; // not logged in
+
+      const handleOnlineStatus = async (isOnline) => {
+        try {
+          await updateDoc(doc(db, "user", user.uid), {
+            online: isOnline,
+            lastActive: serverTimestamp(),
+          });
+          console.log(
+            `✅ ${user.email} marked as ${isOnline ? "Online" : "Offline"}`
+          );
+        } catch (err) {
+          console.log("❌ Error updating online status:", err);
+        }
+      };
+
+      const sub = AppState.addEventListener("change", (state) => {
+        if (state === "active") handleOnlineStatus(true);
+        else handleOnlineStatus(false);
+      });
+
+      // Mark online immediately after login
+      handleOnlineStatus(true);
+
+      // Cleanup when layout unmounts or logout
+      return () => {
+        sub.remove();
+        handleOnlineStatus(false);
+      };
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
 
   // 🔔 Global notification listeners
   useEffect(() => {
