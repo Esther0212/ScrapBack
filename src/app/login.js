@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -15,15 +15,14 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerForPushNotificationsAsync } from "../utils/notifications";
-
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
-import { useUser } from "../context/userContext"; // ✅ import your context
+import { useUser } from "../context/userContext";
 
 const { width } = Dimensions.get("window");
 
 const Login = () => {
-  const { setUserData } = useUser(); // ✅ context updater
+  const { setUserData } = useUser();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,8 +30,10 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
 
+  // 🔹 Email format validator
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
+  // 🔹 Handle login
   const handleLogin = async () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
@@ -54,39 +55,32 @@ const Login = () => {
     if (!isValid) return;
 
     try {
-      // 🔐 Firebase auth login
-      const { user } = await signInWithEmailAndPassword(auth, email, password);
+      // 🔐 Firebase sign in
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
       console.log("✅ Logged in:", user.uid);
 
-      // 🔔 Get push token
+      // 🔔 Register push notifications
       const token = await registerForPushNotificationsAsync();
       if (token) {
-        await setDoc(
-          doc(db, "user", user.uid),
-          { expoPushToken: token },
-          { merge: true }
-        );
+        await setDoc(doc(db, "user", user.uid), { expoPushToken: token }, { merge: true });
+        console.log("🔥 Expo Push Token saved:", token);
       }
 
-      // 🔎 Fetch user profile from Firestore
+      // 🔎 Get user profile
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
-        const profile = userDocSnap.data();
-
-        // ✅ Update global userContext
-        setUserData({
-          uid: user.uid,
-          email: user.email,
-          ...profile,
-        });
+        const userData = userDocSnap.data();
+        await AsyncStorage.setItem("firstName", userData.firstName || "");
+        setUserData({ uid: user.uid, email: user.email, ...userData });
       } else {
         console.warn("⚠️ No profile found for user:", user.uid);
         setUserData({ uid: user.uid, email: user.email });
       }
 
-      // Remember email/password only (NOT firstName!)
+      // 💾 Remember credentials
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", email);
         await AsyncStorage.setItem("savedPassword", password);
@@ -100,19 +94,16 @@ const Login = () => {
     } catch (error) {
       console.error("❌ FULL LOGIN ERROR:", error);
       let message = "Login failed. Please try again.";
-      if (error.code === "auth/invalid-email")
-        message = "Invalid email address.";
-      else if (error.code === "auth/user-not-found")
-        message = "User not found.";
-      else if (error.code === "auth/wrong-password")
-        message = "Incorrect password.";
+      if (error.code === "auth/invalid-email") message = "Invalid email address.";
+      else if (error.code === "auth/user-not-found") message = "User not found.";
+      else if (error.code === "auth/wrong-password") message = "Incorrect password.";
       Alert.alert("Login Error", message);
     }
   };
 
-  // Auto-load saved creds (if "Remember Me" checked)
-  React.useEffect(() => {
-    const loadSaved = async () => {
+  // 🔹 Auto-load saved credentials
+  useEffect(() => {
+    const loadSavedCredentials = async () => {
       try {
         const savedEmail = await AsyncStorage.getItem("savedEmail");
         const savedPassword = await AsyncStorage.getItem("savedPassword");
@@ -122,10 +113,10 @@ const Login = () => {
           setRememberMe(true);
         }
       } catch (e) {
-        console.log("Error loading saved creds:", e);
+        console.log("Error loading saved credentials:", e);
       }
     };
-    loadSaved();
+    loadSavedCredentials();
   }, []);
 
   return (
@@ -150,9 +141,7 @@ const Login = () => {
                 setErrors((prev) => ({ ...prev, email: "" }));
               }}
             />
-            {errors.email ? (
-              <Text style={styles.errorText}>{errors.email}</Text>
-            ) : null}
+            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
           </View>
 
           {/* Password */}
@@ -181,9 +170,7 @@ const Login = () => {
                 />
               </TouchableOpacity>
             </View>
-            {errors.password ? (
-              <Text style={styles.errorText}>{errors.password}</Text>
-            ) : null}
+            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
           </View>
 
           {/* Remember Me + Forgot Password */}

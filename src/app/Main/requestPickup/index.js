@@ -252,9 +252,14 @@ const RequestPickup = () => {
                 {item.types?.join(", ") || "N/A"}
               </Text>
               <Text style={styles.cardText}>
-                <Text style={styles.bold}>Weight:</Text>{" "}
+                <Text style={styles.bold}>Estimated Weight:</Text>{" "}
                 {item.estimatedWeight ? `${item.estimatedWeight} kg` : "N/A"}
               </Text>
+              <Text style={styles.cardText}>
+                <Text style={styles.bold}>Estimated Points:</Text>{" "}
+                {item.estimatedPoints ? `${item.estimatedPoints} pts` : "N/A"}
+              </Text>
+
               <Text style={styles.cardText}>
                 <Text style={styles.bold}>Datetime:</Text>{" "}
                 {item.pickupDateTime || "N/A"}
@@ -424,19 +429,19 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     color: "#fff",
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Poppins_700Bold",
   },
   toggleBtn: { flexDirection: "row", alignItems: "center" },
   toggleText: {
-    fontSize: 15,
+    fontSize: 12,
     fontFamily: "Poppins_400Regular",
     color: "#ADADAD",
     marginRight: 4,
   },
   cardContent: { marginBottom: 10, marginTop: 10 },
-  cardText: { fontSize: 15, fontFamily: "Poppins_400Regular", color: "#333" },
-  bold: { flex: 1, fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
+  cardText: { fontSize: 13, fontFamily: "Poppins_400Regular", color: "#333" },
+  bold: { flex: 1, fontSize: 13, fontFamily: "Poppins_700Bold", color: "#333" },
   buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -450,7 +455,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 2,
   },
-  cancelText: { color: "#fff", fontSize: 15, fontFamily: "Poppins_700Bold" },
+  cancelText: { color: "#fff", fontSize: 12, fontFamily: "Poppins_700Bold" },
   editBtn: {
     backgroundColor: "#7ac47f",
     flex: 1,
@@ -459,7 +464,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 2,
   },
-  editText: { color: "#fff", fontSize: 15, fontFamily: "Poppins_700Bold" },
+  editText: { color: "#fff", fontSize: 12, fontFamily: "Poppins_700Bold" },
   fab: {
     position: "absolute",
     bottom: 24,

@@ -6,20 +6,65 @@ import {
   View,
   Image,
   ScrollView,
-  Pressable,
-  Dimensions,
   TouchableOpacity,
+  Platform,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  setDoc,
+  doc,
+} from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useUser } from "../../context/userContext";
 import { useEducational } from "../../context/educationalContext";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
 
 const { width } = Dimensions.get("window");
+
+async function registerForPushNotificationsAsync() {
+  if (!Device.isDevice) {
+    alert("Must use physical device for Push Notifications");
+    return null;
+  }
+
+  let { status } = await Notifications.getPermissionsAsync();
+  if (status !== "granted") {
+    const { status: newStatus } = await Notifications.requestPermissionsAsync();
+    status = newStatus;
+  }
+  if (status !== "granted") {
+    alert("Push notification permissions not granted!");
+    return null;
+  }
+
+  const projectId =
+    Constants?.expoConfig?.extra?.eas?.projectId ??
+    Constants?.easConfig?.projectId;
+
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  console.log("Expo push token:", token);
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF231F7C",
+    });
+  }
+
+  return token;
+}
 
 const Home = () => {
   const { userData } = useUser();
@@ -28,26 +73,37 @@ const Home = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [pressedIndex, setPressedIndex] = useState(null);
   const [recyclingTypes, setRecyclingTypes] = useState([]);
-
-  // conversion rates
   const [conversionRates, setConversionRates] = useState([]);
   const [collapsedCategories, setCollapsedCategories] = useState({});
   const router = useRouter();
 
-  // 🔔 Realtime listener for user notifications
+  // ✅ Save Expo Push Token to Firestore
+  useEffect(() => {
+    const saveToken = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await setDoc(
+          doc(db, "user", user.uid),
+          { expoPushToken: token },
+          { merge: true }
+        );
+      }
+    };
+    saveToken();
+  }, []);
+
+  // ✅ Real-time badge for nested notifications path
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const q = query(
-      collection(db, "userNotifications"),
-      where("userId", "==", user.uid)
-    );
+    const notifRef = collection(db, "notifications", user.uid, "userNotifications");
+    const q = query(notifRef, where("read", "==", false));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map((doc) => doc.data());
-      const unread = docs.filter((d) => !d.read).length;
-
+      const unread = snapshot.docs.length;
       setUnreadCount(unread);
       setHasNewNotification(unread > 0);
     });
@@ -55,7 +111,7 @@ const Home = () => {
     return unsubscribe;
   }, []);
 
-  // recycling types
+  // 🔹 Recycling types (educational)
   useEffect(() => {
     if (educationalContent && educationalContent.length > 0) {
       const types = educationalContent.map((item) => item.type);
@@ -63,7 +119,7 @@ const Home = () => {
     }
   }, [educationalContent]);
 
-  // fetch conversion rates
+  // 🔹 Fetch conversion rates
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, "wasteConversionRates"),
@@ -78,7 +134,7 @@ const Home = () => {
     return () => unsub();
   }, []);
 
-  // group by category
+  // 🔹 Group conversion rates by category
   const groupedRates = conversionRates.reduce((acc, item) => {
     if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
@@ -112,9 +168,7 @@ const Home = () => {
                 name="notifications-outline"
                 size={28}
                 color="black"
-                onPress={() => {
-                  router.push("/Main/notifications");
-                }}
+                onPress={() => router.push("/Main/notifications")}
               />
               {hasNewNotification && (
                 <View style={styles.badgeNumber}>
@@ -132,7 +186,7 @@ const Home = () => {
             Every action counts—start recycling today!
           </Text>
 
-          {/* Points */}
+          {/* Points Section */}
           <View style={styles.pointsContainer}>
             <View style={styles.leftContainer}>
               <Text style={styles.pointsLabel}>Your Total Points</Text>
@@ -181,8 +235,6 @@ const Home = () => {
                 onPress={() => {
                   setSelectedType(type);
                   router.push("/Main/recyclingGuide/guides");
-                  setSelectedType(type);
-                  router.push("/Main/recyclingGuide/guides");
                 }}
               >
                 <Text style={styles.typeButtonText}>{type}</Text>
@@ -192,26 +244,22 @@ const Home = () => {
 
           {/* Conversion Rates */}
           <Text style={styles.sectionTitle}>Conversion Rates</Text>
-
           {Object.keys(groupedRates)
             .slice(0, 5)
             .map((category, catIdx) => {
               const rows = groupedRates[category];
               const firstRow = rows[0];
-
               return (
                 <TouchableOpacity
                   key={catIdx}
                   onPress={() => router.push("/Main/conversionTable")}
                 >
                   <View style={styles.card}>
-                    {/* Header Bar */}
                     <View style={styles.headerBar}>
                       <Text style={styles.category}>{category} Conversion</Text>
                       <Ionicons name="chevron-forward" size={20} color="#fff" />
                     </View>
 
-                    {/* Table preview with only first row */}
                     <View style={styles.table}>
                       <View style={styles.tableHeader}>
                         <Text style={[styles.cellHeader, { flex: 2 }]}>
@@ -219,7 +267,6 @@ const Home = () => {
                         </Text>
                         <Text style={styles.cellHeader}>Points/kg</Text>
                       </View>
-
                       {firstRow && (
                         <View
                           style={[styles.row, { backgroundColor: "#FFFFFF" }]}
@@ -227,7 +274,9 @@ const Home = () => {
                           <Text style={[styles.cell, { flex: 2 }]}>
                             {firstRow.type}
                           </Text>
-                          <Text style={styles.cell}>{firstRow.points} pts</Text>
+                          <Text style={styles.cell}>
+                            {firstRow.points} pts
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -328,8 +377,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "bold",
   },
-
-  // conversion cards (same as staff styling)
   card: {
     backgroundColor: "#F6F8F0",
     borderRadius: 14,

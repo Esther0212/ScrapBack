@@ -17,6 +17,8 @@ import { useRouter } from "expo-router";
 import { useUser } from "../../../context/userContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { db } from "../../../../firebase";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 const Settings = () => {
   const router = useRouter();
@@ -25,14 +27,30 @@ const Settings = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [savedUsers, setSavedUsers] = useState([]);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.replace("/login");
-    } catch (error) {
-      Alert.alert("Logout Failed", error.message);
+ const handleLogout = async () => {
+  try {
+    const user = auth.currentUser;
+    if (user) {
+      // 👇 Mark user offline in Firestore before logging out
+      await updateDoc(doc(db, "user", user.uid), {
+        online: false,
+        lastActive: serverTimestamp(),
+      });
+      console.log("✅ Marked user offline before logout");
     }
-  };
+
+    // 🔐 Now sign them out from Firebase
+    await signOut(auth);
+
+    // 🧹 Optional: clear any locally stored session
+    await AsyncStorage.removeItem("lastUsedUser");
+
+    router.replace("/login");
+  } catch (error) {
+    console.error("Logout Failed:", error);
+    Alert.alert("Logout Failed", error.message);
+  }
+};
 
   // Load saved accounts
   useEffect(() => {
