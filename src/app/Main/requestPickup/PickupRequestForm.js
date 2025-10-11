@@ -1010,7 +1010,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   searchOverlay: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
-  searchOverlay: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
   footerOverlay: {
     position: "absolute",
     bottom: 40,

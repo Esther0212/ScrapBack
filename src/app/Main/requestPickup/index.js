@@ -44,7 +44,6 @@ const RequestPickup = () => {
   const [cancelTargetId, setCancelTargetId] = useState(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelItemId, setCancelItemId] = useState(null);
   const [archiveModalVisible, setArchiveModalVisible] = useState(false);
   const [archiveItemId, setArchiveItemId] = useState(null);
