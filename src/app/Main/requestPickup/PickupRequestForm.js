@@ -684,10 +684,6 @@ const showAnimatedToast = (msg) => {
                     fetchAddressName(coords);
                   }}
                 >
-                  <UrlTile
-                    urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                    maximumZ={19}
-                  />
                   {markerCoords && (
                     <Marker
                       coordinate={markerCoords}
