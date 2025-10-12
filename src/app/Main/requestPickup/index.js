@@ -252,13 +252,16 @@ const RequestPickup = () => {
               </Text>
               {/* ✅ Show reason only if provided */}
               {(item.reason || item.cancelReason) && (
-                <Text style={styles.cardText}>
-                  <Text style={styles.bold}>Reason:</Text>{" "}
-                  {item.reason || item.cancelReason}{" "}
-                  {item.reasonBy &&
-                    `(${item.reasonBy === "admin" ? "by Admin" : "by You"})`}
-                </Text>
-              )}
+  <Text style={styles.cardText}>
+    <Text style={styles.bold}>Reason:</Text>{" "}
+    <Text style={{ color: "#d9534f" }}>
+      {item.reason || item.cancelReason}{" "}
+      {item.reasonBy &&
+        `(${item.reasonBy === "admin" ? "by Admin" : "by You"})`}
+    </Text>
+  </Text>
+)}
+
             </View>
 
             {/* ✅ Hide cancel/edit buttons if final status */}
