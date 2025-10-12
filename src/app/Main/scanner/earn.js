@@ -107,6 +107,7 @@ export default function EarnPointsQR() {
           {userData && timeLeft > 0 ? (
             <QRCode
               value={JSON.stringify({
+                type: "earn", // 👈 add this line
                 uid: user.uid,
                 email: user.email,
                 name: `${userData.firstName || ""} ${userData.lastName || ""}`,
@@ -186,7 +187,10 @@ const styles = StyleSheet.create({
     marginVertical: 40, // pushes it away from description and button
   },
 
-  closeButtonText: { fontSize: 15,
-    fontFamily: "Poppins_700Bold", color: "#000" },
+  closeButtonText: {
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    color: "#000",
+  },
   errorText: { color: "red", fontWeight: "bold", textAlign: "center" },
 });

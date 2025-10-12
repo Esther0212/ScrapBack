@@ -95,6 +95,7 @@ export default function RedeemRewardsQR() {
           {userData && timeLeft > 0 ? (
             <QRCode
               value={JSON.stringify({
+                type: "redeem", // 👈 add this line
                 uid: user.uid,
                 email: user.email,
                 name: `${userData.firstName || ""} ${userData.lastName || ""}`,
