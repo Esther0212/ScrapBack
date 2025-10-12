@@ -17,6 +17,7 @@ import * as Notifications from "expo-notifications";
 import { AppState } from "react-native";
 import { auth, db } from "../../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { Provider as PaperProvider } from "react-native-paper";
 
 // 👇 Ensure foreground shows the SMALL system banner (toast-style)
 Notifications.setNotificationHandler({
@@ -117,13 +118,15 @@ export default function Layout() {
 
   return (
     <SafeAreaProvider>
-      <UserProvider>
-        <EducationalProvider>
-          <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-            <Slot />
-          </View>
-        </EducationalProvider>
-      </UserProvider>
+      <PaperProvider>
+        <UserProvider>
+          <EducationalProvider>
+            <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+              <Slot />
+            </View>
+          </EducationalProvider>
+        </UserProvider>
+      </PaperProvider>
     </SafeAreaProvider>
   );
 }

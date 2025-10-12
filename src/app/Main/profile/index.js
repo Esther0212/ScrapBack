@@ -8,10 +8,13 @@ import {
   Image,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 import CustomBgColor from "../../../components/customBgColor";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import Feather from "@expo/vector-icons/Feather";
 import { useUser } from "../../../context/userContext";
+import { useRouter } from "expo-router";
 import { db } from "../../../../firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
@@ -19,6 +22,8 @@ const { height, width } = Dimensions.get("window");
 
 const Profile = () => {
   const { userData } = useUser();
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState("points");
   const [logs, setLogs] = useState([]);
   const [rewards, setRewards] = useState([]);
@@ -44,11 +49,9 @@ const Profile = () => {
       const yesterdayStr = yesterday.toDateString();
 
       let groupKey;
-      if (logDateStr === todayStr) {
-        groupKey = "Today";
-      } else if (logDateStr === yesterdayStr) {
-        groupKey = "Yesterday";
-      } else {
+      if (logDateStr === todayStr) groupKey = "Today";
+      else if (logDateStr === yesterdayStr) groupKey = "Yesterday";
+      else {
         groupKey = logDate.toLocaleDateString("en-US", {
           weekday: "short",
           day: "numeric",
@@ -63,7 +66,7 @@ const Profile = () => {
     }, {});
   };
 
-  // Fetch contribution logs
+  // 🔹 Fetch contribution logs
   useEffect(() => {
     const fetchLogs = async () => {
       if (!userData?.uid) return;
@@ -86,11 +89,10 @@ const Profile = () => {
         setLoading(false);
       }
     };
-
     fetchLogs();
   }, [userData?.uid]);
 
-  // Fetch redemption logs
+  // 🔹 Fetch redemption logs
   useEffect(() => {
     const fetchRewards = async () => {
       if (!userData?.uid) return;
@@ -105,7 +107,9 @@ const Profile = () => {
           ...doc.data(),
         }));
         setRewards(
-          rewardsData.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds)
+          rewardsData.sort(
+            (a, b) => b.createdAt?.seconds - a.createdAt?.seconds
+          )
         );
       } catch (error) {
         console.error("Error fetching redemption logs: ", error);
@@ -113,11 +117,10 @@ const Profile = () => {
         setLoadingRewards(false);
       }
     };
-
     fetchRewards();
   }, [userData?.uid]);
 
-  // Render grouped list
+  // 🔹 Render grouped list
   const renderGroupedList = (groupedData, type = "points") => (
     <FlatList
       data={Object.entries(groupedData)}
@@ -127,41 +130,78 @@ const Profile = () => {
         const [date, items] = item;
         return (
           <View style={{ marginBottom: 20 }}>
-            {/* Date Header */}
             <Text style={styles.dateHeader}>{date}</Text>
 
-            {/* Items under this date */}
             {items.map((log) => (
-              <View key={log.id} style={styles.logCard}>
-                {type === "points" ? (
-                  <>
-                    <Text style={styles.pointsText}>
-                      + {log.points || 0} points
-                    </Text>
-                    <Text style={styles.categoryText}>
-                      {log.category || "Uncategorized"}
-                    </Text>
-                    {log.weight && (
-                      <Text style={styles.detailText}>{log.weight} kg</Text>
-                    )}
-                    {log.school && (
-                      <Text style={styles.detailText}>{log.school}</Text>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Text style={[styles.pointsText, { color: "red" }]}>
-                      - {log.points || 0} points
-                    </Text>
-                    <Text style={styles.categoryText}>
-                      {log.rewardCategory || "Unknown Reward"}
-                    </Text>
-                    {log.school && (
-                      <Text style={styles.detailText}>{log.school}</Text>
-                    )}
-                  </>
-                )}
-              </View>
+              <TouchableOpacity
+                key={log.id}
+                style={styles.logCard}
+                onPress={() =>
+                  router.push({
+                    pathname:
+                      type === "points"
+                        ? "/Main/profile/contributionLogs"
+                        : "/Main/profile/redemptionLogs",
+                    params: { id: log.id },
+                  })
+                }
+              >
+                {/* LEFT SIDE IMAGE */}
+                <View style={styles.leftSide}>
+                  <Image
+                    source={
+                      type === "points"
+                        ? log.staffPhotoUrl
+                          ? { uri: log.staffPhotoUrl }
+                          : require("../../../assets/profile/noImage.png")
+                        : log.proofPhotoUrl
+                        ? { uri: log.proofPhotoUrl }
+                        : require("../../../assets/profile/noImage.png")
+                    }
+                    style={styles.staffPhoto}
+                  />
+                </View>
+
+                {/* RIGHT SIDE CONTENT */}
+                <View style={styles.rightSide}>
+                  {type === "points" ? (
+                    <>
+                      <View style={styles.pointsRow}>
+                        <Text style={styles.pointsText}>
+                          +{log.totalPoints || 0} pts
+                        </Text>
+                      </View>
+
+                      {log.selectedTypes && (
+                        <View style={styles.typeContainer}>
+                          {log.selectedTypes.map((type) => (
+                            <View key={type} style={styles.typeRow}>
+                              <Text style={styles.typeLabel}>{type}</Text>
+                              <Text style={styles.typeValue}>
+                                {log.weights?.[type]
+                                  ? `${log.weights[type]} kg`
+                                  : "0 kg"}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.pointsRow}>
+                        <Text style={styles.pointsTextRed}>
+                          -{log.points || 0} pts
+                        </Text>
+                      </View>
+
+                      <Text style={styles.smallText}>
+                        {log.rewardName || "Reward"}
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </TouchableOpacity>
             ))}
           </View>
         );
@@ -249,28 +289,18 @@ const Profile = () => {
             <View style={styles.contentContainer}>
               {activeTab === "points" ? (
                 loading ? (
-                  <Text>Loading logs...</Text>
+                  <ActivityIndicator color="#008243" size="large" />
                 ) : logs.length > 0 ? (
                   renderGroupedList(groupLogsByDate(logs), "points")
                 ) : (
-                  <>
-                    <Text style={styles.titleText}>No earned points yet</Text>
-                    <Text style={styles.subtitleText}>
-                      Recycle your first scrap and your points will appear here.
-                    </Text>
-                  </>
+                  <Text style={styles.titleText}>No earned points yet</Text>
                 )
               ) : loadingRewards ? (
-                <Text>Loading rewards...</Text>
+                <ActivityIndicator color="#008243" size="large" />
               ) : rewards.length > 0 ? (
                 renderGroupedList(groupLogsByDate(rewards), "rewards")
               ) : (
-                <>
-                  <Text style={styles.titleText}>No redeemed rewards yet</Text>
-                  <Text style={styles.subtitleText}>
-                    Redeem rewards with your points and they’ll show up here.
-                  </Text>
-                </>
+                <Text style={styles.titleText}>No redeemed rewards yet</Text>
               )}
             </View>
           </View>
@@ -281,124 +311,108 @@ const Profile = () => {
 };
 
 const styles = StyleSheet.create({
-  safeAreaView: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
+  safeAreaView: { flex: 1 },
+  container: { flex: 1, justifyContent: "flex-end" },
   box: {
     backgroundColor: "#F0F1C5",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     minHeight: height * 0.65,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
     elevation: 3,
     alignItems: "center",
     paddingTop: width / 8,
   },
-  imageWrapper: {
-    position: "absolute",
-    top: -width / 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  imageWrapper: { position: "absolute", top: -width / 8, alignItems: "center" },
   profileImage: {
     width: width / 4,
     height: width / 4,
     borderRadius: width / 8,
-    resizeMode: "cover",
   },
-  infoContainer: {
-    marginTop: 10,
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  nameText: {
-    fontSize: 20,
-    fontFamily: "Poppins_700Bold",
-  },
-  emailText: {
-    fontSize: 16,
-    fontFamily: "Poppins_400Regular",
-  },
+  infoContainer: { marginTop: 10, alignItems: "center", marginBottom: 20 },
+  nameText: { fontSize: 20, fontFamily: "Poppins_700Bold" },
+  emailText: { fontSize: 16, fontFamily: "Poppins_400Regular" },
   tabContainer: {
     flexDirection: "row",
     marginTop: 20,
     marginBottom: 8,
     width: "100%",
   },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tabIcon: {
-    width: width * 0.07,
-    height: width * 0.07,
-  },
+  tab: { flex: 1, alignItems: "center" },
+  tabIcon: { width: width * 0.07, height: width * 0.07 },
   tabUnderlineContainer: {
     flexDirection: "row",
     paddingHorizontal: 20,
     marginBottom: 10,
   },
-  tabUnderline: {
-    flex: 1,
-    height: 2,
-    borderRadius: 2,
-  },
-  contentContainer: {
-    flex: 1,
-    width: "100%",
-    paddingHorizontal: 20,
-  },
+  tabUnderline: { flex: 1, height: 2, borderRadius: 2 },
+  contentContainer: { flex: 1, width: "100%", paddingHorizontal: 20 },
   titleText: {
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
-    marginBottom: 6,
     textAlign: "center",
+    marginTop: 20,
   },
-  subtitleText: {
-    fontSize: 14,
-    fontFamily: "Poppins_400Regular",
-    color: "#555",
-    textAlign: "center",
+  dateHeader: {
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
+    marginBottom: 8,
   },
   logCard: {
+    flexDirection: "row",
     backgroundColor: "#fff",
     borderRadius: 14,
-    padding: 30,
+    padding: 20,
     marginBottom: 14,
-    borderWidth: 1, // ✅ green border
-    borderColor: "#3cd38aff", // ✅ green edge
+    borderWidth: 1,
+    borderColor: "#3cd38aff",
+    justifyContent: "flex-start",
   },
-
+  leftSide: { marginRight: 14, justifyContent: "center" },
+  staffPhoto: {
+    width: 70,
+    height: 70,
+    borderRadius: 10,
+    backgroundColor: "#eee",
+    alignItems: "center",
+  },
+  rightSide: { flex: 1 },
+  pointsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   pointsText: {
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
     color: "#008243",
     marginBottom: 6,
   },
-  categoryText: {
-    fontSize: 14,
-    fontFamily: "Poppins_600SemiBold",
-    marginBottom: 4,
+  pointsTextRed: {
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
+    color: "#D22B2B",
+    marginBottom: 6,
+  },
+  smallText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
     color: "#333",
   },
-  detailText: {
-    fontSize: 13,
-    fontFamily: "Poppins_400Regular",
-    color: "#555",
+  typeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  dateHeader: {
-    fontSize: 14,
-    fontFamily: "Poppins_600SemiBold",
-    color: "#444",
-    marginBottom: 8,
+  typeLabel: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+  },
+  typeValue: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
   },
 });
 

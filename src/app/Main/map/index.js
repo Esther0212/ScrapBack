@@ -359,7 +359,7 @@ export default function MapSelector() {
                 </TouchableOpacity>
               </View>
               <View style={styles.toggleLabelBox}>
-                <Text style={styles.toggleLabel}>Drop-off Schedules</Text>
+                <Text style={styles.toggleLabel}>View Collection Points Around You</Text>
               </View>
             </View>
           </View>
