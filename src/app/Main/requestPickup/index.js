@@ -47,6 +47,8 @@ const RequestPickup = () => {
   const [cancelItemId, setCancelItemId] = useState(null);
   const [archiveModalVisible, setArchiveModalVisible] = useState(false);
   const [archiveItemId, setArchiveItemId] = useState(null);
+  const [confirmCancelModalVisible, setConfirmCancelModalVisible] =
+    useState(false);
 
   // Load current user's pickup requests
   useEffect(() => {
@@ -134,7 +136,7 @@ const RequestPickup = () => {
 
   const handleCancel = (id) => {
     setCancelTargetId(id);
-    setCancelModalVisible(true);
+    setConfirmCancelModalVisible(true); // 👈 open the first "Are you sure?" modal
   };
 
   const handleEdit = (item) => {
@@ -252,16 +254,15 @@ const RequestPickup = () => {
               </Text>
               {/* ✅ Show reason only if provided */}
               {(item.reason || item.cancelReason) && (
-  <Text style={styles.cardText}>
-    <Text style={styles.bold}>Reason:</Text>{" "}
-    <Text style={{ color: "#d9534f" }}>
-      {item.reason || item.cancelReason}{" "}
-      {item.reasonBy &&
-        `(${item.reasonBy === "admin" ? "by Admin" : "by You"})`}
-    </Text>
-  </Text>
-)}
-
+                <Text style={styles.cardText}>
+                  <Text style={styles.bold}>Reason:</Text>{" "}
+                  <Text style={{ color: "#d9534f" }}>
+                    {item.reason || item.cancelReason}{" "}
+                    {item.reasonBy &&
+                      `(${item.reasonBy === "admin" ? "by Admin" : "by You"})`}
+                  </Text>
+                </Text>
+              )}
             </View>
 
             {/* ✅ Hide cancel/edit buttons if final status */}
@@ -354,6 +355,7 @@ const RequestPickup = () => {
         >
           <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>
+        
         {/* ✅ Edit Confirmation Modal */}
         {editModalVisible && (
           <View style={styles.modalOverlay}>
@@ -388,7 +390,8 @@ const RequestPickup = () => {
           </View>
         )}
       </SafeAreaView>
-      {cancelModalVisible && (
+      {/* STEP 1: Confirm Cancel Modal */}
+      {confirmCancelModalVisible && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Ionicons name="alert-circle-outline" size={40} color="#d9534f" />
@@ -400,24 +403,15 @@ const RequestPickup = () => {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalCancelBtn]}
-                onPress={() => setCancelModalVisible(false)}
+                onPress={() => setConfirmCancelModalVisible(false)}
               >
                 <Text style={styles.modalCancelText}>No</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalConfirmBtn]}
-                onPress={async () => {
-                  try {
-                    await updateDoc(doc(db, "pickupRequests", cancelItemId), {
-                      status: "cancelled",
-                    });
-                    showToast("Pickup request cancelled.");
-                  } catch (err) {
-                    console.error("Error cancelling request:", err);
-                    showToast("Failed to cancel request.");
-                  } finally {
-                    setCancelModalVisible(false);
-                  }
+                onPress={() => {
+                  setConfirmCancelModalVisible(false);
+                  setCancelModalVisible(true); // 👈 open the reason modal next
                 }}
               >
                 <Text style={styles.modalConfirmText}>Yes</Text>
@@ -426,6 +420,7 @@ const RequestPickup = () => {
           </View>
         </View>
       )}
+
       {archiveModalVisible && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
