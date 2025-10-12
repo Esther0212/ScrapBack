@@ -56,6 +56,7 @@ const AccountInfo = () => {
   const [toastMessage, setToastMessage] = useState("");
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchBarangays = async () => {
@@ -124,6 +125,8 @@ const AccountInfo = () => {
     try {
       if (!userData?.uid) return;
 
+      setIsSaving(true); // ✅ start loading spinner
+
       let finalProfilePic = profilePic;
 
       // if new local image, upload to Firebase Storage
@@ -168,27 +171,31 @@ const AccountInfo = () => {
         address: updatedAddress,
       });
 
+      // ✅ Success toast animation
       setToastMessage("Profile updated successfully!");
       setToastVisible(true);
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 300, // fade-in speed
+        duration: 300,
         useNativeDriver: true,
       }).start(() => {
         setTimeout(() => {
           Animated.timing(fadeAnim, {
             toValue: 0,
-            duration: 300, // fade-out speed
+            duration: 300,
             useNativeDriver: true,
           }).start(() => setToastVisible(false));
-        }, 2000); // visible duration before fade-out
+        }, 2000);
       });
+
       setEditMode(false);
     } catch (err) {
       console.error(err);
       setToastMessage("Failed to update profile.");
       setToastVisible(true);
       setTimeout(() => setToastVisible(false), 2500);
+    } finally {
+      setIsSaving(false); // ✅ stop spinner
     }
   };
 
@@ -208,266 +215,284 @@ const AccountInfo = () => {
   };
 
   return (
-      <CustomBgColor>
-        <SafeAreaView style={styles.safeArea}>
-          <ScrollView contentContainerStyle={styles.scrollContainer}>
-            <View style={styles.container}>
-              <View style={styles.imageWrapper}>
-                <TouchableOpacity
-                  disabled={!editMode}
-                  onPress={() => editMode && setProfileModalVisible(true)}
-                >
-                  <Image
-                    source={
-                      profilePic
-                        ? { uri: profilePic }
-                        : require("../../../assets/profile/defaultUser.png")
-                    }
-                    style={styles.profileImage}
-                  />
-                </TouchableOpacity>
-                {editMode && (
-                  <TouchableOpacity
-                    style={styles.editIconWrapper}
-                    onPress={() => setProfileModalVisible(true)}
-                  >
-                    <Ionicons name="pencil" size={20} color="#fff" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Profile Modal */}
-              <Modal
-                visible={profileModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setProfileModalVisible(false)}
+    <CustomBgColor>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.container}>
+            <View style={styles.imageWrapper}>
+              <TouchableOpacity
+                disabled={!editMode}
+                onPress={() => editMode && setProfileModalVisible(true)}
               >
-                <TouchableOpacity
-                  style={styles.modalOverlay}
-                  onPress={() => setProfileModalVisible(false)}
-                  activeOpacity={1}
-                >
-                  <View style={styles.modalContent}>
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={pickImage}
-                    >
-                      <Text style={styles.modalButtonText}>
-                        Choose Profile Picture
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={removeImage}
-                    >
-                      <Text style={styles.modalButtonText}>
-                        Remove Profile Picture
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              </Modal>
-
-              {uploading && (
-                <ActivityIndicator
-                  size="large"
-                  color="#008243"
-                  style={{ marginBottom: 10 }}
+                <Image
+                  source={
+                    profilePic
+                      ? { uri: profilePic }
+                      : require("../../../assets/profile/defaultUser.png")
+                  }
+                  style={styles.profileImage}
                 />
-              )}
-              {/* Confirmation Modal */}
-              <Modal
-                visible={confirmModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setConfirmModalVisible(false)}
-              >
-                <View style={styles.modalOverlayCenter}>
-                  <View style={styles.confirmModal}>
-                    <Text style={styles.confirmTitle}>Confirm Changes</Text>
-                    <Text style={styles.confirmText}>
-                      Are you sure you want to save these changes to your
-                      profile?
-                    </Text>
-
-                    <View style={styles.confirmButtons}>
-                      <TouchableOpacity
-                        style={[styles.cancelButton, { flex: 0.45 }]}
-                        onPress={() => setConfirmModalVisible(false)}
-                      >
-                        <Text style={styles.cancelText}>No</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.saveButton, { flex: 0.45 }]}
-                        onPress={async () => {
-                          setConfirmModalVisible(false);
-                          await handleSave();
-                        }}
-                      >
-                        <Text style={styles.saveText}>Yes, Save</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </Modal>
-
-              {/* Fields */}
-              <View style={styles.row}>
-                <InputField
-                  label="First Name"
-                  value={firstName}
-                  setValue={setFirstName}
-                  editable={editMode}
-                  containerStyle={{ flex: 1, marginRight: 8 }}
-                />
-                <InputField
-                  label="Last Name"
-                  value={lastName}
-                  setValue={setLastName}
-                  editable={editMode}
-                  containerStyle={{ flex: 1, marginLeft: 8 }}
-                />
-              </View>
-              <InputField
-                label="Email"
-                value={email}
-                setValue={setEmail}
-                editable={editMode}
-              />
-              <InputField
-                label="Contact Number"
-                value={contact}
-                setValue={setContact}
-                editable={editMode}
-              />
-
-              {/* Gender */}
-              <DropdownField
-                label="Gender"
-                visible={genderMenuVisible}
-                setVisible={setGenderMenuVisible}
-                selected={gender}
-                setSelected={setGender}
-                options={["Male", "Female", "Other"]}
-                editable={editMode}
-              />
-
-              {/* DOB */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={styles.label}>Date of Birth</Text>
+              </TouchableOpacity>
+              {editMode && (
                 <TouchableOpacity
-                  style={styles.input}
-                  onPress={() => editMode && setShowDatePicker(true)}
-                  disabled={!editMode}
+                  style={styles.editIconWrapper}
+                  onPress={() => setProfileModalVisible(true)}
                 >
-                  <Text
-                    style={{
-                      color: editMode ? "#3A2E2E" : "#777",
-                      fontSize: 15,
-                      fontFamily: "Poppins_400Regular",
-                    }}
-                  >
-                    {formatDOB(dob) || "Select Date"}
-                  </Text>
-                </TouchableOpacity>
-                {showDatePicker && (
-                  <DateTimePicker
-                    mode="date"
-                    display="default"
-                    value={dob ? new Date(dob) : new Date()}
-                    onChange={(event, selectedDate) => {
-                      setShowDatePicker(false);
-                      if (selectedDate) setDob(selectedDate.toISOString());
-                    }}
-                  />
-                )}
-              </View>
-
-              {/* Address */}
-              <Text style={styles.label}>Address</Text>
-              <InputField
-                label="Street"
-                value={street}
-                setValue={setStreet}
-                editable={editMode}
-                subLabel
-              />
-              <InputField
-                label="Region"
-                value={userData?.address?.region || "Northern Mindanao"}
-                editable={false}
-                subLabel
-              />
-              <InputField
-                label="Province"
-                value={userData?.address?.province || "Misamis Oriental"}
-                editable={false}
-                subLabel
-              />
-              <InputField
-                label="City"
-                value={userData?.address?.city || "City of Cagayan De Oro"}
-                editable={false}
-                subLabel
-              />
-              <DropdownField
-                label="Barangay"
-                visible={barangayMenuVisible}
-                setVisible={setBarangayMenuVisible}
-                selected={barangay ? barangay.name : ""}
-                setSelected={setBarangay}
-                options={barangays}
-                optionKey="name"
-                editable={editMode}
-                subLabel
-              />
-              <InputField
-                label="Postal Code"
-                value={userData?.address?.postalCode || "9000"}
-                editable={false}
-                subLabel
-              />
-
-              {/* Buttons */}
-              {editMode ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <TouchableOpacity
-                    style={[styles.cancelButton, { flex: 0.48 }]}
-                    onPress={handleCancel}
-                  >
-                    <Text style={styles.cancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.saveButton, { flex: 0.48 }]}
-                    onPress={() => setConfirmModalVisible(true)}
-                  >
-                    <Text style={styles.saveText}>Save Changes</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => setEditMode(true)}
-                >
-                  <Text style={styles.editButtonText}>Edit Profile</Text>
+                  <Ionicons name="pencil" size={20} color="#fff" />
                 </TouchableOpacity>
               )}
             </View>
-          </ScrollView>
-          {toastVisible && (
-            <Animated.View style={[styles.toast, { opacity: fadeAnim }]}>
-              <Text style={styles.toastText}>{toastMessage}</Text>
-            </Animated.View>
-          )}
-        </SafeAreaView>
-      </CustomBgColor>
+
+            {/* Profile Modal */}
+            <Modal
+              visible={profileModalVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setProfileModalVisible(false)}
+            >
+              <TouchableOpacity
+                style={styles.modalOverlay}
+                onPress={() => setProfileModalVisible(false)}
+                activeOpacity={1}
+              >
+                <View style={styles.modalContent}>
+                  <TouchableOpacity
+                    style={styles.modalButton}
+                    onPress={pickImage}
+                  >
+                    <Text style={styles.modalButtonText}>
+                      Choose Profile Picture
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalButton}
+                    onPress={removeImage}
+                  >
+                    <Text style={styles.modalButtonText}>
+                      Remove Profile Picture
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            </Modal>
+
+            {uploading && (
+              <ActivityIndicator
+                size="large"
+                color="#008243"
+                style={{ marginBottom: 10 }}
+              />
+            )}
+            {/* Confirmation Modal */}
+            <Modal
+              visible={confirmModalVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setConfirmModalVisible(false)}
+            >
+              <View style={styles.modalOverlayCenter}>
+                <View style={styles.confirmModal}>
+                  <Text style={styles.confirmTitle}>Confirm Changes</Text>
+                  <Text style={styles.confirmText}>
+                    Are you sure you want to save these changes to your profile?
+                  </Text>
+
+                  <View style={styles.confirmButtons}>
+                    <TouchableOpacity
+                      style={[styles.cancelButton, { flex: 0.45 }]}
+                      onPress={() => setConfirmModalVisible(false)}
+                    >
+                      <Text style={styles.cancelText}>No</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.saveButton,
+                        { flex: 0.45, opacity: isSaving ? 0.7 : 1 },
+                      ]}
+                      onPress={async () => {
+                        if (isSaving) return;
+                        setIsSaving(true); // show spinner right away
+                        await handleSave();
+                        setConfirmModalVisible(false); // close AFTER save
+                      }}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <View
+                          style={{ flexDirection: "row", alignItems: "center" }}
+                        >
+                          <ActivityIndicator
+                            size="small"
+                            color="#fff"
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={styles.saveText}>Saving...</Text>
+                        </View>
+                      ) : (
+                        <Text style={styles.saveText}>Yes, Save</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+
+            {/* Fields */}
+            <View style={styles.row}>
+              <InputField
+                label="First Name"
+                value={firstName}
+                setValue={setFirstName}
+                editable={editMode}
+                containerStyle={{ flex: 1, marginRight: 8 }}
+              />
+              <InputField
+                label="Last Name"
+                value={lastName}
+                setValue={setLastName}
+                editable={editMode}
+                containerStyle={{ flex: 1, marginLeft: 8 }}
+              />
+            </View>
+            <InputField
+              label="Email"
+              value={email}
+              setValue={setEmail}
+              editable={editMode}
+            />
+            <InputField
+              label="Contact Number"
+              value={contact}
+              setValue={setContact}
+              editable={editMode}
+            />
+
+            {/* Gender */}
+            <DropdownField
+              label="Gender"
+              visible={genderMenuVisible}
+              setVisible={setGenderMenuVisible}
+              selected={gender}
+              setSelected={setGender}
+              options={["Male", "Female", "Other"]}
+              editable={editMode}
+            />
+
+            {/* DOB */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={styles.label}>Date of Birth</Text>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => editMode && setShowDatePicker(true)}
+                disabled={!editMode}
+              >
+                <Text
+                  style={{
+                    color: editMode ? "#3A2E2E" : "#777",
+                    fontSize: 15,
+                    fontFamily: "Poppins_400Regular",
+                  }}
+                >
+                  {formatDOB(dob) || "Select Date"}
+                </Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  mode="date"
+                  display="default"
+                  value={dob ? new Date(dob) : new Date()}
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(false);
+                    if (selectedDate) setDob(selectedDate.toISOString());
+                  }}
+                />
+              )}
+            </View>
+
+            {/* Address */}
+            <Text style={styles.label}>Address</Text>
+            <InputField
+              label="Street"
+              value={street}
+              setValue={setStreet}
+              editable={editMode}
+              subLabel
+            />
+            <InputField
+              label="Region"
+              value={userData?.address?.region || "Northern Mindanao"}
+              editable={false}
+              subLabel
+            />
+            <InputField
+              label="Province"
+              value={userData?.address?.province || "Misamis Oriental"}
+              editable={false}
+              subLabel
+            />
+            <InputField
+              label="City"
+              value={userData?.address?.city || "City of Cagayan De Oro"}
+              editable={false}
+              subLabel
+            />
+            <DropdownField
+              label="Barangay"
+              visible={barangayMenuVisible}
+              setVisible={setBarangayMenuVisible}
+              selected={barangay ? barangay.name : ""}
+              setSelected={setBarangay}
+              options={barangays}
+              optionKey="name"
+              editable={editMode}
+              subLabel
+            />
+            <InputField
+              label="Postal Code"
+              value={userData?.address?.postalCode || "9000"}
+              editable={false}
+              subLabel
+            />
+
+            {/* Buttons */}
+            {editMode ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <TouchableOpacity
+                  style={[styles.cancelButton, { flex: 0.48 }]}
+                  onPress={handleCancel}
+                >
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.saveButton, { flex: 0.48 }]}
+                  onPress={() => setConfirmModalVisible(true)}
+                >
+                  <Text style={styles.saveText}>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => setEditMode(true)}
+              >
+                <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+        {toastVisible && (
+          <Animated.View style={[styles.toast, { opacity: fadeAnim }]}>
+            <Text style={styles.toastText}>{toastMessage}</Text>
+          </Animated.View>
+        )}
+      </SafeAreaView>
+    </CustomBgColor>
   );
 };
 
