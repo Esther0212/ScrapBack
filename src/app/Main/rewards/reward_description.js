@@ -1,4 +1,3 @@
-// src/app/Main/rewards/reward_description.js
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -9,25 +8,32 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
 
-// ✅ Firestore
-import { db } from "../../../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+// ✅ Firebase
+import { db, auth } from "../../../../firebase";
+import {
+  doc,
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const RewardDescription = () => {
   const router = useRouter();
-  const { id } = useLocalSearchParams(); // Reward document ID
+  const { id } = useLocalSearchParams();
   const [reward, setReward] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // ✅ Determine header title based on reward category
+  // ✅ Determine title based on category
   const getHeaderTitle = (category) => {
     switch (category) {
       case "gcash":
@@ -41,44 +47,78 @@ const RewardDescription = () => {
     }
   };
 
-  // ✅ Fetch reward by ID
+  // ✅ Fetch reward
   useEffect(() => {
     const fetchReward = async () => {
       try {
-        const docRef = doc(db, "reward", id);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          setReward({ id: docSnap.id, ...docSnap.data() });
-        } else {
-          setReward(null);
-        }
-      } catch (err) {
-        console.error("Error fetching reward:", err);
+        const ref = doc(db, "reward", id);
+        const snap = await getDoc(ref);
+        if (snap.exists()) setReward({ id: snap.id, ...snap.data() });
+        else setReward(null);
+      } catch (error) {
+        console.error("Error fetching reward:", error);
       } finally {
         setLoading(false);
       }
     };
-
     if (id) fetchReward();
   }, [id]);
 
-  // ✅ Loading state
+  const handleRedeem = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Login Required", "Please log in to redeem rewards.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      // 🔹 Fetch user data
+      const userRef = doc(db, "user", user.uid);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.exists() ? userSnap.data() : {};
+
+      // 🔹 Combine firstName + lastName into name
+      const fullName = `${userData.firstName || ""} ${userData.lastName || ""}`.trim();
+
+      // 🔹 Add Firestore document in redemptionRequest
+      await addDoc(collection(db, "redemptionRequest"), {
+        userId: user.uid,
+        name: fullName || "Unknown User",
+        rewardId: reward.id,
+        contact: userData.contact || "",
+        rewardName: reward.title || reward.rewardName || "Unknown Reward",
+        points: reward.points?.toString() || "0",
+        status: "Pending",
+        adminNote: "",
+        action: "Archive",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      setModalVisible(true);
+    } catch (error) {
+      console.error("Error saving redemption request:", error);
+      Alert.alert("Error", "Failed to submit redemption request.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
+  // ✅ Loading UI
   if (loading) {
     return (
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <ActivityIndicator
-            size="large"
-            color="#2E7D32"
-            style={{ marginTop: 40 }}
-          />
+          <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 40 }} />
         </SafeAreaView>
       </CustomBgColor>
     );
   }
 
-  // ✅ No reward found
+  // ✅ Not found
   if (!reward) {
     return (
       <CustomBgColor>
@@ -91,9 +131,10 @@ const RewardDescription = () => {
     );
   }
 
+  const isUnavailable = reward.status === "unavailable";
+
   return (
     <CustomBgColor>
-      {/* ✅ Dynamic header title */}
       <Stack.Screen options={{ title: getHeaderTitle(reward?.category) }} />
 
       <SafeAreaView style={styles.safeArea}>
@@ -105,17 +146,12 @@ const RewardDescription = () => {
 
         {/* Content */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Image */}
-          <LinearGradient
-            colors={["#E8F5E9", "#FFFFFF"]}
-            style={styles.imageWrapper}
-          >
+          <LinearGradient colors={["#E8F5E9", "#FFFFFF"]} style={styles.imageWrapper}>
             {reward.image && (
               <Image source={{ uri: reward.image }} style={styles.image} />
             )}
           </LinearGradient>
 
-          {/* Card Content */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>About this Reward</Text>
             <Text style={styles.text}>{reward.description}</Text>
@@ -125,42 +161,43 @@ const RewardDescription = () => {
 
             <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
             <Text style={styles.text}>
-              {reward.howToRedeem
-                ? reward.howToRedeem
-                : "Redemption instructions are not available at the moment."}
+              {reward.howToRedeem ||
+                "Redemption instructions are not available at the moment."}
             </Text>
 
             <Text style={styles.bold}>
-              Note: Ensure you meet the minimum points required before
-              redeeming.
+              Note: Ensure you meet the minimum points required before redeeming.
             </Text>
 
-            {/* CTA Button */}
-            {reward.category === "sack" ? (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => router.push("Main/map")}
-                style={styles.ctaButtonSolid}
+            {/* Redeem Button */}
+            <TouchableOpacity
+              activeOpacity={isUnavailable ? 1 : 0.85}
+              onPress={() => {
+                if (!isUnavailable && !saving) handleRedeem();
+              }}
+              style={[
+                styles.ctaButtonSolid,
+                isUnavailable && styles.disabledButton,
+              ]}
+              disabled={saving}
+            >
+              <Text
+                style={[
+                  styles.ctaText,
+                  isUnavailable && styles.disabledText,
+                ]}
               >
-                <Text style={styles.ctaText}>
-                  See Available Collection Points
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => setModalVisible(true)}
-                style={styles.ctaButtonSolid}
-              >
-                <Text style={styles.ctaText}>
-                  Redeem for {reward.points} Points
-                </Text>
-              </TouchableOpacity>
-            )}
+                {isUnavailable
+                  ? "Not Available"
+                  : saving
+                  ? "Submitting..."
+                  : `Redeem for ${reward.points} Points`}
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
 
-        {/* Modal */}
+        {/* Confirmation Modal */}
         <Modal
           visible={modalVisible}
           transparent
@@ -174,7 +211,10 @@ const RewardDescription = () => {
               </Text>
               <TouchableOpacity
                 style={styles.okButton}
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  setModalVisible(false);
+                  router.back();
+                }}
               >
                 <Text style={styles.okButtonText}>OKAY</Text>
               </TouchableOpacity>
@@ -263,10 +303,17 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
+  disabledButton: {
+    backgroundColor: "#CCCCCC",
+    shadowOpacity: 0,
+  },
   ctaText: {
     color: "white",
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
+  },
+  disabledText: {
+    color: "#666",
   },
   modalOverlay: {
     flex: 1,
