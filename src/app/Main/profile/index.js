@@ -16,7 +16,7 @@ import Feather from "@expo/vector-icons/Feather";
 import { useUser } from "../../../context/userContext";
 import { useRouter } from "expo-router";
 import { db } from "../../../../firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 
 const { height, width } = Dimensions.get("window");
 
@@ -68,41 +68,57 @@ const Profile = () => {
 
   // 🔹 Fetch contribution logs
   useEffect(() => {
-    const fetchLogs = async () => {
-      if (!userData?.uid) return;
-      try {
-        const q = query(
-          collection(db, "contribution_logs"),
-          where("userId", "==", userData.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        const logsData = querySnapshot.docs.map((doc) => ({
+    if (!userData?.uid) return;
+  
+    console.log("🔄 Setting up real-time listener for contribution_logs...");
+  
+    const q = query(
+      collection(db, "contribution_logs"),
+      where("userId", "==", userData.uid)
+    );
+  
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        console.log("📡 Snapshot received for contribution_logs:", snapshot.size, "docs");
+        const logsData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
         setLogs(
           logsData.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds)
         );
-      } catch (error) {
-        console.error("Error fetching contribution logs: ", error);
-      } finally {
         setLoading(false);
+      },
+      (error) => {
+        console.error("❌ Error in contribution_logs snapshot:", error);
       }
+    );
+  
+    // 🧹 Cleanup
+    return () => {
+      console.log("🧹 Unsubscribing from contribution_logs listener");
+      unsubscribe();
     };
-    fetchLogs();
   }, [userData?.uid]);
+  
 
   // 🔹 Fetch redemption logs
   useEffect(() => {
-    const fetchRewards = async () => {
-      if (!userData?.uid) return;
-      try {
-        const q = query(
-          collection(db, "redemption_logs"),
-          where("userId", "==", userData.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        const rewardsData = querySnapshot.docs.map((doc) => ({
+    if (!userData?.uid) return;
+  
+    console.log("🔄 Setting up real-time listener for redemption_logs...");
+  
+    const q = query(
+      collection(db, "redemption_logs"),
+      where("userId", "==", userData.uid)
+    );
+  
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        console.log("📡 Snapshot received for redemption_logs:", snapshot.size, "docs");
+        const rewardsData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
@@ -111,14 +127,20 @@ const Profile = () => {
             (a, b) => b.createdAt?.seconds - a.createdAt?.seconds
           )
         );
-      } catch (error) {
-        console.error("Error fetching redemption logs: ", error);
-      } finally {
         setLoadingRewards(false);
+      },
+      (error) => {
+        console.error("❌ Error in redemption_logs snapshot:", error);
       }
+    );
+  
+    // 🧹 Cleanup
+    return () => {
+      console.log("🧹 Unsubscribing from redemption_logs listener");
+      unsubscribe();
     };
-    fetchRewards();
   }, [userData?.uid]);
+  
 
   // 🔹 Render grouped list
   const renderGroupedList = (groupedData, type = "points") => (
