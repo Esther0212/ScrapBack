@@ -1,4 +1,3 @@
-// src/app/Main/rewards/reward_description.js
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -9,38 +8,44 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Alert,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
 
-// ✅ Firestore
-import { db } from "../../../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+// ✅ Firebase
+import { db, auth } from "../../../../firebase";
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
+} from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 const RewardDescription = () => {
   const router = useRouter();
   const { id } = useLocalSearchParams(); // Firestore doc ID
+
   const [reward, setReward] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
 
-  // ✅ Determine header title based on reward category
-  const getHeaderTitle = (category) => {
-    switch (category) {
-      case "gcash":
-        return "Gcash Offer";
-      case "load":
-        return "Load Offer";
-      case "sack":
-        return "Rice Offer";
-      default:
-        return "Reward Details";
-    }
-  };
+  // 🔹 Modals
+  const [choiceModalVisible, setChoiceModalVisible] = useState(false);
+  const [confirmMapModalVisible, setConfirmMapModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [failedModalVisible, setFailedModalVisible] = useState(false);
+  // 🪙 Cash modal (user sets amount)
+  const [cashModalVisible, setCashModalVisible] = useState(false);
+  const [selectedAmount, setSelectedAmount] = useState("");
 
-  // ✅ Fetch reward by ID
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ✅ Fetch reward
   useEffect(() => {
     const fetchReward = async () => {
       try {
@@ -61,7 +66,154 @@ const RewardDescription = () => {
     if (id) fetchReward();
   }, [id]);
 
-  // ✅ Loading state
+  // ✅ Helper: get current user
+  const getCurrentUser = () =>
+    new Promise((resolve) => {
+      if (auth.currentUser) return resolve(auth.currentUser);
+      const unsub = onAuthStateChanged(auth, (u) => {
+        unsub();
+        resolve(u || null);
+      });
+    });
+
+  // ✅ Handle redeem (online request)
+  const handleRedeemOnline = async () => {
+    setIsSubmitting(true);
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        Alert.alert("Login Required", "Please log in to redeem rewards.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Get user profile
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (!userDocSnap.exists()) {
+        Alert.alert("Error", "User profile not found.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const userProfile = userDocSnap.data();
+      const userPoints = Number(userProfile.points || 0);
+      const requiredPoints = Number(reward.points || 0);
+
+      if (userPoints < requiredPoints) {
+        setIsSubmitting(false);
+        setFailedModalVisible(true);
+        return;
+      }
+
+      // ✅ Create redemption request
+      await addDoc(collection(db, "redemptionRequest"), {
+        userId: user.uid,
+        name: `${userProfile.firstName || ""} ${
+          userProfile.lastName || ""
+        }`.trim(),
+        contact: userProfile.contact || "N/A",
+        email: userProfile.email || "",
+        rewardId: reward.id,
+        rewardName: reward.title || "Reward",
+        rewardCategory: reward.category || "Other",
+        points: requiredPoints,
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+
+      setSuccessModalVisible(true);
+    } catch (error) {
+      console.error("Redemption error:", error);
+      Alert.alert("Error", "Something went wrong. Please try again later.");
+    } finally {
+      setIsSubmitting(false);
+      setChoiceModalVisible(false);
+    }
+  };
+
+  // ✅ Handle redeem for CASH (user decides amount)
+  const handleCashRedeem = async () => {
+    if (
+      !selectedAmount ||
+      isNaN(selectedAmount) ||
+      Number(selectedAmount) <= 0
+    ) {
+      Alert.alert("Invalid Amount", "Please enter a valid cash amount.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        Alert.alert("Login Required", "Please log in to redeem rewards.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const userDocSnap = await getDoc(doc(db, "user", user.uid));
+      if (!userDocSnap.exists()) {
+        Alert.alert("Error", "User profile not found.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const userData = userDocSnap.data();
+      const userPoints = Number(userData.points || 0);
+      const requiredPoints = Number(selectedAmount); // 1 peso = 1 point
+
+      if (userPoints < requiredPoints) {
+        setIsSubmitting(false);
+        setCashModalVisible(false);
+        setFailedModalVisible(true);
+        return;
+      }
+
+      await addDoc(collection(db, "redemptionRequest"), {
+        userId: user.uid,
+        name: `${userData.firstName || ""} ${userData.lastName || ""}`.trim(),
+        contact: userData.contact || "N/A",
+        email: userData.email || "",
+        rewardId: reward.id,
+        rewardName: reward.title || "Cash Redemption",
+        rewardCategory: reward.category || "cash",
+        cashAmount: Number(selectedAmount),
+        points: requiredPoints,
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+
+      setCashModalVisible(false);
+      setSuccessModalVisible(true);
+    } catch (err) {
+      console.error("Cash redemption error:", err);
+      Alert.alert("Error", "Something went wrong. Please try again later.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ✅ Handle redeem button click
+  const handleRedeemClick = () => {
+    const mode = reward.modeAvailable?.toLowerCase() || "online";
+    const category = reward.category?.toLowerCase();
+
+    // ✅ CASH: open modal to set amount
+    if (category === "cash") {
+      setCashModalVisible(true);
+      return;
+    }
+
+    // Normal modes
+    if (mode === "online") handleRedeemOnline();
+    else if (mode === "onsite") setConfirmMapModalVisible(true);
+    else if (mode === "both" || mode.includes("online"))
+      setChoiceModalVisible(true);
+    else handleRedeemOnline();
+  };
+
+  // ✅ Loading
   if (loading) {
     return (
       <CustomBgColor>
@@ -76,7 +228,6 @@ const RewardDescription = () => {
     );
   }
 
-  // ✅ No reward found
   if (!reward) {
     return (
       <CustomBgColor>
@@ -89,8 +240,44 @@ const RewardDescription = () => {
     );
   }
 
-  // ✅ Check if reward is unavailable
-  const isUnavailable = reward.status === "unavailable";
+  // ✅ Redeemable mode badge helpers
+  const formatMode = (mode) => {
+    if (!mode) return "N/A";
+    const formatted = mode.toString().trim().toLowerCase();
+    if (formatted === "both") return "Online or Onsite";
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  };
+
+  const getModeColor = (mode) => {
+    switch (mode?.toLowerCase()) {
+      case "online":
+        return { borderColor: "#43A047", textColor: "#2E7D32" };
+      case "onsite":
+        return { borderColor: "#039BE5", textColor: "#0277BD" };
+      case "both":
+        return { borderColor: "#8E24AA", textColor: "#6A1B9A" };
+      default:
+        return { borderColor: "#BDBDBD", textColor: "#616161" };
+    }
+  };
+
+  const modeStyle = getModeColor(reward.modeAvailable);
+
+  const isUnavailable = reward.status?.toLowerCase() === "unavailable";
+
+  // ✅ Header title logic
+  const getHeaderTitle = (category) => {
+    switch (category) {
+      case "gcash":
+        return "Gcash Offer";
+      case "load":
+        return "Load Offer";
+      case "sack":
+        return "Rice Offer";
+      default:
+        return "Reward Details";
+    }
+  };
 
   return (
     <CustomBgColor>
@@ -103,15 +290,27 @@ const RewardDescription = () => {
           <View style={{ width: 24 }} />
         </View>
 
-        {/* Content */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Reward Image */}
+          {/* Reward Image with Redeemable Badge */}
           <LinearGradient
             colors={["#E8F5E9", "#FFFFFF"]}
-            style={styles.imageWrapper}
+            style={[styles.imageWrapper, { position: "relative" }]}
           >
             {reward.image && (
               <Image source={{ uri: reward.image }} style={styles.image} />
+            )}
+
+            {reward.modeAvailable && (
+              <View
+                style={[
+                  styles.modeBadge,
+                  { borderColor: modeStyle.borderColor },
+                ]}
+              >
+                <Text style={[styles.modeText, { color: modeStyle.textColor }]}>
+                  Redeemable {formatMode(reward.modeAvailable)}
+                </Text>
+              </View>
             )}
           </LinearGradient>
 
@@ -120,83 +319,251 @@ const RewardDescription = () => {
             <Text style={styles.sectionTitle}>About this Reward</Text>
             <Text style={styles.text}>{reward.description}</Text>
 
-            <Text style={styles.sectionTitle}>Points Required</Text>
-            <Text style={styles.text}>{reward.points} pts</Text>
+            {reward.category?.toLowerCase() !== "cash" && (
+              <>
+                <Text style={styles.sectionTitle}>Points Required</Text>
+                <Text style={styles.text}>{reward.points} pts</Text>
+              </>
+            )}
 
-            <Text style={styles.sectionTitle}>How to Redeem Rewards</Text>
+            <Text style={styles.sectionTitle}>How to Redeem</Text>
             <Text style={styles.text}>
               {reward.howToRedeem ||
                 "Redemption instructions are not available at the moment."}
             </Text>
 
             <Text style={styles.bold}>
-              Note: Ensure you meet the minimum points required before redeeming.
+              Note: Ensure you meet the minimum points required before
+              redeeming.
             </Text>
 
-            {/* ✅ CTA Button */}
-            {reward.category === "sack" ? (
-              <TouchableOpacity
-                activeOpacity={isUnavailable ? 1 : 0.85}
-                onPress={() => {
-                  if (!isUnavailable) router.push("Main/map");
-                }}
-                style={[
-                  styles.ctaButtonSolid,
-                  isUnavailable && styles.disabledButton,
-                ]}
+            {/* Redeem Button */}
+            <TouchableOpacity
+              activeOpacity={isUnavailable ? 1 : 0.85}
+              onPress={() => {
+                if (!isUnavailable) handleRedeemClick();
+              }}
+              style={[
+                styles.ctaButtonSolid,
+                isUnavailable && styles.disabledButton,
+              ]}
+              disabled={isSubmitting}
+            >
+              <Text
+                style={[styles.ctaText, isUnavailable && styles.disabledText]}
               >
-                <Text
-                  style={[
-                    styles.ctaText,
-                    isUnavailable && styles.disabledText,
-                  ]}
-                >
-                  {isUnavailable
-                    ? "Not Available"
-                    : "Go to Nearest PACAFACO Point"}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                activeOpacity={isUnavailable ? 1 : 0.85}
-                onPress={() => {
-                  if (!isUnavailable) setModalVisible(true);
-                }}
-                style={[
-                  styles.ctaButtonSolid,
-                  isUnavailable && styles.disabledButton,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.ctaText,
-                    isUnavailable && styles.disabledText,
-                  ]}
-                >
-                  {isUnavailable
-                    ? "Not Available"
-                    : `Redeem for ${reward.points} Points`}
-                </Text>
-              </TouchableOpacity>
-            )}
+                {isUnavailable
+                  ? "Not Available"
+                  : isSubmitting
+                  ? "Processing..."
+                  : reward.category?.toLowerCase() === "cash"
+                  ? "Redeem Cash Amount"
+                  : `Redeem for ${reward.points} Points`}
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
 
-        {/* Modal */}
+        {/* ✅ Choice Modal for BOTH */}
+        <Modal visible={choiceModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalText}>
+                How would you like to redeem this reward?
+              </Text>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity
+                  style={styles.choiceButton}
+                  onPress={handleRedeemOnline}
+                >
+                  <Text style={styles.okButtonText}>Request Online</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.choiceButton, { backgroundColor: "#5F934A" }]}
+                  onPress={() => {
+                    setChoiceModalVisible(false);
+                    setConfirmMapModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.okButtonText}>Go to Map</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ⚠️ Confirm Map Modal */}
         <Modal
-          visible={modalVisible}
+          visible={confirmMapModalVisible}
           transparent
           animationType="fade"
-          onRequestClose={() => setModalVisible(false)}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalText}>
-                Waiting for PACAFACO to accept your request...
+                Would you like to check available PACAFACO Collection Points?
+              </Text>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.choiceButton, { backgroundColor: "#5F934A" }]}
+                  onPress={() => {
+                    setConfirmMapModalVisible(false);
+                    router.push("Main/map");
+                  }}
+                >
+                  <Text style={styles.okButtonText}>Yes, Go</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.choiceButton, { backgroundColor: "#B00020" }]}
+                  onPress={() => setConfirmMapModalVisible(false)}
+                >
+                  <Text style={styles.okButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* 💵 CASH AMOUNT MODAL */}
+        <Modal visible={cashModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={[styles.modalText, { fontWeight: "700" }]}>
+                Enter the amount you want to redeem (₱)
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 20,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontFamily: "Poppins_600SemiBold",
+                    color: "#2E7D32",
+                    marginRight: 6,
+                  }}
+                >
+                  ₱
+                </Text>
+                <TextInput
+                  value={selectedAmount}
+                  onChangeText={setSelectedAmount}
+                  keyboardType="numeric"
+                  placeholder="Enter amount"
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#ccc",
+                    borderRadius: 8,
+                    padding: 10,
+                    width: 120,
+                    textAlign: "center",
+                    fontSize: 16,
+                    color: "#333",
+                  }}
+                />
+              </View>
+{/* Suggested Amount Buttons */}
+<View
+  style={{
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 20,
+  }}
+>
+  {[50, 100, 200, 500].map((amount) => (
+    <TouchableOpacity
+      key={amount}
+      onPress={() => setSelectedAmount(amount.toString())}
+      style={{
+        backgroundColor:
+          selectedAmount === amount.toString() ? "#008243" : "#E8F5E9",
+        borderColor: "#008243",
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        margin: 4,
+      }}
+    >
+      <Text
+        style={{
+          color:
+            selectedAmount === amount.toString() ? "white" : "#2E7D32",
+          fontFamily: "Poppins_600SemiBold",
+        }}
+      >
+        ₱{amount}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</View>
+
+              <TouchableOpacity
+                style={[
+                  styles.okButton,
+                  { backgroundColor: "#008243", marginBottom: 10 },
+                ]}
+                onPress={handleCashRedeem}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.okButtonText}>
+                  {isSubmitting ? "Submitting..." : "Request to Redeem"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.okButton, { backgroundColor: "#B00020" }]}
+                onPress={() => setCashModalVisible(false)}
+              >
+                <Text style={styles.okButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ✅ Success Modal */}
+        <Modal visible={successModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalText}>
+                Your redemption request has been sent successfully!{"\n"}Waiting
+                for PACAFACO approval.
               </Text>
               <TouchableOpacity
                 style={styles.okButton}
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  setSuccessModalVisible(false);
+                  router.back();
+                }}
+              >
+                <Text style={styles.okButtonText}>OKAY</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ❌ Failed Modal */}
+        <Modal visible={failedModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text
+                style={[
+                  styles.modalText,
+                  { color: "#B00020", fontWeight: "600" },
+                ]}
+              >
+                Not Enough Points to Redeem
+              </Text>
+              <TouchableOpacity
+                style={[styles.okButton, { backgroundColor: "#B00020" }]}
+                onPress={() => setFailedModalVisible(false)}
               >
                 <Text style={styles.okButtonText}>OKAY</Text>
               </TouchableOpacity>
@@ -242,7 +609,7 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: 220,
-    resizeMode: "contain",
+    resizeMode: "cover",
   },
   card: {
     backgroundColor: "white",
@@ -271,7 +638,7 @@ const styles = StyleSheet.create({
   },
   bold: { fontFamily: "Poppins_700Bold" },
   ctaButtonSolid: {
-    backgroundColor: "#008243", // ✅ stays green for all
+    backgroundColor: "#008243",
     borderRadius: 10,
     paddingVertical: 14,
     marginTop: 24,
@@ -286,7 +653,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   disabledButton: {
-    backgroundColor: "#CCCCCC", // ✅ gray when unavailable
+    backgroundColor: "#CCCCCC",
     shadowOpacity: 0,
   },
   ctaText: {
@@ -294,9 +661,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
   },
-  disabledText: {
-    color: "#666",
-  },
+  disabledText: { color: "#666" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
@@ -328,6 +693,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
   },
+  choiceButton: {
+    backgroundColor: "#008243",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
   notFoundText: {
     fontSize: 16,
     fontFamily: "Poppins_600SemiBold",
@@ -335,4 +706,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 40,
   },
+  modeBadge: {
+  position: "absolute",
+  top: 12,
+  right: 12,
+  paddingHorizontal: 12,
+  paddingVertical: 5,
+  borderRadius: 50,
+  borderWidth: 1.5,
+  backgroundColor: "rgba(255,255,255,0.9)",
+},
+modeText: {
+  fontSize: 12,
+  fontFamily: "Poppins_600SemiBold",
+},
+
 });
