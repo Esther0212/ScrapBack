@@ -40,6 +40,32 @@ const ChangePassword = () => {
   const [toastMessage, setToastMessage] = useState("");
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isVerified, setIsVerified] = useState(null); // null = not checked yet, true = correct, false = wrong
+
+  // ✅ Automatically check password after typing
+  const checkCurrentPassword = async (password) => {
+    if (!password || password.length < 3) {
+      setIsVerified(null);
+      return;
+    }
+
+    try {
+      setIsVerifying(true);
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const cred = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, cred);
+
+      setIsVerified(true);
+    } catch (err) {
+      setIsVerified(false);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   // ✅ Handle password change securely
   const handleChangePassword = async () => {
     try {
@@ -47,7 +73,10 @@ const ChangePassword = () => {
       const user = auth.currentUser;
       if (!user) throw new Error("User not logged in.");
 
-      if (!currentPassword || !newPassword) {
+      if (!isVerified) {
+        throw new Error("Please confirm your current password first.");
+      }
+      if (!newPassword || !confirmPassword) {
         throw new Error("Please fill in all fields.");
       }
       if (newPassword.length < 6) {
@@ -57,11 +86,6 @@ const ChangePassword = () => {
         throw new Error("New passwords do not match.");
       }
 
-      // Reauthenticate
-      const cred = EmailAuthProvider.credential(user.email, currentPassword);
-      await reauthenticateWithCredential(user, cred);
-
-      // Update password
       await updatePassword(user, newPassword);
 
       setToastMessage("Password updated successfully!");
@@ -70,15 +94,10 @@ const ChangePassword = () => {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setIsVerified(null);
     } catch (error) {
       console.error("Error updating password:", error);
-      if (error.code === "auth/wrong-password") {
-        setToastMessage("Incorrect current password.");
-      } else if (error.code === "auth/weak-password") {
-        setToastMessage("Password must be at least 6 characters.");
-      } else {
-        setToastMessage(error.message || "Failed to update password.");
-      }
+      setToastMessage(error.message || "Failed to update password.");
       showToast();
     } finally {
       setIsSaving(false);
@@ -109,13 +128,34 @@ const ChangePassword = () => {
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <Text style={styles.header}>Change Password</Text>
 
+          {/* 🔹 Current Password */}
           <PasswordField
             label="Current Password"
             value={currentPassword}
-            setValue={setCurrentPassword}
+            setValue={(val) => {
+              setCurrentPassword(val);
+              checkCurrentPassword(val);
+            }}
             visible={showCurrent}
             toggleVisible={() => setShowCurrent(!showCurrent)}
           />
+
+          {/* 🔹 Verification text */}
+          {isVerifying ? (
+            <Text style={[styles.verifyText, { color: "#555" }]}>
+              Checking password...
+            </Text>
+          ) : isVerified === true ? (
+            <Text style={[styles.verifyText, { color: "#008243" }]}>
+              ✅ Correct password
+            </Text>
+          ) : isVerified === false ? (
+            <Text style={[styles.verifyText, { color: "#B71C1C" }]}>
+              ❌ Incorrect password
+            </Text>
+          ) : null}
+
+          {/* 🔹 New Password */}
           <PasswordField
             label="New Password"
             value={newPassword}
@@ -123,6 +163,8 @@ const ChangePassword = () => {
             visible={showNew}
             toggleVisible={() => setShowNew(!showNew)}
           />
+
+          {/* 🔹 Confirm Password */}
           <PasswordField
             label="Confirm New Password"
             value={confirmPassword}
@@ -136,21 +178,19 @@ const ChangePassword = () => {
               styles.saveButton,
               {
                 opacity:
-                  !currentPassword || !newPassword || !confirmPassword
-                    ? 0.6
-                    : 1,
+                  !isVerified || !newPassword || !confirmPassword ? 0.6 : 1,
               },
             ]}
             onPress={() => setConfirmModalVisible(true)}
             disabled={
-              !currentPassword || !newPassword || !confirmPassword || isSaving
+              !isVerified || !newPassword || !confirmPassword || isSaving
             }
           >
             <Text style={styles.saveText}>Update Password</Text>
           </TouchableOpacity>
         </ScrollView>
 
-        {/* ✅ Confirm Modal */}
+        {/* 🔹 Confirm Modal */}
         <Modal
           visible={confirmModalVisible}
           transparent
@@ -198,7 +238,7 @@ const ChangePassword = () => {
           </View>
         </Modal>
 
-        {/* ✅ Toast */}
+        {/* 🔹 Toast */}
         {toastVisible && (
           <Animated.View style={[styles.toast, { opacity: fadeAnim }]}>
             <Text style={styles.toastText}>{toastMessage}</Text>
@@ -209,7 +249,7 @@ const ChangePassword = () => {
   );
 };
 
-// ✅ Password input field with eye toggle
+// 🔹 Reusable password input
 const PasswordField = ({ label, value, setValue, visible, toggleVisible }) => (
   <View style={styles.inputContainer}>
     <Text style={styles.label}>{label}</Text>
@@ -224,7 +264,7 @@ const PasswordField = ({ label, value, setValue, visible, toggleVisible }) => (
       />
       <TouchableOpacity onPress={toggleVisible} style={styles.eyeIcon}>
         <Ionicons
-          name={visible ? "eye" : "eye-off"} // 👁 shows password | 👁‍🗨 hides password
+          name={visible ? "eye-off" : "eye"}
           size={22}
           color="#3A2E2E"
         />
@@ -268,6 +308,12 @@ const styles = StyleSheet.create({
     color: "#3A2E2E",
   },
   eyeIcon: { paddingHorizontal: 8 },
+  verifyText: {
+    fontFamily: "Poppins_500Medium",
+    fontSize: 14,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
   saveButton: {
     backgroundColor: "#008243",
     paddingVertical: 16,
