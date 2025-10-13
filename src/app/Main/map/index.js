@@ -17,6 +17,7 @@ import MapView, { Marker, Callout } from "react-native-maps";
 import CustomBgColor from "../../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
 import { Entypo } from "@expo/vector-icons";
+import Feather from "@expo/vector-icons/Feather";
 import { db } from "../../../../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
@@ -91,6 +92,11 @@ export default function MapSelector() {
     longitudeDelta: 0.05,
   });
   const [marker, setMarker] = useState(null);
+  const [searchMarker, setSearchMarker] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const searchTimeout = useRef(null);
+
   const [points, setPoints] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [flattenedData, setFlattenedData] = useState([]);
@@ -176,6 +182,65 @@ export default function MapSelector() {
     filtered.sort((a, b) => (a.distance || 9999) - (b.distance || 9999));
     setFlattenedData(filtered);
   }, [points, schedules, marker]);
+
+  /* ================================
+     Geoapify Autocomplete
+  ================================= */
+  const fetchGeoapifySuggestions = async (query) => {
+    if (!query || query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      const apiKey = "21e4ce510e324d2c81b5caa1989a69d2"; // your Geoapify key
+      const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(
+        query
+      )}&limit=5&format=json&apiKey=${apiKey}`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data?.results) setSearchResults(data.results);
+      else setSearchResults([]);
+    } catch (err) {
+      console.error("Geoapify fetch error:", err);
+      setSearchResults([]);
+    }
+  };
+
+  /* ================================
+     Reset to current location (instant)
+  ================================= */
+  const resetToUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+      });
+      const { latitude, longitude } = location.coords;
+
+      const newRegion = {
+        latitude,
+        longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+
+      setRegion(newRegion);
+      setMarker({ latitude, longitude });
+      setSearchMarker(null);
+
+      // ⚡ instant jump
+      setTimeout(() => {
+        mapRef.current?.animateToRegion(newRegion, 0);
+      }, 0);
+    } catch (err) {
+      console.error("Error resetting location:", err);
+    }
+  };
 
   // 🔹 Alternate color but group by pointId
   const getGroupedColors = useMemo(() => {
@@ -304,21 +369,79 @@ export default function MapSelector() {
     <CustomBgColor>
       <SafeAreaView style={{ flex: 1, paddingTop: 25 }}>
         <View style={styles.container}>
-          {/* Top Controls */}
+          {showSearchModal && searchResults.length > 0 && (
+            <View style={styles.searchModal}>
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item.place_id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.searchResultItem}
+                    onPress={() => {
+                      const { lat, lon, formatted } = item;
+                      const newRegion = {
+                        latitude: lat,
+                        longitude: lon,
+                        latitudeDelta: 0.05,
+                        longitudeDelta: 0.05,
+                      };
+                      setRegion(newRegion);
+                      setSearchMarker({ latitude: lat, longitude: lon });
+                      mapRef.current?.animateToRegion(newRegion, 1000);
+                      setShowSearchModal(false);
+                      setSearchText(formatted);
+                      Keyboard.dismiss();
+                    }}
+                  >
+                    <Text style={styles.resultTitle}>{item.address_line1}</Text>
+                    <Text style={styles.resultSubtitle}>{item.formatted}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          )}
+          {/* 🔍 Search + Tabs + Header Actions (copy UX; only LIST tab gets edit controls) */}
           <View
             style={[
               styles.topOverlayContainer,
               selectedView === "list" && styles.listTabBackground,
             ]}
           >
+            {/* Search */}
             <View style={styles.searchBox}>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search location..."
-                value={searchText}
-                onChangeText={setSearchText}
-                onSubmitEditing={handleSearch}
-              />
+              {/* Input + Clear Button Row */}
+              <View
+                style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+              >
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search location..."
+                  value={searchText}
+                  onChangeText={(text) => {
+                    setSearchText(text);
+                    setShowSearchModal(true);
+
+                    searchTimeout.current = setTimeout(() => {
+                      fetchGeoapifySuggestions(text);
+                    }, 50); // super fast
+                  }}
+                  onSubmitEditing={handleSearch}
+                />
+                {searchText.length > 0 && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      setSearchText("");
+                      setSearchResults([]);
+                      setShowSearchModal(false);
+                      setSearchMarker(null); // ✅ remove search pin
+                      await resetToUserLocation(); // ✅ re-center map
+                    }}
+                    style={{ marginLeft: 8 }}
+                  >
+                    <Feather name="x" size={22} color="#333" />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
 
             <View style={styles.toggleContainer}>
@@ -359,7 +482,9 @@ export default function MapSelector() {
                 </TouchableOpacity>
               </View>
               <View style={styles.toggleLabelBox}>
-                <Text style={styles.toggleLabel}>View Collection Points Around You</Text>
+                <Text style={styles.toggleLabel}>
+                  View Collection Points Around You
+                </Text>
               </View>
             </View>
           </View>
@@ -374,6 +499,14 @@ export default function MapSelector() {
                     userData?.firstName ? userData.firstName : "Guest"
                   }'s Location`}
                   description="This is where you are."
+                />
+              )}
+              {searchMarker && (
+                <Marker
+                  coordinate={searchMarker}
+                  title="Searched Location"
+                  description="Selected place from search"
+                  pinColor="#0B57D0"
                 />
               )}
 
@@ -447,6 +580,37 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   searchInput: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
+  searchModal: {
+    position: "absolute",
+    top: 95,
+    left: 20,
+    right: 20,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    maxHeight: 250,
+    zIndex: 999,
+  },
+  searchResultItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  resultTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
+  },
+  resultSubtitle: {
+    fontSize: 13,
+    color: "#666",
+    fontFamily: "Poppins_400Regular",
+  },
   toggleContainer: { marginHorizontal: 20, marginTop: 10 },
   toggleButtons: {
     flexDirection: "row",
