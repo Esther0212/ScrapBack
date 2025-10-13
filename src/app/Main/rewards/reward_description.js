@@ -78,35 +78,36 @@ const RewardDescription = () => {
     });
 
   // ✅ Send notification to all admins (shared adminNotifications collection)
-// ✅ Send notification to all admins (shared adminNotifications collection)
-const notifyAdmins = async (title, body, userId, type = "redemption") => {
-  try {
-    const auth = getAuth();
-    const user = await new Promise((resolve) => {
-      if (auth.currentUser) return resolve(auth.currentUser);
-      const unsub = onAuthStateChanged(auth, (u) => {
-        unsub();
-        resolve(u);
+  // ✅ Send notification to all admins (shared adminNotifications collection)
+  const notifyAdmins = async (title, body, userId, type = "redemption") => {
+    try {
+      const auth = getAuth();
+      const user = await new Promise((resolve) => {
+        if (auth.currentUser) return resolve(auth.currentUser);
+        const unsub = onAuthStateChanged(auth, (u) => {
+          unsub();
+          resolve(u);
+        });
       });
-    });
 
-    if (!user) throw new Error("No authenticated user when sending admin notif.");
+      if (!user)
+        throw new Error("No authenticated user when sending admin notif.");
 
-    console.log("🔹 Auth UID:", user.uid); // debug
-    await addDoc(collection(db, "adminNotifications"), {
-      title,
-      body,
-      userId,
-      createdAt: serverTimestamp(),
-      read: false,
-      type,
-    });
+      console.log("🔹 Auth UID:", user.uid); // debug
+      await addDoc(collection(db, "adminNotifications"), {
+        title,
+        body,
+        userId,
+        createdAt: serverTimestamp(),
+        read: false,
+        type,
+      });
 
-    console.log("✅ Sent admin notification");
-  } catch (err) {
-    console.error("❌ Error sending admin notification:", err);
-  }
-};
+      console.log("✅ Sent admin notification");
+    } catch (err) {
+      console.error("❌ Error sending admin notification:", err);
+    }
+  };
 
   // ✅ Send notification to current user
   const notifyUser = async (userId, title, body, type = "redemption") => {
@@ -169,6 +170,7 @@ const notifyAdmins = async (title, body, userId, type = "redemption") => {
         rewardName: reward.title || "Reward",
         rewardCategory: reward.category || "Other",
         points: requiredPoints,
+        seenByAdmin: false, // 👈 add this
         status: "pending",
         createdAt: serverTimestamp(),
       });
@@ -245,6 +247,7 @@ const notifyAdmins = async (title, body, userId, type = "redemption") => {
         rewardCategory: reward.category || "cash",
         cashAmount: Number(selectedAmount),
         points: requiredPoints,
+        seenByAdmin: false, // 👈 add this
         status: "pending",
         createdAt: serverTimestamp(),
       });

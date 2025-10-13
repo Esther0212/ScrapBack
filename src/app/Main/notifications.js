@@ -126,28 +126,41 @@ const renderRichBody = (body, isUnread) => (
 
   // 🔹 Handle notification tap (with confirmation prompts)
   const handleNotificationPress = (item) => {
-    if (!item.read) markOneAsRead(item.id);
+  if (!item.read) markOneAsRead(item.id);
 
-    if (item.title?.includes("Collection Point")) {
-      Alert.alert(
-        "Go to Collection Points?",
-        "Do you want to view the collection points page?",
-        [
-          { text: "No", style: "cancel" },
-          { text: "Yes", onPress: () => router.push("/Main/map") },
-        ]
-      );
-    } else if (item.type === "pickupStatus") {
-      Alert.alert(
-        "Pickup Request Update",
-        "Do you want to view your pickup requests?",
-        [
-          { text: "No", style: "cancel" },
-          { text: "Yes", onPress: () => router.push("/Main/requestPickup") },
-        ]
-      );
-    }
-  };
+  if (item.title?.includes("Collection Point")) {
+    Alert.alert(
+      "Go to Collection Points?",
+      "Do you want to view the collection points page?",
+      [
+        { text: "No", style: "cancel" },
+        { text: "Yes", onPress: () => router.push("/Main/map") },
+      ]
+    );
+  } else if (item.type === "pickupStatus") {
+    Alert.alert(
+      "Pickup Request Update",
+      "Do you want to view your pickup requests?",
+      [
+        { text: "No", style: "cancel" },
+        { text: "Yes", onPress: () => router.push("/Main/requestPickup") },
+      ]
+    );
+  } 
+  // 🟢 NEW CASE for redemption notifications
+ else if (item.type === "redemptionStatus") {
+  Alert.alert(
+    "View Transaction",
+    "Do you want to view your redemption transaction details?",
+    [
+      { text: "No", style: "cancel" },
+      { text: "Yes", onPress: () => router.push("/Main/profile") },
+    ]
+  );
+}
+
+};
+
 
   // 🔹 Render each notification card
   const renderItem = ({ item }) => (
