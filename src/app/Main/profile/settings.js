@@ -128,6 +128,7 @@ const Settings = () => {
               <Ionicons name="lock-closed-outline" size={22} color="#333" />
             }
             label="Password"
+            onPress={() => router.push("/Main/profile/changePassword")}
           />
           <SettingsItem
             icon={
