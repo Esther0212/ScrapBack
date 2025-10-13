@@ -29,6 +29,24 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState([]);
   const router = useRouter();
 
+  // 1) Add this helper above NotificationsScreen (or inside it)
+const renderRichBody = (body, isUnread) => (
+  <Text style={[styles.body, isUnread && styles.bodyUnread]} numberOfLines={10}>
+    {(body || "")
+      .replace(/<\/?b>/gi, "§§")        // support <b> and </b>, case-insensitive
+      .split("§§")
+      .map((segment, i) =>
+        i % 2 === 1 ? (
+          <Text key={i} style={{ fontFamily: "Poppins_700Bold" }}>
+            {segment}
+          </Text>
+        ) : (
+          <Text key={i}>{segment}</Text>
+        )
+      )}
+  </Text>
+);
+
   // 🔹 Real-time notifications
   useEffect(() => {
     const user = auth.currentUser;
@@ -154,33 +172,19 @@ export default function NotificationsScreen() {
       </View>
 
       {/* 🔸 Body and optional thumbnail */}
-      {item.photoUrl ? (
-        <View style={styles.rowWithImage}>
-          <View style={{ flex: 1, paddingRight: 10 }}>
-            <Text
-              style={[styles.body, !item.read && styles.bodyUnread]}
-              numberOfLines={10}
-            >
-              {item.body}
-            </Text>
-          </View>
+   {item.photoUrl ? (
+  <View style={styles.rowWithImage}>
+    <View style={{ flex: 1, paddingRight: 10 }}>
+      {renderRichBody(item.body, !item.read)}
+    </View>
+    <Image source={{ uri: item.photoUrl }} style={styles.thumbnail} resizeMode="cover" />
+  </View>
+) : (
+  <View>
+    {renderRichBody(item.body, !item.read)}
+  </View>
+)}
 
-          <Image
-            source={{ uri: item.photoUrl }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
-        </View>
-      ) : (
-        <View>
-          <Text
-            style={[styles.body, !item.read && styles.bodyUnread]}
-            numberOfLines={10}
-          >
-            {item.body}
-          </Text>
-        </View>
-      )}
 
       {/* 🔸 Date */}
       <Text style={styles.date}>

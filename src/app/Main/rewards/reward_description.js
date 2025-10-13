@@ -15,17 +15,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
-
 // ✅ Firebase
-import { db, auth } from "../../../../firebase";
+import { db } from "../../../../firebase";
 import {
   doc,
   getDoc,
   addDoc,
   collection,
   serverTimestamp,
+  getDocs,
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 const RewardDescription = () => {
   const router = useRouter();
@@ -69,12 +69,63 @@ const RewardDescription = () => {
   // ✅ Helper: get current user
   const getCurrentUser = () =>
     new Promise((resolve) => {
-      if (auth.currentUser) return resolve(auth.currentUser);
-      const unsub = onAuthStateChanged(auth, (u) => {
+      const authInstance = getAuth();
+      if (authInstance.currentUser) return resolve(authInstance.currentUser);
+      const unsub = onAuthStateChanged(authInstance, (u) => {
         unsub();
         resolve(u || null);
       });
     });
+
+  // ✅ Send notification to all admins (shared adminNotifications collection)
+// ✅ Send notification to all admins (shared adminNotifications collection)
+const notifyAdmins = async (title, body, userId, type = "redemption") => {
+  try {
+    const auth = getAuth();
+    const user = await new Promise((resolve) => {
+      if (auth.currentUser) return resolve(auth.currentUser);
+      const unsub = onAuthStateChanged(auth, (u) => {
+        unsub();
+        resolve(u);
+      });
+    });
+
+    if (!user) throw new Error("No authenticated user when sending admin notif.");
+
+    console.log("🔹 Auth UID:", user.uid); // debug
+    await addDoc(collection(db, "adminNotifications"), {
+      title,
+      body,
+      userId,
+      createdAt: serverTimestamp(),
+      read: false,
+      type,
+    });
+
+    console.log("✅ Sent admin notification");
+  } catch (err) {
+    console.error("❌ Error sending admin notification:", err);
+  }
+};
+
+  // ✅ Send notification to current user
+  const notifyUser = async (userId, title, body, type = "redemption") => {
+    try {
+      await addDoc(
+        collection(db, "notifications", userId, "userNotifications"),
+        {
+          title,
+          body,
+          createdAt: serverTimestamp(),
+          read: false,
+          type,
+        }
+      );
+      console.log("✅ Sent user notification");
+    } catch (err) {
+      console.error("❌ Error sending user notification:", err);
+    }
+  };
 
   // ✅ Handle redeem (online request)
   const handleRedeemOnline = async () => {
@@ -121,6 +172,20 @@ const RewardDescription = () => {
         status: "pending",
         createdAt: serverTimestamp(),
       });
+
+      // 🔔 Notify admins
+      await notifyAdmins(
+        "New Redemption Request",
+        `User <b>${userProfile.firstName} ${userProfile.lastName}</b> requested to redeem <b>${reward.title}</b>.`,
+        user.uid
+      );
+
+      // 🔔 Notify user
+      await notifyUser(
+        user.uid,
+        "Redemption Request Submitted",
+        `Your redemption request for <b>${reward.title}</b> has been successfully sent.`
+      );
 
       setSuccessModalVisible(true);
     } catch (error) {
@@ -183,7 +248,19 @@ const RewardDescription = () => {
         status: "pending",
         createdAt: serverTimestamp(),
       });
+      // 🔔 Notify admins
+      await notifyAdmins(
+        "New Redemption Request",
+        `User <b>${userData.firstName} ${userData.lastName}</b> requested to redeem ₱${selectedAmount}.`,
+        user.uid
+      );
 
+      // 🔔 Notify user
+      await notifyUser(
+        user.uid,
+        "Redemption Request Submitted",
+        `Your cash redemption request of ₱${selectedAmount} has been successfully sent.`
+      );
       setCashModalVisible(false);
       setSuccessModalVisible(true);
     } catch (err) {
@@ -467,43 +544,47 @@ const RewardDescription = () => {
                   }}
                 />
               </View>
-{/* Suggested Amount Buttons */}
-<View
-  style={{
-    flexDirection: "row",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 20,
-  }}
->
-  {[50, 100, 200, 500].map((amount) => (
-    <TouchableOpacity
-      key={amount}
-      onPress={() => setSelectedAmount(amount.toString())}
-      style={{
-        backgroundColor:
-          selectedAmount === amount.toString() ? "#008243" : "#E8F5E9",
-        borderColor: "#008243",
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        margin: 4,
-      }}
-    >
-      <Text
-        style={{
-          color:
-            selectedAmount === amount.toString() ? "white" : "#2E7D32",
-          fontFamily: "Poppins_600SemiBold",
-        }}
-      >
-        ₱{amount}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</View>
+              {/* Suggested Amount Buttons */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  marginBottom: 20,
+                }}
+              >
+                {[50, 100, 200, 500].map((amount) => (
+                  <TouchableOpacity
+                    key={amount}
+                    onPress={() => setSelectedAmount(amount.toString())}
+                    style={{
+                      backgroundColor:
+                        selectedAmount === amount.toString()
+                          ? "#008243"
+                          : "#E8F5E9",
+                      borderColor: "#008243",
+                      borderWidth: 1,
+                      borderRadius: 8,
+                      paddingVertical: 8,
+                      paddingHorizontal: 16,
+                      margin: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          selectedAmount === amount.toString()
+                            ? "white"
+                            : "#2E7D32",
+                        fontFamily: "Poppins_600SemiBold",
+                      }}
+                    >
+                      ₱{amount}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
               <TouchableOpacity
                 style={[
@@ -707,18 +788,17 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   modeBadge: {
-  position: "absolute",
-  top: 12,
-  right: 12,
-  paddingHorizontal: 12,
-  paddingVertical: 5,
-  borderRadius: 50,
-  borderWidth: 1.5,
-  backgroundColor: "rgba(255,255,255,0.9)",
-},
-modeText: {
-  fontSize: 12,
-  fontFamily: "Poppins_600SemiBold",
-},
-
+    position: "absolute",
+    top: 12,
+    right: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 50,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(255,255,255,0.9)",
+  },
+  modeText: {
+    fontSize: 12,
+    fontFamily: "Poppins_600SemiBold",
+  },
 });
