@@ -8,26 +8,27 @@ export default function RewardsLayout() {
 
   return (
     <Stack
-      // Default for ALL profile screens
       screenOptions={{
         headerStyle: { backgroundColor: "#F0F1C5" },
         headerTitleAlign: "center",
         headerTitleStyle: { fontFamily: "Poppins_700Bold", fontSize: 18 },
       }}
     >
-      <Stack.Screen
-        name="[category]"
-        options={{
-          title: "Rice Offer",
-          headerShown: true,
-          headerBackVisible: false,
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="chevron-back-outline" size={24} color="black" />
-            </TouchableOpacity>
-          ),
-        }}
-      />
+      {/* ✅ Dynamic header titles will come from the child screen */}
+   <Stack.Screen
+  name="[category]"
+  options={{
+    headerShown: true,
+    headerBackVisible: false,
+    headerTitle: "", // ⬅️ let child screen control the title
+    headerLeft: () => (
+      <TouchableOpacity onPress={() => router.back()}>
+        <Ionicons name="chevron-back-outline" size={24} color="black" />
+      </TouchableOpacity>
+    ),
+  }}
+/>
+
       <Stack.Screen
         name="index"
         options={{
@@ -41,10 +42,11 @@ export default function RewardsLayout() {
           ),
         }}
       />
+
       <Stack.Screen
         name="reward_description"
         options={{
-          title: "List of Rice Rewards",
+          title: "Reward Details",
           headerShown: true,
           headerBackVisible: false,
           headerLeft: () => (
@@ -54,10 +56,11 @@ export default function RewardsLayout() {
           ),
         }}
       />
+
       <Stack.Screen
         name="reward_item"
         options={{
-          title: "Rice Offer",
+          title: "Reward Items",
           headerShown: true,
           headerBackVisible: false,
           headerLeft: () => (

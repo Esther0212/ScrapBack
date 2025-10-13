@@ -1,5 +1,5 @@
 // src/app/Main/rewards/index.js
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,131 +8,153 @@ import {
   Image,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../../components/customBgColor";
-import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { db } from "../../../../firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 
 const { width } = Dimensions.get("window");
 
 const RewardsIndex = () => {
   const router = useRouter();
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // 🔹 Real-time Firestore listener — ignoring modeAvailable entirely
+  useEffect(() => {
+    const rewardRef = collection(db, "reward");
+    const unsubscribe = onSnapshot(rewardRef, (snapshot) => {
+      const rewards = snapshot.docs.map((doc) => doc.data());
+
+      // Filter available only
+      const available = rewards.filter(
+        (r) => r.status?.toLowerCase()?.trim() !== "unavailable"
+      );
+
+      // Extract and normalize categories
+      const rawCategories = available
+        .map((r) => r.category?.toLowerCase()?.trim())
+        .filter(Boolean);
+
+      // Collapse any "others" variant to "other"
+      const normalized = rawCategories.map((c) =>
+        c === "others" ? "other" : c
+      );
+
+      // Deduplicate
+      const uniqueCategories = [...new Set(normalized)];
+
+      // Sort logically
+      const order = ["sack", "load", "cash", "other"];
+      const sorted = uniqueCategories.sort(
+        (a, b) => order.indexOf(a) - order.indexOf(b)
+      );
+
+      setCategories(sorted);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 🔸 Category image selector
+  const getCategoryImage = (cat) => {
+    switch (cat) {
+      case "sack":
+        return require("../../../assets/redeem/rice.png");
+      case "load":
+        return require("../../../assets/redeem/load.png");
+      case "cash":
+        return require("../../../assets/redeem/cash.png");
+      default:
+        return require("../../../assets/redeem/other.png");
+    }
+  };
+
+  // 🔸 Category title
+  const getCategoryTitle = (cat) => {
+    switch (cat) {
+      case "sack":
+        return "Rice Sack";
+      case "load":
+        return "Load";
+      case "cash":
+        return "Cash";
+      default:
+        return "Others";
+    }
+  };
+
+  if (loading) {
+    return (
+      <CustomBgColor>
+        <SafeAreaView style={styles.safeArea}>
+          <ActivityIndicator
+            size="large"
+            color="#2E7D32"
+            style={{ marginTop: 40 }}
+          />
+        </SafeAreaView>
+      </CustomBgColor>
+    );
+  }
 
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
-        {/* Body */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <Text style={styles.descriptionText}>
             ♻️ Here are the rewards you can redeem using your earned points:
           </Text>
 
-          <View style={styles.cardContainer}>
-            {/* RICE */}
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.9}
-              onPress={() => router.push("/Main/rewards/sack")}
-            >
-              <LinearGradient
-                colors={["#A5D6A7", "#E8F5E9"]}
-                style={styles.gradientCard}
-              >
-                <Image
-                  source={require("../../../assets/redeem/rice.png")}
-                  style={styles.icon}
-                />
-                <Text style={styles.cardTitle}>Rice Sack</Text>
-                <Text style={styles.cardSubtitle}>Redeemable Onsite</Text>
+          {categories.length === 0 ? (
+            <Text style={styles.noRewardsText}>No rewards available yet.</Text>
+          ) : (
+            <View style={styles.cardContainer}>
+              {categories.map((category, index) => (
                 <TouchableOpacity
-                  style={styles.redeemButton}
-                  onPress={() => router.push("/Main/rewards/sack")}
+                  key={`${String(category)}-${index}`}
+                  style={styles.card}
+                  activeOpacity={0.9}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/Main/rewards/reward_item",
+                      params: { category },
+                    })
+                  }
                 >
-                  <Text style={styles.redeemText}>Redeem</Text>
-                </TouchableOpacity>
-              </LinearGradient>
-            </TouchableOpacity>
+                  <LinearGradient
+                    colors={["#A5D6A7", "#E8F5E9"]}
+                    style={styles.gradientCard}
+                  >
+                    <Image
+                      source={getCategoryImage(category)}
+                      style={styles.icon}
+                    />
+                    <Text style={styles.cardTitle}>
+                      {getCategoryTitle(category)}
+                    </Text>
 
-            {/* LOAD */}
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.9}
-              onPress={() => router.push("/Main/rewards/load")}
-            >
-              <LinearGradient
-                colors={["#A5D6A7", "#E8F5E9"]}
-                style={styles.gradientCard}
-              >
-                <Image
-                  source={require("../../../assets/redeem/load.png")}
-                  style={styles.icon}
-                />
-                <Text style={styles.cardTitle}>Load</Text>
-                <Text style={styles.cardSubtitle}>
-                  Redeemable Onsite/Online
-                </Text>
-                <TouchableOpacity
-                  style={styles.redeemButton}
-                  onPress={() => router.push("/Main/rewards/load")}
-                >
-                  <Text style={styles.redeemText}>Redeem</Text>
+                    <TouchableOpacity
+                      style={styles.redeemButton}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/Main/rewards/reward_item",
+                          params: { category },
+                        })
+                      }
+                    >
+                      <Text style={styles.redeemText}>View Rewards</Text>
+                    </TouchableOpacity>
+                  </LinearGradient>
                 </TouchableOpacity>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* GCASH */}
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.9}
-              onPress={() => router.push("/Main/rewards/gcash")}
-            >
-              <LinearGradient
-                colors={["#A5D6A7", "#E8F5E9"]}
-                style={styles.gradientCard}
-              >
-                <Image
-                  source={require("../../../assets/redeem/gcash.png")}
-                  style={styles.icon}
-                />
-                <Text style={styles.cardTitle}>GCash</Text>
-                <Text style={styles.cardSubtitle}>Redeemable Online</Text>
-                <TouchableOpacity
-                  style={styles.redeemButton}
-                  onPress={() => router.push("/Main/rewards/gcash")}
-                >
-                  <Text style={styles.redeemText}>Redeem</Text>
-                </TouchableOpacity>
-              </LinearGradient>
-            </TouchableOpacity>
-            {/* OTHERS */}
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.9}
-              onPress={() => router.push("/Main/rewards/others")}
-            >
-              <LinearGradient
-                colors={["#A5D6A7", "#E8F5E9"]}
-                style={styles.gradientCard}
-              >
-                <Image
-                  source={require("../../../assets/redeem/other.png")}
-                  style={styles.icon}
-                />
-                <Text style={styles.cardTitle}>Others</Text>
-                <Text style={styles.cardSubtitle}>
-                  Redeemable Onsite/Online
-                </Text>
-                <TouchableOpacity
-                  style={styles.redeemButton}
-                  onPress={() => router.push("/Main/rewards/others")}
-                >
-                  <Text style={styles.redeemText}>Redeem</Text>
-                </TouchableOpacity>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
     </CustomBgColor>
@@ -141,19 +163,8 @@ const RewardsIndex = () => {
 
 export default RewardsIndex;
 
-// ✅ Styles matching your rice.js
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontFamily: "Poppins_700Bold",
-  },
   scrollContainer: {
     paddingHorizontal: 16,
     paddingBottom: 40,
@@ -165,6 +176,13 @@ const styles = StyleSheet.create({
     color: "#1B5E20",
     textAlign: "center",
     marginBottom: 20,
+  },
+  noRewardsText: {
+    fontSize: 14,
+    color: "#777",
+    textAlign: "center",
+    fontFamily: "Poppins_500Medium",
+    marginTop: 30,
   },
   cardContainer: {
     flexDirection: "row",
@@ -201,13 +219,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     color: "#1B5E20",
     textAlign: "center",
-  },
-  cardSubtitle: {
-    fontSize: 12,
-    fontFamily: "Poppins_400Regular",
-    color: "#444",
-    textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 5,
   },
   redeemButton: {
     backgroundColor: "#008243",
