@@ -133,7 +133,6 @@ const ChangePassword = () => {
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.container}>
-            <Text style={styles.header}>Change Password</Text>
 
             {/* Current Password */}
             <Text style={styles.label}>Current Password</Text>
@@ -293,7 +292,7 @@ const ChangePassword = () => {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollContainer: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 30 },
-  container: { flex: 1 },
+  container: { flex: 1, alignItems: "stretch", justifyContent: "center" },
   header: {
     fontSize: 22,
     fontFamily: "Poppins_700Bold",
