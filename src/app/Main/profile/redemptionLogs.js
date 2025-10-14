@@ -136,12 +136,19 @@ export default function RedemptionLogs() {
               resizeMode="contain"
             />
 
-            {collectionPoint ? (
-              <Text style={styles.addressText}>{collectionPoint}</Text>
-            ) : null}
-            {collectionAddress ? (
-              <Text style={styles.addressSubText}>{collectionAddress}</Text>
-            ) : null}
+            {collectionPoint?.includes("N/A") ? (
+              // 🔹 Show "Online Redemption" only
+              <Text style={styles.addressText}>Online Redemption</Text>
+            ) : (
+              <>
+                {collectionPoint ? (
+                  <Text style={styles.addressText}>{collectionPoint}</Text>
+                ) : null}
+                {collectionAddress ? (
+                  <Text style={styles.addressSubText}>{collectionAddress}</Text>
+                ) : null}
+              </>
+            )}
 
             <Text style={styles.dateText}>{dateStr}</Text>
 
@@ -206,7 +213,12 @@ const Divider = () => (
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, padding: 20, alignItems: "center" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
   subHeader: {
     fontSize: 15,
     fontFamily: "Poppins_700Bold",
