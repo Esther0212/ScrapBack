@@ -1,3 +1,4 @@
+// src/app/Main/profile/ChangePassword.js
 import React, { useState, useRef } from "react";
 import {
   StyleSheet,
@@ -34,170 +35,214 @@ const ChangePassword = () => {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const [isSaving, setIsSaving] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [checkingPass, setCheckingPass] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState(null); // ✅ "correct" | "wrong" | null
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isVerified, setIsVerified] = useState(null); // null = not checked yet, true = correct, false = wrong
-
-  // ✅ Verify password accurately (no session-expired messages)
-  const checkCurrentPassword = async (password) => {
-    if (!password || password.length < 3) {
-      setIsVerified(null);
-      return;
-    }
-
-    try {
-      setIsVerifying(true);
-      const user = auth.currentUser;
-      if (!user?.email) throw new Error("No user email found.");
-
-      const cred = EmailAuthProvider.credential(user.email, password);
-      await reauthenticateWithCredential(user, cred);
-
-      setIsVerified(true); // ✅ correct password
-    } catch (err) {
-      console.log("Reauth error:", err.code);
-      // Only show wrong if clearly wrong
-      if (err.code === "auth/wrong-password") {
-        setIsVerified(false);
-      } else {
-        // Other errors (session, invalid-credential, etc.) → just reset quietly
-        setIsVerified(null);
-      }
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  // ✅ Handle password change securely
-  const handleChangePassword = async () => {
-    try {
-      setIsSaving(true);
-      const user = auth.currentUser;
-      if (!user) throw new Error("User not logged in.");
-
-      if (!isVerified) {
-        throw new Error("Please confirm your current password first.");
-      }
-      if (!newPassword || !confirmPassword) {
-        throw new Error("Please fill in all fields.");
-      }
-      if (newPassword.length < 6) {
-        throw new Error("Password must be at least 6 characters long.");
-      }
-      if (newPassword !== confirmPassword) {
-        throw new Error("New passwords do not match.");
-      }
-
-      await updatePassword(user, newPassword);
-
-      setToastMessage("Password updated successfully!");
-      showToast();
-      setConfirmModalVisible(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setIsVerified(null);
-    } catch (error) {
-      console.error("Error updating password:", error);
-      setToastMessage(error.message || "Failed to update password.");
-      showToast();
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // ✅ Toast animation
-  const showToast = () => {
+  // ✅ Toast Animation
+  const showToast = (msg, duration = 2000) => {
+    setToastMessage(msg);
     setToastVisible(true);
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 300,
+      duration: 250,
       useNativeDriver: true,
     }).start(() => {
       setTimeout(() => {
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 300,
+          duration: 250,
           useNativeDriver: true,
         }).start(() => setToastVisible(false));
-      }, 2000);
+      }, duration);
     });
+  };
+
+  // ✅ Reauthenticate user
+  const reauthenticate = async (password) => {
+    const user = auth.currentUser;
+    if (!user || !user.email) throw new Error("No active user session");
+    const credential = EmailAuthProvider.credential(user.email, password);
+    return reauthenticateWithCredential(user, credential);
+  };
+
+  // ✅ Check current password validity
+  const handleCheckPassword = async () => {
+    if (!currentPassword) return;
+    try {
+      setCheckingPass(true);
+      await reauthenticate(currentPassword);
+      setPasswordStatus("correct");
+    } catch (err) {
+      setPasswordStatus("wrong");
+    } finally {
+      setCheckingPass(false);
+    }
+  };
+
+  // ✅ Handle change password
+  const handleChangePassword = async () => {
+    try {
+      setIsSaving(true);
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not found");
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        showToast("Please fill in all fields");
+        return;
+      }
+      if (passwordStatus !== "correct") {
+        showToast("Please verify your current password first");
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        showToast("Passwords do not match");
+        return;
+      }
+      if (newPassword.length < 6) {
+        showToast("Password must be at least 6 characters");
+        return;
+      }
+
+      await updatePassword(user, newPassword);
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordStatus(null);
+      showToast("Password updated successfully!");
+      setConfirmModalVisible(false);
+    } catch (err) {
+      console.error("Error changing password:", err);
+      let msg = "Failed to change password.";
+      if (err.code === "auth/requires-recent-login")
+        msg = "Session expired. Please log in again.";
+      showToast(msg);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Text style={styles.header}>Change Password</Text>
+          <View style={styles.container}>
+            <Text style={styles.header}>Change Password</Text>
 
-          {/* 🔹 Current Password */}
-          <PasswordField
-            label="Current Password"
-            value={currentPassword}
-            setValue={(val) => {
-              setCurrentPassword(val);
-              checkCurrentPassword(val);
-            }}
-            visible={showCurrent}
-            toggleVisible={() => setShowCurrent(!showCurrent)}
-          />
+            {/* Current Password */}
+            <Text style={styles.label}>Current Password</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter current password"
+                secureTextEntry={!showCurrent}
+                value={currentPassword}
+                onChangeText={(text) => {
+                  setCurrentPassword(text);
+                  setPasswordStatus(null);
+                }}
+                onBlur={handleCheckPassword}
+                placeholderTextColor="#777"
+              />
+              <TouchableOpacity
+                style={styles.eyeIcon}
+                onPress={() => setShowCurrent(!showCurrent)}
+              >
+                <Ionicons
+                  name={showCurrent ? "eye" : "eye-off"}
+                  size={22}
+                  color="#3A2E2E"
+                />
+              </TouchableOpacity>
+            </View>
 
-          {/* 🔹 Verification text */}
-          {isVerifying ? (
-            <Text style={[styles.verifyText, { color: "#555" }]}>
-              Checking password...
-            </Text>
-          ) : isVerified === true ? (
-            <Text style={[styles.verifyText, { color: "#008243" }]}>
-              ✅ Correct password
-            </Text>
-          ) : isVerified === false ? (
-            <Text style={[styles.verifyText, { color: "#B71C1C" }]}>
-              ❌ Incorrect password
-            </Text>
-          ) : null}
+            {/* ✅ Status Feedback */}
+            {checkingPass ? (
+              <Text style={styles.checkingText}>Checking password...</Text>
+            ) : passwordStatus === "correct" ? (
+              <Text style={styles.correctText}>✓ Current password verified</Text>
+            ) : passwordStatus === "wrong" ? (
+              <Text style={styles.errorText}>✗ Incorrect password</Text>
+            ) : null}
 
-          {/* 🔹 New Password */}
-          <PasswordField
-            label="New Password"
-            value={newPassword}
-            setValue={setNewPassword}
-            visible={showNew}
-            toggleVisible={() => setShowNew(!showNew)}
-          />
+            {/* New Password */}
+            <Text style={[styles.label, { marginTop: 10 }]}>New Password</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter new password"
+                secureTextEntry={!showNew}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholderTextColor="#777"
+              />
+              <TouchableOpacity
+                style={styles.eyeIcon}
+                onPress={() => setShowNew(!showNew)}
+              >
+                <Ionicons
+                  name={showNew ? "eye" : "eye-off"}
+                  size={22}
+                  color="#3A2E2E"
+                />
+              </TouchableOpacity>
+            </View>
 
-          {/* 🔹 Confirm Password */}
-          <PasswordField
-            label="Confirm New Password"
-            value={confirmPassword}
-            setValue={setConfirmPassword}
-            visible={showConfirm}
-            toggleVisible={() => setShowConfirm(!showConfirm)}
-          />
+            {/* Confirm Password */}
+            <Text style={styles.label}>Confirm New Password</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="Re-enter new password"
+                secureTextEntry={!showConfirm}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholderTextColor="#777"
+              />
+              <TouchableOpacity
+                style={styles.eyeIcon}
+                onPress={() => setShowConfirm(!showConfirm)}
+              >
+                <Ionicons
+                  name={showConfirm ? "eye" : "eye-off"}
+                  size={22}
+                  color="#3A2E2E"
+                />
+              </TouchableOpacity>
+            </View>
 
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              {
-                opacity:
-                  !isVerified || !newPassword || !confirmPassword ? 0.6 : 1,
-              },
-            ]}
-            onPress={() => setConfirmModalVisible(true)}
-            disabled={
-              !isVerified || !newPassword || !confirmPassword || isSaving
-            }
-          >
-            <Text style={styles.saveText}>Update Password</Text>
-          </TouchableOpacity>
+            {/* Immediate warning if mismatch */}
+            {confirmPassword && newPassword !== confirmPassword && (
+              <Text style={styles.errorText}>⚠️ Passwords do not match</Text>
+            )}
+
+            {/* Button */}
+            <TouchableOpacity
+              style={[styles.saveButton, { opacity: isSaving ? 0.8 : 1 }]}
+              onPress={() => setConfirmModalVisible(true)}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={[styles.saveText, { marginLeft: 8 }]}>
+                    Saving...
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.saveText}>Change Password</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </ScrollView>
 
-        {/* 🔹 Confirm Modal */}
+        {/* Confirm Modal */}
         <Modal
           visible={confirmModalVisible}
           transparent
@@ -206,38 +251,27 @@ const ChangePassword = () => {
         >
           <View style={styles.modalOverlayCenter}>
             <View style={styles.confirmModal}>
-              <Text style={styles.confirmTitle}>Confirm Password Change</Text>
+              <Text style={styles.confirmTitle}>Confirm Change</Text>
               <Text style={styles.confirmText}>
                 Are you sure you want to update your password?
               </Text>
 
               <View style={styles.confirmButtons}>
                 <TouchableOpacity
-                  style={styles.cancelButton}
+                  style={styles.noButton}
                   onPress={() => setConfirmModalVisible(false)}
                 >
-                  <Text style={styles.cancelText}>Cancel</Text>
+                  <Text style={styles.noText}>No</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[
-                    styles.confirmButton,
-                    { opacity: isSaving ? 0.7 : 1 },
-                  ]}
+                  style={styles.confirmButton}
                   onPress={handleChangePassword}
-                  disabled={isSaving}
                 >
                   {isSaving ? (
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <ActivityIndicator
-                        size="small"
-                        color="#fff"
-                        style={{ marginRight: 6 }}
-                      />
-                      <Text style={styles.saveText}>Saving...</Text>
-                    </View>
+                    <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Text style={styles.saveText}>Confirm</Text>
+                    <Text style={styles.confirmTextBtn}>Confirm</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -245,7 +279,7 @@ const ChangePassword = () => {
           </View>
         </Modal>
 
-        {/* 🔹 Toast */}
+        {/* Toast */}
         {toastVisible && (
           <Animated.View style={[styles.toast, { opacity: fadeAnim }]}>
             <Text style={styles.toastText}>{toastMessage}</Text>
@@ -256,33 +290,10 @@ const ChangePassword = () => {
   );
 };
 
-// 🔹 Reusable password input
-const PasswordField = ({ label, value, setValue, visible, toggleVisible }) => (
-  <View style={styles.inputContainer}>
-    <Text style={styles.label}>{label}</Text>
-    <View style={styles.passwordWrapper}>
-      <TextInput
-        value={value}
-        onChangeText={setValue}
-        secureTextEntry={!visible}
-        style={styles.input}
-        placeholder={`Enter ${label.toLowerCase()}`}
-        placeholderTextColor="#777"
-      />
-      <TouchableOpacity onPress={toggleVisible} style={styles.eyeIcon}>
-        <Ionicons
-          name={visible ? "eye-off" : "eye"}
-          size={22}
-          color="#3A2E2E"
-        />
-      </TouchableOpacity>
-    </View>
-  </View>
-);
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  scrollContainer: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20 },
+  scrollContainer: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 30 },
+  container: { flex: 1 },
   header: {
     fontSize: 22,
     fontFamily: "Poppins_700Bold",
@@ -290,70 +301,57 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
   },
-  inputContainer: { marginBottom: 16 },
   label: {
     fontSize: 17,
     fontFamily: "Poppins_700Bold",
     color: "#3A2E2E",
     marginBottom: 6,
   },
-  passwordWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F1E3D3",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E0D4C3",
-    paddingHorizontal: 10,
+  inputWrapper: {
+    position: "relative",
+    marginBottom: 10,
   },
   input: {
-    flex: 1,
+    backgroundColor: "#F1E3D3",
+    borderRadius: 10,
     paddingVertical: 14,
-    paddingHorizontal: 10,
+    paddingHorizontal: 18,
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
     color: "#3A2E2E",
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
   },
-  eyeIcon: { paddingHorizontal: 8 },
-  verifyText: {
-    fontFamily: "Poppins_500Medium",
-    fontSize: 14,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
+  eyeIcon: { position: "absolute", right: 16, top: 14 },
   saveButton: {
     backgroundColor: "#008243",
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: "center",
-    marginTop: 10,
-    marginBottom: 40,
+    marginTop: 20,
+    marginBottom: 30,
   },
-  confirmButton: {
-    backgroundColor: "#008243",
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    flex: 1,
-    marginLeft: 10,
+  saveText: { color: "#fff", fontSize: 16, fontFamily: "Poppins_700Bold" },
+  checkingText: {
+    fontSize: 14,
+    fontFamily: "Poppins_500Medium",
+    color: "#71695B",
+    marginLeft: 4,
+    marginBottom: 8,
   },
-  saveText: {
-    color: "#fff",
-    fontSize: 16,
-    fontFamily: "Poppins_700Bold",
+  correctText: {
+    fontSize: 14,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#2ECC71",
+    marginLeft: 4,
+    marginBottom: 8,
   },
-  cancelButton: {
-    backgroundColor: "#888",
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    flex: 1,
-    marginRight: 10,
-  },
-  cancelText: {
-    color: "#fff",
-    fontSize: 16,
-    fontFamily: "Poppins_700Bold",
+  errorText: {
+    color: "#E74C3C",
+    fontSize: 14,
+    fontFamily: "Poppins_500Medium",
+    marginLeft: 4,
+    marginBottom: 8,
   },
   modalOverlayCenter: {
     flex: 1,
@@ -365,8 +363,8 @@ const styles = StyleSheet.create({
   confirmModal: {
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 20,
-    width: "90%",
+    padding: 22,
+    width: "88%",
     alignItems: "center",
   },
   confirmTitle: {
@@ -380,12 +378,36 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_400Regular",
     color: "#3A2E2E",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 18,
   },
   confirmButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
+  },
+  noButton: {
+    flex: 0.45,
+    backgroundColor: "#888",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  noText: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 15,
+  },
+  confirmButton: {
+    flex: 0.45,
+    backgroundColor: "#008243",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  confirmTextBtn: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 15,
   },
   toast: {
     position: "absolute",
