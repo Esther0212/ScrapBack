@@ -421,21 +421,34 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_400Regular",
     color: "#333",
   },
+  typeContainer: {
+    width: "100%",
+  },
+  
   typeRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between", // keeps left & right apart
+    width: "100%",
   },
+  
   typeLabel: {
+    flexShrink: 1, // ✅ allows long text to wrap or truncate if needed
+    flex: 1, // ✅ lets it take remaining space
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
     color: "#333",
+    marginRight: 10, // ✅ adds breathing room before the kg value
   },
+  
   typeValue: {
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
     color: "#333",
+    textAlign: "right",
+    minWidth: 50, // ✅ keeps a consistent width for the right column
   },
+  
 });
 
 export default Profile;
