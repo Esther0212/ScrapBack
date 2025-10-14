@@ -1,4 +1,3 @@
-// src/app/Main/rewards/reward_item.js
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -13,37 +12,36 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../../components/customBgColor";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { db } from "../../../../firebase";
 import { collection, getDocs } from "firebase/firestore";
 
 const { width } = Dimensions.get("window");
 
-const RewardItem = ({ category }) => {
+const RewardItem = () => {
   const router = useRouter();
+  const { category } = useLocalSearchParams(); // e.g. "cash", "load", "sack", "other"
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch rewards from Firestore
+  // 🔹 Fetch Firestore rewards filtered by category
   useEffect(() => {
     const fetchRewards = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "reward"));
-        const filteredRewards = querySnapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((r) => {
-            if (category === "others") {
-              // ✅ Collect all rewards that are NOT gcash, load, or sack
-              return (
-                r.category !== "gcash" &&
-                r.category !== "load" &&
-                r.category !== "sack"
-              );
-            }
-            return r.category === category;
-          });
+        const allRewards = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
 
-        setOffers(filteredRewards);
+        // ✅ Filter by category
+        const filtered = allRewards.filter((r) => {
+          const cat = r.category?.toLowerCase()?.trim();
+          if (category === "other") return !["sack", "load", "cash"].includes(cat);
+          return cat === category?.toLowerCase()?.trim();
+        });
+
+        setOffers(filtered);
       } catch (err) {
         console.error("Error fetching rewards:", err);
       } finally {
@@ -63,46 +61,62 @@ const RewardItem = ({ category }) => {
             color="#2E7D32"
             style={{ marginTop: 30 }}
           />
+        ) : offers.length === 0 ? (
+          <Text style={styles.noDataText}>
+            No rewards found in this category.
+          </Text>
         ) : (
           <ScrollView contentContainerStyle={styles.scrollView}>
             <View style={styles.cardContainer}>
-              {offers.map((offer) => (
+              {offers.map((offer, index) => (
                 <TouchableOpacity
-                  key={offer.id}
+                  key={`${offer.id}-${index}`}
                   style={styles.card}
                   activeOpacity={0.85}
                   onPress={() =>
                     router.push({
                       pathname: "/Main/rewards/reward_description",
-                      params: { id: offer.id }, // ✅ universal description page
+                      params: { id: offer.id },
                     })
                   }
                 >
-                  {/* Image */}
+                  {/* 🖼️ Image */}
                   <View style={styles.imageWrapper}>
-                    {offer.image && (
+                    {offer.image ? (
                       <Image
                         source={{ uri: offer.image }}
                         style={styles.image}
                       />
+                    ) : (
+                      <View style={styles.imagePlaceholder}>
+                        <Text style={styles.placeholderText}>No Image</Text>
+                      </View>
                     )}
+
+                    {/* Gradient overlay */}
                     <LinearGradient
-                      colors={["rgba(0,0,0,0.3)", "transparent"]}
+                      colors={["rgba(0,0,0,0.25)", "transparent"]}
                       style={styles.imageOverlay}
                     />
 
-                    {/* Points Badge */}
-                    <View style={styles.pointsBadge}>
-                      <Image
-                        source={require("../../../assets/home/lettermarkLogo.png")}
-                        style={styles.logoIcon}
-                      />
-                      <Text style={styles.pointsText}>{offer.points} pts</Text>
-                    </View>
+                    {/* ✅ Points Badge (hide for cash/gcash) */}
+                    {category !== "cash" && (
+                      <View style={styles.pointsBadge}>
+                        <Image
+                          source={require("../../../assets/home/lettermarkLogo.png")}
+                          style={styles.logoIcon}
+                        />
+                        <Text style={styles.pointsText}>
+                          {offer.points} pts
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
-                  {/* Title */}
-                  <Text style={styles.cardTitle}>{offer.title}</Text>
+                  {/* 🏷️ Title */}
+                  <Text style={styles.cardTitle}>
+                    {offer.title || "Untitled Reward"}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -118,6 +132,13 @@ export default RewardItem;
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollView: { paddingHorizontal: 14, paddingBottom: 30 },
+  noDataText: {
+    textAlign: "center",
+    marginTop: 50,
+    fontFamily: "Poppins_500Medium",
+    color: "#555",
+    fontSize: 15,
+  },
   cardContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -141,6 +162,17 @@ const styles = StyleSheet.create({
     height: width * 0.38,
     resizeMode: "cover",
   },
+  imagePlaceholder: {
+    width: "100%",
+    height: width * 0.38,
+    backgroundColor: "#E8E8E8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  placeholderText: {
+    fontFamily: "Poppins_500Medium",
+    color: "#777",
+  },
   imageOverlay: {
     position: "absolute",
     top: 0,
@@ -156,7 +188,6 @@ const styles = StyleSheet.create({
     color: "#1B5E20",
     paddingVertical: 10,
     textAlign: "center",
-    fontWeight: "bold",
   },
   pointsBadge: {
     position: "absolute",

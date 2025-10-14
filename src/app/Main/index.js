@@ -203,7 +203,7 @@ const Home = () => {
 
           {/* Greeting */}
           <Text style={styles.greeting}>
-            Hi, {userData?.firstName || "Guest"}
+            Hi, {userData?.firstName || "Guest"}!
           </Text>
           <Text style={styles.subGreeting}>
             Every action counts—start recycling today!

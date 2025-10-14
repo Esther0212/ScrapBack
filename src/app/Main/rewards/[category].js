@@ -2,17 +2,17 @@ import { useLocalSearchParams, Stack } from "expo-router";
 import RewardItem from "./reward_item";
 
 export default function RewardsCategoryPage() {
-  const { category } = useLocalSearchParams(); // "gcash", "load", "sack", or "others"
+  const { category } = useLocalSearchParams(); // "sack", "load", "cash", or "other"
 
-  const getHeaderTitle = (category) => {
-    switch (category) {
-      case "gcash":
-        return "List of GCash Offers";
+  const getHeaderTitle = (cat) => {
+    switch (cat?.toLowerCase()) {
+      case "cash":
+        return "List of Cash Rewards";
       case "load":
         return "List of Load Offers";
       case "sack":
         return "List of Rice Rewards";
-      case "others":
+      case "other":
         return "List of Other Rewards";
       default:
         return "Rewards";
@@ -21,14 +21,11 @@ export default function RewardsCategoryPage() {
 
   return (
     <>
-      {/* ✅ Dynamic header title based on category */}
       <Stack.Screen
         options={{
           title: getHeaderTitle(category),
         }}
       />
-
-      {/* ✅ Render items for the selected category */}
       <RewardItem category={category} />
     </>
   );

@@ -32,6 +32,44 @@ export default function NotificationsScreen() {
   const [selectedNotif, setSelectedNotif] = useState(null);
 
   const router = useRouter();
+  const renderRichBody = (body, isUnread) => {
+    if (!body) return null;
+
+    // 🧩 1. Decode HTML entities (Firestore often stores &lt; and &gt;)
+    const decoded = body
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&");
+
+    // 🧩 2. Convert <br> and <br/> into real newlines
+    const withLineBreaks = decoded.replace(/<br\s*\/?>/gi, "\n");
+
+    // 🧩 3. Split and render <b> tags as bold
+    const segments = withLineBreaks.replace(/<\/?b>/gi, "§§").split("§§");
+
+    const result = [];
+
+    segments.forEach((segment, i) => {
+      const parts = segment.split("\n");
+      parts.forEach((part, j) => {
+        const textEl = (
+          <Text
+            key={`${i}-${j}`}
+            style={i % 2 === 1 ? { fontFamily: "Poppins_700Bold" } : null}
+          >
+            {part}
+          </Text>
+        );
+        result.push(textEl);
+        if (j < parts.length - 1)
+          result.push(<Text key={`br-${i}-${j}`}>{"\n"}</Text>);
+      });
+    });
+
+    return (
+      <Text style={[styles.body, isUnread && styles.bodyUnread]}>{result}</Text>
+    );
+  };
 
   // 🔹 Real-time notifications
   useEffect(() => {
@@ -159,14 +197,8 @@ export default function NotificationsScreen() {
       {item.photoUrl ? (
         <View style={styles.rowWithImage}>
           <View style={{ flex: 1, paddingRight: 10 }}>
-            <Text
-              style={[styles.body, !item.read && styles.bodyUnread]}
-              numberOfLines={10}
-            >
-              {item.body}
-            </Text>
+            {renderRichBody(item.body, !item.read)}
           </View>
-
           <Image
             source={{ uri: item.photoUrl }}
             style={styles.thumbnail}
@@ -174,14 +206,7 @@ export default function NotificationsScreen() {
           />
         </View>
       ) : (
-        <View>
-          <Text
-            style={[styles.body, !item.read && styles.bodyUnread]}
-            numberOfLines={10}
-          >
-            {item.body}
-          </Text>
-        </View>
+        <View>{renderRichBody(item.body, !item.read)}</View>
       )}
 
       {/* 🔸 Date */}
