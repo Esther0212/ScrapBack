@@ -43,7 +43,7 @@ const ChangePassword = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(null); // null = not checked yet, true = correct, false = wrong
 
-  // ✅ Automatically check password after typing
+  // ✅ Verify password accurately (no session-expired messages)
   const checkCurrentPassword = async (password) => {
     if (!password || password.length < 3) {
       setIsVerified(null);
@@ -53,14 +53,21 @@ const ChangePassword = () => {
     try {
       setIsVerifying(true);
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user?.email) throw new Error("No user email found.");
 
       const cred = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, cred);
 
-      setIsVerified(true);
+      setIsVerified(true); // ✅ correct password
     } catch (err) {
-      setIsVerified(false);
+      console.log("Reauth error:", err.code);
+      // Only show wrong if clearly wrong
+      if (err.code === "auth/wrong-password") {
+        setIsVerified(false);
+      } else {
+        // Other errors (session, invalid-credential, etc.) → just reset quietly
+        setIsVerified(null);
+      }
     } finally {
       setIsVerifying(false);
     }
