@@ -554,12 +554,22 @@ export default function PickupRequestForm() {
           {/* Weight */}
           <Text style={styles.label}>Total Estimated Weight (kg)</Text>
           <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>{totalWeight} kg</Text>
+            <Text style={styles.infoTitle}>
+              {totalWeight % 1 === 0
+                ? totalWeight
+                : parseFloat(totalWeight.toFixed(2))}{" "}
+              kg
+            </Text>
           </View>
 
           <Text style={styles.label}>Estimated Points</Text>
           <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>{totalPoints} pts</Text>
+            <Text style={styles.infoTitle}>
+              {totalPoints % 1 === 0
+                ? totalPoints
+                : parseFloat(totalPoints.toFixed(2))}{" "}
+              pts
+            </Text>
           </View>
 
           {/* Waste photo */}
@@ -789,9 +799,14 @@ export default function PickupRequestForm() {
                               style={styles.weightInput}
                               placeholder="kg"
                               keyboardType="numeric"
-                              value={weights[item.type] || ""}
+                              value={weights[item.type] ?? "0"}
                               onChangeText={(val) => {
-                                const sanitized = val.replace(/[^0-9.]/g, ""); // ✅ only allow numbers + dot
+                                // ✅ only allow one decimal point and max 2 digits after
+                                const sanitized = val
+                                  .replace(/[^0-9.]/g, "") // allow digits and dot
+                                  .replace(/^([^.]*\.)|\./g, "$1") // allow only one dot
+                                  .replace(/^(\d+\.?\d{0,2}).*$/, "$1"); // limit to 2 decimals
+
                                 setWeights((prev) => ({
                                   ...prev,
                                   [item.type]: sanitized,

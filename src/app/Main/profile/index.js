@@ -143,21 +143,34 @@ const Profile = () => {
   
 
   // 🔹 Render grouped list
-  const renderGroupedList = (groupedData, type = "points") => (
-    <FlatList
-      data={Object.entries(groupedData)}
-      keyExtractor={([date]) => date}
-      contentContainerStyle={{ paddingBottom: 40 }}
-      renderItem={({ item }) => {
-        const [date, items] = item;
-        return (
-          <View style={{ marginBottom: 20 }}>
-            <Text style={styles.dateHeader}>{date}</Text>
+// 🔹 Render grouped list
+const renderGroupedList = (groupedData, type = "points") => (
+  <FlatList
+    data={Object.entries(groupedData)}
+    keyExtractor={([date]) => date}
+    contentContainerStyle={{ paddingBottom: 40 }}
+    renderItem={({ item }) => {
+      const [date, items] = item;
+      return (
+        <View style={{ marginBottom: 20 }}>
+          <Text style={styles.dateHeader}>{date}</Text>
 
-            {items.map((log) => (
+          {items.map((log) => {
+            const status = (log.status || "").toLowerCase().trim();
+            const isVoided =
+              status === "voided" || status === "void" || log.void === true;
+
+            return (
               <TouchableOpacity
                 key={log.id}
-                style={styles.logCard}
+                style={[
+                  styles.logCard,
+                  isVoided && {
+                    opacity: 0.7,
+                    backgroundColor: "#FFF1F1",
+                    borderColor: "#E57373",
+                  },
+                ]}
                 onPress={() =>
                   router.push({
                     pathname:
@@ -167,6 +180,7 @@ const Profile = () => {
                     params: { id: log.id },
                   })
                 }
+                disabled={isVoided} // 🧱 disable tap on voided
               >
                 {/* LEFT SIDE IMAGE */}
                 <View style={styles.leftSide}>
@@ -189,9 +203,21 @@ const Profile = () => {
                   {type === "points" ? (
                     <>
                       <View style={styles.pointsRow}>
-                        <Text style={styles.pointsText}>
+                        <Text
+                          style={[
+                            styles.pointsText,
+                            isVoided && {
+                              textDecorationLine: "line-through",
+                              color: "#A00",
+                            },
+                          ]}
+                        >
                           +{log.totalPoints || 0} pts
                         </Text>
+
+                        {isVoided && (
+                          <Text style={styles.voidedTag}>VOIDED</Text>
+                        )}
                       </View>
 
                       {log.selectedTypes && (
@@ -212,9 +238,21 @@ const Profile = () => {
                   ) : (
                     <>
                       <View style={styles.pointsRow}>
-                        <Text style={styles.pointsTextRed}>
+                        <Text
+                          style={[
+                            styles.pointsTextRed,
+                            isVoided && {
+                              textDecorationLine: "line-through",
+                              color: "#A00",
+                            },
+                          ]}
+                        >
                           -{log.points || 0} pts
                         </Text>
+
+                        {isVoided && (
+                          <Text style={styles.voidedTag}>VOIDED</Text>
+                        )}
                       </View>
 
                       <Text style={styles.smallText}>
@@ -224,12 +262,13 @@ const Profile = () => {
                   )}
                 </View>
               </TouchableOpacity>
-            ))}
-          </View>
-        );
-      }}
-    />
-  );
+            );
+          })}
+        </View>
+      );
+    }}
+  />
+);
 
   return (
     <CustomBgColor>
@@ -448,7 +487,19 @@ const styles = StyleSheet.create({
     textAlign: "right",
     minWidth: 50, // ✅ keeps a consistent width for the right column
   },
-  
+  voidedTag: {
+  fontSize: 12,
+  fontFamily: "Poppins_700Bold",
+  color: "#D22B2B",
+  backgroundColor: "#FADBD8",
+  paddingHorizontal: 8,
+  paddingVertical: 2,
+  borderRadius: 6,
+  textAlign: "center",
+  marginLeft: 8,
+  overflow: "hidden",
+},
+
 });
 
 export default Profile;

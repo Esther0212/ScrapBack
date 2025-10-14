@@ -6,7 +6,6 @@ import {
   FlatList,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Image,
   Modal,
 } from "react-native";
@@ -32,30 +31,31 @@ export default function NotificationsScreen() {
   const [selectedNotif, setSelectedNotif] = useState(null);
 
   const router = useRouter();
+
+  // 🔹 Format <b> and <br> tags in body text
   const renderRichBody = (body, isUnread) => {
     if (!body) return null;
 
-    // 🧩 1. Decode HTML entities (Firestore often stores &lt; and &gt;)
     const decoded = body
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
       .replace(/&amp;/g, "&");
 
-    // 🧩 2. Convert <br> and <br/> into real newlines
     const withLineBreaks = decoded.replace(/<br\s*\/?>/gi, "\n");
-
-    // 🧩 3. Split and render <b> tags as bold
     const segments = withLineBreaks.replace(/<\/?b>/gi, "§§").split("§§");
 
     const result = [];
-
     segments.forEach((segment, i) => {
       const parts = segment.split("\n");
       parts.forEach((part, j) => {
         const textEl = (
           <Text
             key={`${i}-${j}`}
-            style={i % 2 === 1 ? { fontFamily: "Poppins_700Bold" } : null}
+            style={[
+              i % 2 === 1
+                ? { fontFamily: "Poppins_700Bold", color: "#000" }
+                : { color: "#333" },
+            ]}
           >
             {part}
           </Text>
@@ -95,8 +95,8 @@ export default function NotificationsScreen() {
           d?.createdAt?.toDate
             ? d.createdAt.toDate().getTime()
             : typeof d?.createdAt === "number"
-            ? d.createdAt
-            : 0;
+              ? d.createdAt
+              : 0;
         return getTime(b) - getTime(a);
       });
 
@@ -148,13 +148,14 @@ export default function NotificationsScreen() {
     }
   };
 
-  // 🔹 Handle notification tap (with confirmation prompts)
+  // 🔹 Handle notification tap (open modal)
   const handleNotificationPress = (item) => {
     if (!item.read) markOneAsRead(item.id);
     setSelectedNotif(item);
     setModalVisible(true);
   };
 
+  // 🔹 Handle modal action
   const handleModalAction = (confirm) => {
     if (!confirm || !selectedNotif) {
       setModalVisible(false);
@@ -162,15 +163,25 @@ export default function NotificationsScreen() {
       return;
     }
 
+    const type = selectedNotif.type;
+
     if (selectedNotif.title?.includes("Collection Point")) {
       router.push("/Main/map");
-    } else if (selectedNotif.type === "pickupStatus") {
+    } else if (type === "pickupStatus") {
       router.push("/Main/requestPickup");
+    } else if (
+      type === "redemptionStatus" ||
+      type === "pointsEarned" // 🟩 added earned points
+    ) {
+      router.push("/Main/profile");
+    } else if (type === "staff_redemption" || type === "staff_contribution") {
+      router.push("/pages/Transactions");
     }
 
     setModalVisible(false);
     setSelectedNotif(null);
   };
+
   // 🔹 Render each notification card
   const renderItem = ({ item }) => (
     <TouchableOpacity
@@ -222,10 +233,11 @@ export default function NotificationsScreen() {
     </TouchableOpacity>
   );
 
+  // 🔹 UI Render
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.container}>
-        {/* 🔹 Header */}
+        {/* Header */}
         <View style={styles.topHeader}>
           <TouchableOpacity
             onPress={() => router.back()}
@@ -241,7 +253,7 @@ export default function NotificationsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 🔹 List */}
+        {/* Notifications list */}
         {notifications.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>No notifications yet</Text>
@@ -254,6 +266,8 @@ export default function NotificationsScreen() {
             contentContainerStyle={{ paddingBottom: 20 }}
           />
         )}
+
+        {/* 🧩 Modal */}
         <Modal
           visible={modalVisible}
           transparent
@@ -262,9 +276,16 @@ export default function NotificationsScreen() {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
-              <Ionicons name="notifications" size={30} color="#008243" />
+              <Ionicons name="notifications" size={36} color="#008243" />
               <Text style={styles.modalTitle}>{selectedNotif?.title}</Text>
-              <Text style={styles.modalBody}>{selectedNotif?.body}</Text>
+
+              {/* Rich Text Body */}
+              <View style={{ marginVertical: 10 }}>
+                {renderRichBody(
+                  selectedNotif?.body || "",
+                  !selectedNotif?.read
+                )}
+              </View>
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
@@ -275,7 +296,11 @@ export default function NotificationsScreen() {
                 </TouchableOpacity>
 
                 {(selectedNotif?.title?.includes("Collection Point") ||
-                  selectedNotif?.type === "pickupStatus") && (
+                  selectedNotif?.type === "pickupStatus" ||
+                  selectedNotif?.type === "redemptionStatus" ||
+                  selectedNotif?.type === "pointsEarned" || // 🟩 added this line
+                  selectedNotif?.type === "staff_redemption" ||
+                  selectedNotif?.type === "staff_contribution") && (
                   <TouchableOpacity
                     style={[styles.modalBtn, { backgroundColor: "#008243" }]}
                     onPress={() => handleModalAction(true)}
@@ -341,7 +366,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 10,
     borderBottomLeftRadius: 10,
   },
-
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -352,7 +376,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
-
   title: { fontSize: 14, fontFamily: "Poppins_700Bold", color: "#2E7D32" },
   titleUnread: { fontFamily: "Poppins_800ExtraBold", color: "#008243" },
   body: {
@@ -360,10 +383,8 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_400Regular",
     color: "#333",
     marginTop: 4,
-    marginHorizontal: 4, // ✅ added small side margin
-    textAlign: "justify", // ✅ justified text
+    textAlign: "justify",
   },
-
   bodyUnread: { color: "#004d26" },
   thumbnail: {
     width: 60,
@@ -380,6 +401,7 @@ const styles = StyleSheet.create({
   },
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { fontSize: 14, color: "#888" },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
@@ -388,22 +410,21 @@ const styles = StyleSheet.create({
   },
   modalBox: {
     backgroundColor: "#fff",
-    width: "80%",
-    borderRadius: 12,
+    width: "85%",
+    borderRadius: 16,
     padding: 20,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
   },
   modalTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: "Poppins_700Bold",
     color: "#008243",
-    marginTop: 8,
-  },
-  modalBody: {
+    marginTop: 10,
     textAlign: "center",
-    fontFamily: "Poppins_400Regular",
-    color: "#333",
-    marginVertical: 10,
   },
   modalButtons: {
     flexDirection: "row",
