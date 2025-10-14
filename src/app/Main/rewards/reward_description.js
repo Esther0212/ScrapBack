@@ -8,8 +8,9 @@ import {
   Image,
   Modal,
   ActivityIndicator,
-  Alert,
   TextInput,
+  Animated,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -44,6 +45,30 @@ const RewardDescription = () => {
   const [selectedAmount, setSelectedAmount] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ✅ Toast animation
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  const showAnimatedToast = (msg) => {
+    setToastMessage(msg);
+    setToastVisible(true);
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setTimeout(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => setToastVisible(false));
+      }, 2000);
+    });
+  };
 
   // ✅ Fetch reward
   useEffect(() => {
@@ -134,7 +159,7 @@ const RewardDescription = () => {
     try {
       const user = await getCurrentUser();
       if (!user) {
-        Alert.alert("Login Required", "Please log in to redeem rewards.");
+        showAnimatedToast("Please log in to redeem rewards.");
         setIsSubmitting(false);
         return;
       }
@@ -143,7 +168,7 @@ const RewardDescription = () => {
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
       if (!userDocSnap.exists()) {
-        Alert.alert("Error", "User profile not found.");
+        showAnimatedToast("User profile not found.");
         setIsSubmitting(false);
         return;
       }
@@ -192,7 +217,7 @@ const RewardDescription = () => {
       setSuccessModalVisible(true);
     } catch (error) {
       console.error("Redemption error:", error);
-      Alert.alert("Error", "Something went wrong. Please try again later.");
+      showAnimatedToast("Something went wrong. Please try again later.");
     } finally {
       setIsSubmitting(false);
       setChoiceModalVisible(false);
@@ -206,7 +231,7 @@ const RewardDescription = () => {
       isNaN(selectedAmount) ||
       Number(selectedAmount) <= 0
     ) {
-      Alert.alert("Invalid Amount", "Please enter a valid cash amount.");
+      showAnimatedToast("Please enter a valid cash amount.");
       return;
     }
 
@@ -315,6 +340,50 @@ const RewardDescription = () => {
           <Text style={styles.notFoundText}>
             No description found for this reward.
           </Text>
+          {toastVisible && (
+            <Animated.View
+              style={[
+                {
+                  position: "absolute",
+                  top: Platform.OS === "ios" ? 60 : 40,
+                  left: "6%",
+                  right: "6%",
+                  backgroundColor: "rgba(14,146,71,0.95)",
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 18,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 2000,
+                  elevation: 8,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.15,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowRadius: 6,
+                  opacity: fadeAnim,
+                  transform: [
+                    {
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-50, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: "#fff",
+                  fontFamily: "Poppins_700Bold",
+                  fontSize: 15,
+                  textAlign: "center",
+                }}
+              >
+                {toastMessage}
+              </Text>
+            </Animated.View>
+          )}
         </SafeAreaView>
       </CustomBgColor>
     );
@@ -421,25 +490,32 @@ const RewardDescription = () => {
             <TouchableOpacity
               activeOpacity={isUnavailable ? 1 : 0.85}
               onPress={() => {
-                if (!isUnavailable) handleRedeemClick();
+                if (!isUnavailable && !isSubmitting) handleRedeemClick();
               }}
               style={[
                 styles.ctaButtonSolid,
-                isUnavailable && styles.disabledButton,
+                (isUnavailable || isSubmitting) && styles.disabledButton,
               ]}
-              disabled={isSubmitting}
+              disabled={isUnavailable || isSubmitting}
             >
-              <Text
-                style={[styles.ctaText, isUnavailable && styles.disabledText]}
-              >
-                {isUnavailable
-                  ? "Not Available"
-                  : isSubmitting
-                  ? "Processing..."
-                  : reward.category?.toLowerCase() === "cash"
-                  ? "Redeem Cash Amount"
-                  : `Redeem for ${reward.points} Points`}
-              </Text>
+              {isSubmitting ? (
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.ctaText}>Processing...</Text>
+                </View>
+              ) : (
+                <Text
+                  style={[styles.ctaText, isUnavailable && styles.disabledText]}
+                >
+                  {isUnavailable
+                    ? "Not Available"
+                    : reward.category?.toLowerCase() === "cash"
+                      ? "Redeem Cash Amount"
+                      : `Redeem for ${reward.points} Points`}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -504,84 +580,46 @@ const RewardDescription = () => {
           </View>
         </Modal>
 
-        {/* 💵 CASH AMOUNT MODAL */}
+        {/*CASH AMOUNT MODAL */}
         <Modal visible={cashModalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={[styles.modalText, { fontWeight: "700" }]}>
-                Enter the amount you want to redeem (₱)
+            <View style={styles.cashModalCard}>
+              <Text style={styles.cashModalTitle}>Redeem Cash Amount</Text>
+              <Text style={styles.cashModalSubtitle}>
+                Enter or select the amount you want to redeem
               </Text>
 
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 20,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 20,
-                    fontFamily: "Poppins_600SemiBold",
-                    color: "#2E7D32",
-                    marginRight: 6,
-                  }}
-                >
-                  ₱
-                </Text>
+              {/* Input Field */}
+              <View style={styles.amountInputWrapper}>
+                <Text style={styles.pesoSign}>₱</Text>
                 <TextInput
                   value={selectedAmount}
                   onChangeText={setSelectedAmount}
                   keyboardType="numeric"
                   placeholder="Enter amount"
-                  style={{
-                    borderWidth: 1,
-                    borderColor: "#ccc",
-                    borderRadius: 8,
-                    padding: 10,
-                    width: 120,
-                    textAlign: "center",
-                    fontSize: 16,
-                    color: "#333",
-                  }}
+                  placeholderTextColor="#aaa"
+                  style={styles.amountInput}
                 />
               </View>
-              {/* Suggested Amount Buttons */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  marginBottom: 20,
-                }}
-              >
+
+              {/* Quick Select Buttons */}
+              <View style={styles.amountButtonRow}>
                 {[50, 100, 200, 500].map((amount) => (
                   <TouchableOpacity
                     key={amount}
                     onPress={() => setSelectedAmount(amount.toString())}
-                    style={{
-                      backgroundColor:
-                        selectedAmount === amount.toString()
-                          ? "#008243"
-                          : "#E8F5E9",
-                      borderColor: "#008243",
-                      borderWidth: 1,
-                      borderRadius: 8,
-                      paddingVertical: 8,
-                      paddingHorizontal: 16,
-                      margin: 4,
-                    }}
+                    style={[
+                      styles.amountButton,
+                      selectedAmount === amount.toString() &&
+                        styles.amountButtonSelected,
+                    ]}
                   >
                     <Text
-                      style={{
-                        color:
-                          selectedAmount === amount.toString()
-                            ? "white"
-                            : "#2E7D32",
-                        fontFamily: "Poppins_600SemiBold",
-                      }}
+                      style={[
+                        styles.amountButtonText,
+                        selectedAmount === amount.toString() &&
+                          styles.amountButtonTextSelected,
+                      ]}
                     >
                       ₱{amount}
                     </Text>
@@ -589,24 +627,24 @@ const RewardDescription = () => {
                 ))}
               </View>
 
+              {/* Buttons */}
               <TouchableOpacity
-                style={[
-                  styles.okButton,
-                  { backgroundColor: "#008243", marginBottom: 10 },
-                ]}
+                style={[styles.redeemButton, isSubmitting && { opacity: 0.7 }]}
                 onPress={handleCashRedeem}
                 disabled={isSubmitting}
               >
-                <Text style={styles.okButtonText}>
-                  {isSubmitting ? "Submitting..." : "Request to Redeem"}
-                </Text>
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.redeemButtonText}>Request to Redeem</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.okButton, { backgroundColor: "#B00020" }]}
+                style={styles.cancelButton}
                 onPress={() => setCashModalVisible(false)}
               >
-                <Text style={styles.okButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -803,5 +841,125 @@ const styles = StyleSheet.create({
   modeText: {
     fontSize: 12,
     fontFamily: "Poppins_600SemiBold",
+  },
+  cashModalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "85%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+
+  cashModalTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins_700Bold",
+    color: "#2E7D32",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+
+  cashModalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    fontFamily: "Poppins_400Regular",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+
+  amountInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 20,
+    width: "70%",
+    backgroundColor: "#FAFAFA",
+  },
+
+  pesoSign: {
+    fontSize: 20,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#2E7D32",
+    marginRight: 8,
+  },
+
+  amountInput: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: "Poppins_500Medium",
+    color: "#333",
+    textAlign: "center",
+  },
+
+  amountButtonRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 24,
+  },
+
+  amountButton: {
+    borderWidth: 1,
+    borderColor: "#2E7D32",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    margin: 5,
+    backgroundColor: "#E8F5E9",
+  },
+
+  amountButtonSelected: {
+    backgroundColor: "#2E7D32",
+    borderColor: "#2E7D32",
+  },
+
+  amountButtonText: {
+    color: "#2E7D32",
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 15,
+  },
+
+  amountButtonTextSelected: {
+    color: "#fff",
+  },
+
+  redeemButton: {
+    backgroundColor: "#2E7D32",
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    width: "80%",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+
+  redeemButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
+  },
+
+  cancelButton: {
+    backgroundColor: "#eee",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 32,
+    width: "80%",
+    alignItems: "center",
+  },
+
+  cancelButtonText: {
+    color: "#444",
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 15,
   },
 });
