@@ -145,7 +145,7 @@ export default function PickupRequestForm() {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Denied", "Camera permission is required.");
+      showAnimatedToast("Camera permission is required.");
       return;
     }
 
@@ -178,7 +178,7 @@ export default function PickupRequestForm() {
         setPhoto(downloadUrl); // ✅ save the cloud URL, not file://
       } catch (err) {
         console.error("Image upload failed:", err);
-        Alert.alert("Upload failed", "Could not upload photo.");
+        showAnimatedToast("Failed to upload photo.");
       }
     }
   };
@@ -299,7 +299,7 @@ export default function PickupRequestForm() {
         // fallback to GPS if no saved address
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert("Permission Denied", "Location permission is required.");
+          showAnimatedToast("Location permission is required.");
           setLoadingLocation(false);
           return;
         }
@@ -375,28 +375,30 @@ export default function PickupRequestForm() {
     }
   };
 
-const showAnimatedToast = (msg) => {
-  setToastMessage(msg);
-  setToastVisible(true);
-  fadeAnim.setValue(0);
+  const showAnimatedToast = (msg) => {
+    setToastMessage(msg);
+    requestAnimationFrame(() => setToastVisible(true));
+    fadeAnim.setValue(0);
 
-  // ✅ Defer animation until after UI commit to avoid "useInsertionEffect" error
-  InteractionManager.runAfterInteractions(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setTimeout(() => {
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => setToastVisible(false));
-      }, 2000);
+    InteractionManager.runAfterInteractions(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setTimeout(() => {
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            requestAnimationFrame(() => setToastVisible(false));
+          });
+        }, 2000);
+      });
     });
-  });
-};
+  };
+
   const handleSubmit = async () => {
     if (
       !selectedTypes.length ||
@@ -454,9 +456,8 @@ const showAnimatedToast = (msg) => {
         });
 
         // ✅ Consistent alert with routing
-        Alert.alert("Success", "Pickup request updated!", [
-          { text: "OK", onPress: () => router.push("/Main/requestPickup") },
-        ]);
+        showAnimatedToast("Pickup request updated!");
+        setTimeout(() => router.push("/Main/requestPickup"), 2000);
       } else {
         // 🔹 Create new request
         const newDoc = await addDoc(collection(db, "pickupRequests"), {
@@ -486,10 +487,8 @@ const showAnimatedToast = (msg) => {
           requestId: newDoc.id,
         });
 
-        Alert.alert("Success", "Pickup request created!", [
-          { text: "OK", onPress: () => router.push("/Main/requestPickup") },
-        ]);
         showAnimatedToast("Pickup request created!");
+        setTimeout(() => router.push("/Main/requestPickup"), 2000);
       }
 
       return true; // ✅ success
@@ -858,23 +857,28 @@ const showAnimatedToast = (msg) => {
                   style={[styles.confirmButton, { flex: 0.45 }]}
                   onPress={async () => {
                     setConfirmModalVisible(false);
-                    const success = await handleSubmit(); // ✅ check return value
-                    if (!success) return; // ❌ stop if failed
+                    const success = await handleSubmit();
+                    if (!success) return;
 
                     setToastMessage("Pickup request submitted successfully!");
-                    setToastVisible(true);
-                    Animated.timing(fadeAnim, {
-                      toValue: 1,
-                      duration: 300,
-                      useNativeDriver: true,
-                    }).start(() => {
-                      setTimeout(() => {
-                        Animated.timing(fadeAnim, {
-                          toValue: 0,
-                          duration: 300,
-                          useNativeDriver: true,
-                        }).start(() => setToastVisible(false));
-                      }, 2000);
+                    requestAnimationFrame(() => setToastVisible(true));
+
+                    InteractionManager.runAfterInteractions(() => {
+                      Animated.timing(fadeAnim, {
+                        toValue: 1,
+                        duration: 300,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setTimeout(() => {
+                          Animated.timing(fadeAnim, {
+                            toValue: 0,
+                            duration: 300,
+                            useNativeDriver: true,
+                          }).start(() => {
+                            requestAnimationFrame(() => setToastVisible(false));
+                          });
+                        }, 2000);
+                      });
                     });
                   }}
                 >
