@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,6 +28,9 @@ import { useRouter } from "expo-router";
 
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedNotif, setSelectedNotif] = useState(null);
+
   const router = useRouter();
 
   // 🔹 Real-time notifications
@@ -109,28 +113,26 @@ export default function NotificationsScreen() {
   // 🔹 Handle notification tap (with confirmation prompts)
   const handleNotificationPress = (item) => {
     if (!item.read) markOneAsRead(item.id);
-
-    if (item.title?.includes("Collection Point")) {
-      Alert.alert(
-        "Go to Collection Points?",
-        "Do you want to view the collection points page?",
-        [
-          { text: "No", style: "cancel" },
-          { text: "Yes", onPress: () => router.push("/Main/map") },
-        ]
-      );
-    } else if (item.type === "pickupStatus") {
-      Alert.alert(
-        "Pickup Request Update",
-        "Do you want to view your pickup requests?",
-        [
-          { text: "No", style: "cancel" },
-          { text: "Yes", onPress: () => router.push("/Main/requestPickup") },
-        ]
-      );
-    }
+    setSelectedNotif(item);
+    setModalVisible(true);
   };
 
+  const handleModalAction = (confirm) => {
+    if (!confirm || !selectedNotif) {
+      setModalVisible(false);
+      setSelectedNotif(null);
+      return;
+    }
+
+    if (selectedNotif.title?.includes("Collection Point")) {
+      router.push("/Main/map");
+    } else if (selectedNotif.type === "pickupStatus") {
+      router.push("/Main/requestPickup");
+    }
+
+    setModalVisible(false);
+    setSelectedNotif(null);
+  };
   // 🔹 Render each notification card
   const renderItem = ({ item }) => (
     <TouchableOpacity
@@ -200,7 +202,10 @@ export default function NotificationsScreen() {
       <SafeAreaView style={styles.container}>
         {/* 🔹 Header */}
         <View style={styles.topHeader}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+          >
             <Ionicons name="chevron-back" size={24} color="black" />
           </TouchableOpacity>
 
@@ -224,6 +229,41 @@ export default function NotificationsScreen() {
             contentContainerStyle={{ paddingBottom: 20 }}
           />
         )}
+        <Modal
+          visible={modalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Ionicons name="notifications" size={30} color="#008243" />
+              <Text style={styles.modalTitle}>{selectedNotif?.title}</Text>
+              <Text style={styles.modalBody}>{selectedNotif?.body}</Text>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: "#ccc" }]}
+                  onPress={() => handleModalAction(false)}
+                >
+                  <Text style={styles.modalBtnText}>Close</Text>
+                </TouchableOpacity>
+
+                {(selectedNotif?.title?.includes("Collection Point") ||
+                  selectedNotif?.type === "pickupStatus") && (
+                  <TouchableOpacity
+                    style={[styles.modalBtn, { backgroundColor: "#008243" }]}
+                    onPress={() => handleModalAction(true)}
+                  >
+                    <Text style={[styles.modalBtnText, { color: "#fff" }]}>
+                      Go
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </CustomBgColor>
   );
@@ -290,14 +330,14 @@ const styles = StyleSheet.create({
 
   title: { fontSize: 14, fontFamily: "Poppins_700Bold", color: "#2E7D32" },
   titleUnread: { fontFamily: "Poppins_800ExtraBold", color: "#008243" },
- body: {
-  fontSize: 13,
-  fontFamily: "Poppins_400Regular",
-  color: "#333",
-  marginTop: 4,
-  marginHorizontal: 4, // ✅ added small side margin
-  textAlign: "justify", // ✅ justified text
-},
+  body: {
+    fontSize: 13,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+    marginTop: 4,
+    marginHorizontal: 4, // ✅ added small side margin
+    textAlign: "justify", // ✅ justified text
+  },
 
   bodyUnread: { color: "#004d26" },
   thumbnail: {
@@ -315,4 +355,44 @@ const styles = StyleSheet.create({
   },
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { fontSize: 14, color: "#888" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    backgroundColor: "#fff",
+    width: "80%",
+    borderRadius: 12,
+    padding: 20,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
+    color: "#008243",
+    marginTop: 8,
+  },
+  modalBody: {
+    textAlign: "center",
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+    marginVertical: 10,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  modalBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginHorizontal: 6,
+  },
+  modalBtnText: {
+    fontFamily: "Poppins_600SemiBold",
+    color: "#000",
+  },
 });
