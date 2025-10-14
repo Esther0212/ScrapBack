@@ -28,24 +28,44 @@ import { useRouter } from "expo-router";
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState([]);
   const router = useRouter();
+  const renderRichBody = (body, isUnread) => {
+    if (!body) return null;
 
-  // 1) Add this helper above NotificationsScreen (or inside it)
-const renderRichBody = (body, isUnread) => (
-  <Text style={[styles.body, isUnread && styles.bodyUnread]} numberOfLines={10}>
-    {(body || "")
-      .replace(/<\/?b>/gi, "§§")        // support <b> and </b>, case-insensitive
-      .split("§§")
-      .map((segment, i) =>
-        i % 2 === 1 ? (
-          <Text key={i} style={{ fontFamily: "Poppins_700Bold" }}>
-            {segment}
+    // 🧩 1. Decode HTML entities (Firestore often stores &lt; and &gt;)
+    const decoded = body
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&");
+
+    // 🧩 2. Convert <br> and <br/> into real newlines
+    const withLineBreaks = decoded.replace(/<br\s*\/?>/gi, "\n");
+
+    // 🧩 3. Split and render <b> tags as bold
+    const segments = withLineBreaks.replace(/<\/?b>/gi, "§§").split("§§");
+
+    const result = [];
+
+    segments.forEach((segment, i) => {
+      const parts = segment.split("\n");
+      parts.forEach((part, j) => {
+        const textEl = (
+          <Text
+            key={`${i}-${j}`}
+            style={i % 2 === 1 ? { fontFamily: "Poppins_700Bold" } : null}
+          >
+            {part}
           </Text>
-        ) : (
-          <Text key={i}>{segment}</Text>
-        )
-      )}
-  </Text>
-);
+        );
+        result.push(textEl);
+        if (j < parts.length - 1)
+          result.push(<Text key={`br-${i}-${j}`}>{"\n"}</Text>);
+      });
+    });
+
+    return (
+      <Text style={[styles.body, isUnread && styles.bodyUnread]}>{result}</Text>
+    );
+  };
 
   // 🔹 Real-time notifications
   useEffect(() => {
@@ -126,41 +146,46 @@ const renderRichBody = (body, isUnread) => (
 
   // 🔹 Handle notification tap (with confirmation prompts)
   const handleNotificationPress = (item) => {
-  if (!item.read) markOneAsRead(item.id);
+    if (!item.read) markOneAsRead(item.id);
 
-  if (item.title?.includes("Collection Point")) {
-    Alert.alert(
-      "Go to Collection Points?",
-      "Do you want to view the collection points page?",
-      [
-        { text: "No", style: "cancel" },
-        { text: "Yes", onPress: () => router.push("/Main/map") },
-      ]
-    );
-  } else if (item.type === "pickupStatus") {
-    Alert.alert(
-      "Pickup Request Update",
-      "Do you want to view your pickup requests?",
-      [
-        { text: "No", style: "cancel" },
-        { text: "Yes", onPress: () => router.push("/Main/requestPickup") },
-      ]
-    );
-  } 
-  // 🟢 NEW CASE for redemption notifications
- else if (item.type === "redemptionStatus") {
-  Alert.alert(
-    "View Transaction",
-    "Do you want to view your redemption transaction details?",
-    [
-      { text: "No", style: "cancel" },
-      { text: "Yes", onPress: () => router.push("/Main/profile") },
-    ]
-  );
-}
+    if (item.title?.includes("Collection Point")) {
+      Alert.alert(
+        "Go to Collection Points?",
+        "Do you want to view the collection points page?",
+        [
+          { text: "No", style: "cancel" },
+          { text: "Yes", onPress: () => router.push("/Main/map") },
+        ]
+      );
+    } else if (item.type === "pickupStatus") {
+      Alert.alert(
+        "Pickup Request Update",
+        "Do you want to view your pickup requests?",
+        [
+          { text: "No", style: "cancel" },
+          { text: "Yes", onPress: () => router.push("/Main/requestPickup") },
+        ]
+      );
+    }
+    // 🎁 Redemption Completed → has alert
+  else if (item.type === "redemptionStatus") {
+    const isCompleted =
+      item.title?.toLowerCase().includes("completed") ||
+      item.body?.toLowerCase().includes("completed");
 
-};
-
+    if (isCompleted) {
+      Alert.alert(
+        "View Transaction",
+        "Do you want to view your redemption transaction details?",
+        [
+          { text: "No", style: "cancel" },
+          { text: "Yes", onPress: () => router.push("/Main/profile") },
+        ]
+      );
+    }
+    // 🕓 or ❌ or 📨 other redemption → do nothing
+  }
+  };
 
   // 🔹 Render each notification card
   const renderItem = ({ item }) => (
@@ -185,19 +210,20 @@ const renderRichBody = (body, isUnread) => (
       </View>
 
       {/* 🔸 Body and optional thumbnail */}
-   {item.photoUrl ? (
-  <View style={styles.rowWithImage}>
-    <View style={{ flex: 1, paddingRight: 10 }}>
-      {renderRichBody(item.body, !item.read)}
-    </View>
-    <Image source={{ uri: item.photoUrl }} style={styles.thumbnail} resizeMode="cover" />
-  </View>
-) : (
-  <View>
-    {renderRichBody(item.body, !item.read)}
-  </View>
-)}
-
+      {item.photoUrl ? (
+        <View style={styles.rowWithImage}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            {renderRichBody(item.body, !item.read)}
+          </View>
+          <Image
+            source={{ uri: item.photoUrl }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+          />
+        </View>
+      ) : (
+        <View>{renderRichBody(item.body, !item.read)}</View>
+      )}
 
       {/* 🔸 Date */}
       <Text style={styles.date}>
@@ -217,7 +243,10 @@ const renderRichBody = (body, isUnread) => (
       <SafeAreaView style={styles.container}>
         {/* 🔹 Header */}
         <View style={styles.topHeader}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+          >
             <Ionicons name="chevron-back" size={24} color="black" />
           </TouchableOpacity>
 
@@ -307,14 +336,14 @@ const styles = StyleSheet.create({
 
   title: { fontSize: 14, fontFamily: "Poppins_700Bold", color: "#2E7D32" },
   titleUnread: { fontFamily: "Poppins_800ExtraBold", color: "#008243" },
- body: {
-  fontSize: 13,
-  fontFamily: "Poppins_400Regular",
-  color: "#333",
-  marginTop: 4,
-  marginHorizontal: 4, // ✅ added small side margin
-  textAlign: "justify", // ✅ justified text
-},
+  body: {
+    fontSize: 13,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
+    marginTop: 4,
+    marginHorizontal: 4, // ✅ added small side margin
+    textAlign: "justify", // ✅ justified text
+  },
 
   bodyUnread: { color: "#004d26" },
   thumbnail: {
