@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   Dimensions,
+  ActivityIndicator, // ✅ added
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -55,6 +56,9 @@ const Signup = () => {
   const [cities, setCities] = useState([]);
   const [barangays, setBarangays] = useState([]);
   const [barangayMenu, setBarangayMenu] = useState(false);
+
+  // ✅ Added loading state
+  const [loading, setLoading] = useState(false);
 
   // Preload API data to reduce lag (done at component mount)
   useEffect(() => {
@@ -132,6 +136,8 @@ const Signup = () => {
     }
 
     try {
+      setLoading(true); // ✅ start loading
+
       // ✅ Create user with Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -169,6 +175,8 @@ const Signup = () => {
     } catch (error) {
       console.error("Signup Error:", error);
       Alert.alert("Signup Error", error.message);
+    } finally {
+      setLoading(false); // ✅ stop loading after done
     }
   };
 
@@ -324,12 +332,18 @@ const Signup = () => {
                 <TextInput value={postalCode} editable={false} style={styles.input} />
               </View>
 
+              {/* ✅ Sign Up Button with loader */}
               <TouchableOpacity
-                style={styles.signupButton}
+                style={[styles.signupButton, loading && { opacity: 0.7 }]}
                 activeOpacity={0.85}
                 onPress={handleSignup}
+                disabled={loading}
               >
-                <Text style={styles.signupButtonText}>Sign Up</Text>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.signupButtonText}>Sign Up</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity

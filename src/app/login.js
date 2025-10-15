@@ -7,6 +7,7 @@ import {
   TextInput,
   Dimensions,
   Alert,
+  ActivityIndicator, // ✅ added
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -31,6 +32,9 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
 
+  // ✅ Added loading state
+  const [loading, setLoading] = useState(false);
+
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleLogin = async () => {
@@ -54,6 +58,8 @@ const Login = () => {
     if (!isValid) return;
 
     try {
+      setLoading(true); // ✅ Start loading
+
       // 🔐 Firebase auth login
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
@@ -64,7 +70,8 @@ const Login = () => {
           "Email not verified",
           "Please verify your email before logging in. Check your inbox for the verification link."
         );
-        return; // ⛔ stop login if not verified
+        setLoading(false);
+        return;
       }
 
       // 🔔 Get push token
@@ -116,6 +123,8 @@ const Login = () => {
       else if (error.code === "auth/wrong-password")
         message = "Incorrect password.";
       Alert.alert("Login Error", message);
+    } finally {
+      setLoading(false); // ✅ Stop loading
     }
   };
 
@@ -214,13 +223,18 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Login button */}
+          {/* ✅ Login button with loader */}
           <TouchableOpacity
-            style={styles.loginButton}
+            style={[styles.loginButton, loading && { opacity: 0.7 }]}
             activeOpacity={0.8}
             onPress={handleLogin}
+            disabled={loading}
           >
-            <Text style={styles.loginButtonText}>Log in</Text>
+            {loading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.loginButtonText}>Log in</Text>
+            )}
           </TouchableOpacity>
 
           {/* Signup link */}
