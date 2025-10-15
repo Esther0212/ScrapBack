@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -6,8 +6,7 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
-  ActivityIndicator, // ✅ import spinner
-  ToastAndroid,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -16,26 +15,24 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerForPushNotificationsAsync } from "../utils/notifications";
+
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
-import { useUser } from "../context/userContext";
+import { useUser } from "../context/userContext"; // ✅ import your context
 
 const { width } = Dimensions.get("window");
 
 const Login = () => {
-  const { setUserData } = useUser();
+  const { setUserData } = useUser(); // ✅ context updater
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
-  const [loading, setLoading] = useState(false); // ✅ loading state
 
-  // 🔹 Email format validator
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  // 🔹 Handle login
   const handleLogin = async () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
@@ -57,33 +54,48 @@ const Login = () => {
     if (!isValid) return;
 
     try {
-      setLoading(true); // ✅ start loading
-
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      // 🔐 Firebase auth login
+      const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
 
-      // 🔔 Register push notifications
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        await setDoc(doc(db, "user", user.uid), { expoPushToken: token }, { merge: true });
-        console.log("🔥 Expo Push Token saved:", token);
+      // 🚨 ADD THIS CHECK FOR EMAIL VERIFICATION
+      if (!user.emailVerified) {
+        Alert.alert(
+          "Email not verified",
+          "Please verify your email before logging in. Check your inbox for the verification link."
+        );
+        return; // ⛔ stop login if not verified
       }
 
-      // 🔎 Get user profile
+      // 🔔 Get push token
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await setDoc(
+          doc(db, "user", user.uid),
+          { expoPushToken: token },
+          { merge: true }
+        );
+      }
+
+      // 🔎 Fetch user profile from Firestore
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        await AsyncStorage.setItem("firstName", userData.firstName || "");
-        setUserData({ uid: user.uid, email: user.email, ...userData });
+        const profile = userDocSnap.data();
+
+        // ✅ Update global userContext
+        setUserData({
+          uid: user.uid,
+          email: user.email,
+          ...profile,
+        });
       } else {
         console.warn("⚠️ No profile found for user:", user.uid);
         setUserData({ uid: user.uid, email: user.email });
       }
 
-      // 💾 Remember credentials
+      // Remember email/password only (NOT firstName!)
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", email);
         await AsyncStorage.setItem("savedPassword", password);
@@ -92,31 +104,24 @@ const Login = () => {
         await AsyncStorage.removeItem("savedPassword");
       }
 
-      ToastAndroid.show("Login successful!", ToastAndroid.SHORT);
+      Alert.alert("Login Success", "You have successfully logged in!");
       router.replace("/Main");
     } catch (error) {
       console.error("❌ FULL LOGIN ERROR:", error);
       let message = "Login failed. Please try again.";
-
-      if (error.code === "auth/invalid-email") {
+      if (error.code === "auth/invalid-email")
         message = "Invalid email address.";
-      } else if (error.code === "auth/user-not-found") {
+      else if (error.code === "auth/user-not-found")
         message = "User not found.";
-      } else if (error.code === "auth/wrong-password") {
+      else if (error.code === "auth/wrong-password")
         message = "Incorrect password.";
-      } else if (error.code === "auth/network-request-failed") {
-        message = "No internet connection. Please check your network.";
-      }
-
-      ToastAndroid.show(message, ToastAndroid.LONG);
-    } finally {
-      setLoading(false); // ✅ stop loading
+      Alert.alert("Login Error", message);
     }
   };
 
-  // 🔹 Auto-load saved credentials
-  useEffect(() => {
-    const loadSavedCredentials = async () => {
+  // Auto-load saved creds (if "Remember Me" checked)
+  React.useEffect(() => {
+    const loadSaved = async () => {
       try {
         const savedEmail = await AsyncStorage.getItem("savedEmail");
         const savedPassword = await AsyncStorage.getItem("savedPassword");
@@ -126,10 +131,10 @@ const Login = () => {
           setRememberMe(true);
         }
       } catch (e) {
-        console.log("Error loading saved credentials:", e);
+        console.log("Error loading saved creds:", e);
       }
     };
-    loadSavedCredentials();
+    loadSaved();
   }, []);
 
   return (
@@ -139,7 +144,7 @@ const Login = () => {
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Login to your account</Text>
 
-          {/* Email Input */}
+          {/* Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email address</Text>
             <TextInput
@@ -154,10 +159,12 @@ const Login = () => {
                 setErrors((prev) => ({ ...prev, email: "" }));
               }}
             />
-            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+            {errors.email ? (
+              <Text style={styles.errorText}>{errors.email}</Text>
+            ) : null}
           </View>
 
-          {/* Password Input */}
+          {/* Password */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordWrapper}>
@@ -183,10 +190,12 @@ const Login = () => {
                 />
               </TouchableOpacity>
             </View>
-            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+            {errors.password ? (
+              <Text style={styles.errorText}>{errors.password}</Text>
+            ) : null}
           </View>
 
-          {/* Remember / Forgot */}
+          {/* Remember Me + Forgot Password */}
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.rememberMe}
@@ -205,21 +214,16 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          {/* ✅ Login Button with Loading Spinner */}
+          {/* Login button */}
           <TouchableOpacity
-            style={[styles.loginButton, loading && { opacity: 0.7 }]}
+            style={styles.loginButton}
             activeOpacity={0.8}
             onPress={handleLogin}
-            disabled={loading}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.loginButtonText}>Log in</Text>
-            )}
+            <Text style={styles.loginButtonText}>Log in</Text>
           </TouchableOpacity>
 
-          {/* Signup Link */}
+          {/* Signup link */}
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => router.push("/signup")}
@@ -296,7 +300,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 14,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: "rgba(0, 0, 0, 1)",
     shadowOpacity: 0.25,
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 5,
