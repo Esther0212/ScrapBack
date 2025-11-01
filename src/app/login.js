@@ -215,10 +215,9 @@ const Login = () => {
 
           {/* Login button */}
           <TouchableOpacity
-            style={[styles.loginButton, loading && { opacity: 0.7 }]}
+            style={styles.loginButton}
             activeOpacity={0.8}
             onPress={handleLogin}
-            disabled={loading}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -304,7 +303,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 14,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: "rgba(0, 0, 0, 1)",
     shadowOpacity: 0.25,
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 5,

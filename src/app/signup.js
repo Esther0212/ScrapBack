@@ -334,10 +334,9 @@ const Signup = () => {
 
               {/* ✅ Sign Up Button with loader */}
               <TouchableOpacity
-                style={[styles.signupButton, loading && { opacity: 0.7 }]}
+                style={styles.signupButton}
                 activeOpacity={0.85}
                 onPress={handleSignup}
-                disabled={loading}
               >
                 {loading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
