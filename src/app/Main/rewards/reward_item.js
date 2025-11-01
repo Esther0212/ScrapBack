@@ -24,7 +24,7 @@ const RewardItem = () => {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Fetch Firestore rewards filtered by category
+  // 🔹 Fetch Firestore rewards filtered by category and sorted by lowest points
   useEffect(() => {
     const fetchRewards = async () => {
       try {
@@ -41,7 +41,14 @@ const RewardItem = () => {
           return cat === category?.toLowerCase()?.trim();
         });
 
-        setOffers(filtered);
+        // ✅ Sort rewards from lowest to highest based on points
+        const sorted = filtered.sort((a, b) => {
+          const pointsA = Number(a.points) || 0;
+          const pointsB = Number(b.points) || 0;
+          return pointsA - pointsB; // ascending order
+        });
+
+        setOffers(sorted);
       } catch (err) {
         console.error("Error fetching rewards:", err);
       } finally {

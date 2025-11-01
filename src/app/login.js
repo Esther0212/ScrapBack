@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,7 +7,7 @@ import {
   TextInput,
   Dimensions,
   Alert,
-  ActivityIndicator, // ✅ added
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -19,20 +19,18 @@ import { registerForPushNotificationsAsync } from "../utils/notifications";
 
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
-import { useUser } from "../context/userContext"; // ✅ import your context
+import { useUser } from "../context/userContext";
 
 const { width } = Dimensions.get("window");
 
 const Login = () => {
-  const { setUserData } = useUser(); // ✅ context updater
+  const { setUserData } = useUser();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
-
-  // ✅ Added loading state
   const [loading, setLoading] = useState(false);
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -58,21 +56,13 @@ const Login = () => {
     if (!isValid) return;
 
     try {
-      setLoading(true); // ✅ Start loading
+      setLoading(true);
 
-      // 🔐 Firebase auth login
+      // 🔐 Firebase sign-in
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
 
-      // 🚨 ADD THIS CHECK FOR EMAIL VERIFICATION
-      if (!user.emailVerified) {
-        Alert.alert(
-          "Email not verified",
-          "Please verify your email before logging in. Check your inbox for the verification link."
-        );
-        setLoading(false);
-        return;
-      }
+      // ✅ No email verification check here (handled in Signup)
 
       // 🔔 Get push token
       const token = await registerForPushNotificationsAsync();
@@ -84,14 +74,14 @@ const Login = () => {
         );
       }
 
-      // 🔎 Fetch user profile from Firestore
+      // 🔎 Fetch user profile
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
         const profile = userDocSnap.data();
 
-        // ✅ Update global userContext
+        // ✅ Update context
         setUserData({
           uid: user.uid,
           email: user.email,
@@ -102,7 +92,7 @@ const Login = () => {
         setUserData({ uid: user.uid, email: user.email });
       }
 
-      // Remember email/password only (NOT firstName!)
+      // 💾 Remember credentials
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", email);
         await AsyncStorage.setItem("savedPassword", password);
@@ -124,12 +114,12 @@ const Login = () => {
         message = "Incorrect password.";
       Alert.alert("Login Error", message);
     } finally {
-      setLoading(false); // ✅ Stop loading
+      setLoading(false);
     }
   };
 
-  // Auto-load saved creds (if "Remember Me" checked)
-  React.useEffect(() => {
+  // Auto-load saved creds
+  useEffect(() => {
     const loadSaved = async () => {
       try {
         const savedEmail = await AsyncStorage.getItem("savedEmail");
@@ -223,7 +213,7 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          {/* ✅ Login button with loader */}
+          {/* Login button */}
           <TouchableOpacity
             style={[styles.loginButton, loading && { opacity: 0.7 }]}
             activeOpacity={0.8}
