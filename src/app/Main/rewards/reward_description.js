@@ -25,6 +25,8 @@ import {
   collection,
   serverTimestamp,
   getDocs,
+  query,
+  where, 
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
@@ -35,6 +37,8 @@ const RewardDescription = () => {
   const [reward, setReward] = useState(null);
   const [userPoints, setUserPoints] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [hasPendingRedemption, setHasPendingRedemption] = useState(false);
+
 
   // 🔹 Modals
   const [choiceModalVisible, setChoiceModalVisible] = useState(false);
@@ -92,6 +96,7 @@ const RewardDescription = () => {
     if (id) fetchReward();
   }, [id]);
 
+  // ✅ Fetch user points
   useEffect(() => {
     const fetchUserPoints = async () => {
       try {
@@ -109,6 +114,27 @@ const RewardDescription = () => {
     fetchUserPoints();
   }, []);
 
+  // ✅ Check if user already has pending redemption for this reward
+  useEffect(() => {
+    const checkPendingRedemption = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user || !id) return;
+
+        const q = query(
+          collection(db, "redemptionRequest"),
+          where("userId", "==", user.uid),
+          where("rewardId", "==", id),
+          where("status", "in", ["pending", "processing"])
+        );
+        const snap = await getDocs(q);
+        setHasPendingRedemption(!snap.empty);
+      } catch (err) {
+        console.error("Error checking pending redemption:", err);
+      }
+    };
+    checkPendingRedemption();
+  }, [id]);
 
   // ✅ Helper: get current user
   const getCurrentUser = () =>
@@ -435,7 +461,9 @@ const RewardDescription = () => {
   const canRedeem =
   reward &&
   reward.category?.toLowerCase() !== "cash" &&
-  userPoints >= Number(reward.points || 0);
+  userPoints >= Number(reward.points || 0) &&
+  !hasPendingRedemption;
+
 
   // ✅ Header title logic
   const getHeaderTitle = (category) => {
@@ -542,14 +570,15 @@ const RewardDescription = () => {
                     (!canRedeem || isUnavailable) && styles.disabledText,
                   ]}
                 >
-                  {!canRedeem
+                  {hasPendingRedemption
+                  ? "Already Redeemed (Pending Approval)"
+                  : !canRedeem
                   ? `Redeem for ${reward.points} Points`
                   : isUnavailable
                   ? "Not Available"
                   : reward.category?.toLowerCase() === "cash"
                   ? "Redeem Cash Amount"
                   : `Redeem for ${reward.points} Points`}
-
                 </Text>
               )}
             </TouchableOpacity>
