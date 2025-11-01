@@ -1,13 +1,31 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, Modal, ActivityIndicator,
-  TextInput, Animated, Platform, Alert,
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  Modal,
+  ActivityIndicator,
+  TextInput,
+  Animated,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
+// ✅ Firebase
 import { db } from "../../../../firebase";
-import { doc, getDoc, addDoc, collection, serverTimestamp, getDocs, query, where, } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
+  getDocs,
+} from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 const RewardDescription = () => {
@@ -15,18 +33,21 @@ const RewardDescription = () => {
   const { id } = useLocalSearchParams(); // Firestore doc ID
 
   const [reward, setReward] = useState(null);
+  const [userPoints, setUserPoints] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // 🔹 Modals
   const [choiceModalVisible, setChoiceModalVisible] = useState(false);
   const [confirmMapModalVisible, setConfirmMapModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [failedModalVisible, setFailedModalVisible] = useState(false);
-  const [hasRedeemed, setHasRedeemed] = useState(false);
+  // 🪙 Cash modal (user sets amount)
   const [cashModalVisible, setCashModalVisible] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [userPoints, setUserPoints] = useState(null);
-  const [actionLocked, setActionLocked] = useState(false);
+
+  // ✅ Toast animation
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -51,29 +72,42 @@ const RewardDescription = () => {
   };
 
   // ✅ Fetch reward
-  // 🔍 Check Firestore if user already has an active request for this reward
   useEffect(() => {
-    const checkExistingRequest = async () => {
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user || !reward?.id) return;
-
+    const fetchReward = async () => {
       try {
-        const q = query(
-          collection(db, "redemptionRequest"),
-          where("userId", "==", user.uid),
-          where("rewardId", "==", reward.id),
-          where("status", "in", ["pending", "approved"]) // 🔒 lock if pending or approved
-        );
-        const existing = await getDocs(q);
-        setHasRedeemed(!existing.empty); // true = disable button
+        const docRef = doc(db, "reward", id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setReward({ id: docSnap.id, ...docSnap.data() });
+        } else {
+          setReward(null);
+        }
       } catch (err) {
-        console.error("Error checking existing redemption:", err);
+        console.error("Error fetching reward:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
-    checkExistingRequest();
-  }, [reward]);
+    if (id) fetchReward();
+  }, [id]);
+
+  useEffect(() => {
+    const fetchUserPoints = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) return;
+        const userRef = doc(db, "user", user.uid);
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          setUserPoints(Number(snap.data().points || 0));
+        }
+      } catch (err) {
+        console.error("Error fetching user points:", err);
+      }
+    };
+    fetchUserPoints();
+  }, []);
 
 
   // ✅ Helper: get current user
@@ -87,32 +121,7 @@ const RewardDescription = () => {
       });
     });
 
- 
-  useEffect(() => {
-    const auth = getAuth();
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      try {
-        if (!u) {
-          setUserPoints(null);
-          return;
-        }
-
-        const userDoc = await getDoc(doc(db, "user", u.uid));
-        if (userDoc && userDoc.exists()) {
-          const pts = Number(userDoc.data().points || 0);
-          setUserPoints(pts);
-        } else {
-          setUserPoints(0);
-        }
-      } catch (err) {
-        console.error("Error fetching user points:", err);
-        setUserPoints(null);
-      }
-    });
-
-    return () => unsub();
-  }, []);
-
+  // ✅ Send notification to all admins (shared adminNotifications collection)
   // ✅ Send notification to all admins (shared adminNotifications collection)
   const notifyAdmins = async (title, body, userId, type = "redemption") => {
     try {
@@ -174,25 +183,6 @@ const RewardDescription = () => {
         return;
       }
 
-      // 🔒 Check for existing pending/approved redemption request for this reward
-      try {
-        const q = query(
-          collection(db, "redemptionRequest"),
-          where("userId", "==", user.uid),
-          where("rewardId", "==", reward.id),
-          where("status", "in", ["pending", "approved"])
-        );
-        const existingRequests = await getDocs(q);
-        if (!existingRequests.empty) {
-          showAnimatedToast("You already have a request for this reward.");
-          setIsSubmitting(false);
-          return;
-        }
-      } catch (err) {
-        // If query fails for some reason, continue (fallback to allow request)
-        console.warn("Could not check existing requests:", err);
-      }
-
       // Get user profile
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -244,7 +234,6 @@ const RewardDescription = () => {
       );
 
       setSuccessModalVisible(true);
-      setHasRedeemed(true); // 🔒 disable further redemption for this reward
     } catch (error) {
       console.error("Redemption error:", error);
       showAnimatedToast("Something went wrong. Please try again later.");
@@ -272,24 +261,6 @@ const RewardDescription = () => {
         Alert.alert("Login Required", "Please log in to redeem rewards.");
         setIsSubmitting(false);
         return;
-      }
-
-      // 🔒 Check for existing pending/approved cash redemption request for this reward
-      try {
-        const q = query(
-          collection(db, "redemptionRequest"),
-          where("userId", "==", user.uid),
-          where("rewardId", "==", reward.id),
-          where("status", "in", ["pending", "approved"])
-        );
-        const existingRequests = await getDocs(q);
-        if (!existingRequests.empty) {
-          showAnimatedToast("You already have an active request for this reward.");
-          setIsSubmitting(false);
-          return;
-        }
-      } catch (err) {
-        console.warn("Could not check existing cash requests:", err);
       }
 
       const userDocSnap = await getDoc(doc(db, "user", user.uid));
@@ -461,11 +432,10 @@ const RewardDescription = () => {
   const modeStyle = getModeColor(reward.modeAvailable);
 
   const isUnavailable = reward.status?.toLowerCase() === "unavailable";
-  // true when logged in and user's points < required points for non-cash rewards
-  const insufficientPoints =
-    reward.category?.toLowerCase() !== "cash" &&
-    userPoints !== null &&
-    Number(userPoints) < Number(reward.points || 0);
+  const canRedeem =
+  reward &&
+  reward.category?.toLowerCase() !== "cash" &&
+  userPoints >= Number(reward.points || 0);
 
   // ✅ Header title logic
   const getHeaderTitle = (category) => {
@@ -487,10 +457,19 @@ const RewardDescription = () => {
 
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{reward.title}</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <Text
+          style={{
+            textAlign: "center",
+            fontFamily: "Poppins_700Bold",
+            fontSize: 24,
+            color: userPoints >= reward.points ? "#2E7D32" : "#B00020",
+            marginBottom: 3,
+            marginTop: -10
+          }}
+        >
+          Your Points: {userPoints} pts
+        </Text>
+
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Reward Image with Redeemable Badge */}
@@ -541,25 +520,15 @@ const RewardDescription = () => {
 
             {/* Redeem Button */}
             <TouchableOpacity
-              activeOpacity={isUnavailable ? 1 : 0.85}
+              activeOpacity={canRedeem && !isUnavailable && !isSubmitting ? 0.85 : 1}
               onPress={() => {
-                if (
-                  !isUnavailable &&
-                  !isSubmitting &&
-                  !insufficientPoints &&
-                  !hasRedeemed
-                ) {
-                  handleRedeemClick();
-                }
+                if (canRedeem && !isUnavailable && !isSubmitting) handleRedeemClick();
               }}
               style={[
                 styles.ctaButtonSolid,
-                (isUnavailable ||
-                  isSubmitting ||
-                  insufficientPoints ||
-                  hasRedeemed) && styles.disabledButton,
+                (!canRedeem || isUnavailable || isSubmitting) && styles.disabledButton,
               ]}
-              disabled={isUnavailable || isSubmitting || insufficientPoints || hasRedeemed}
+              disabled={!canRedeem || isUnavailable || isSubmitting}
             >
               {isSubmitting ? (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -570,23 +539,20 @@ const RewardDescription = () => {
                 <Text
                   style={[
                     styles.ctaText,
-                    (isUnavailable || insufficientPoints || hasRedeemed) &&
-                      styles.disabledText,
+                    (!canRedeem || isUnavailable) && styles.disabledText,
                   ]}
                 >
-                  {isUnavailable
-                    ? "Not Available"
-                    : insufficientPoints
-                    ? `Redeem for ${reward.points} Points`
-                    : hasRedeemed
-                    ? "Request Sent ✅"
-                    : reward.category?.toLowerCase() === "cash"
-                    ? "Redeem Cash Amount"
-                    : `Redeem for ${reward.points} Points`}
+                  {!canRedeem
+                  ? `Redeem for ${reward.points} Points`
+                  : isUnavailable
+                  ? "Not Available"
+                  : reward.category?.toLowerCase() === "cash"
+                  ? "Redeem Cash Amount"
+                  : `Redeem for ${reward.points} Points`}
+
                 </Text>
               )}
             </TouchableOpacity>
-
           </View>
         </ScrollView>
 
@@ -594,42 +560,22 @@ const RewardDescription = () => {
         <Modal visible={choiceModalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setChoiceModalVisible(false)}
-              >
-                <Text style={styles.modalCloseText}>←</Text>
-              </TouchableOpacity>
               <Text style={styles.modalText}>
                 How would you like to redeem this reward?
               </Text>
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <TouchableOpacity
                   style={styles.choiceButton}
-                  onPress={async () => {
-                    if (actionLocked) return;
-                    setActionLocked(true);
-                    try {
-                      await handleRedeemOnline();
-                    } finally {
-                      setActionLocked(false);
-                    }
-                  }}
-                  disabled={actionLocked || isSubmitting}
+                  onPress={handleRedeemOnline}
                 >
                   <Text style={styles.okButtonText}>Request Online</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.choiceButton, { backgroundColor: "#5F934A" }]}
                   onPress={() => {
-                    if (actionLocked) return;
-                    setActionLocked(true);
                     setChoiceModalVisible(false);
                     setConfirmMapModalVisible(true);
-                    // unlock after a short delay to prevent immediate double-tap
-                    setTimeout(() => setActionLocked(false), 700);
                   }}
-                  disabled={actionLocked}
                 >
                   <Text style={styles.okButtonText}>Go to Map</Text>
                 </TouchableOpacity>
@@ -646,12 +592,6 @@ const RewardDescription = () => {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setConfirmMapModalVisible(false)}
-              >
-                <Text style={styles.modalCloseText}>←</Text>
-              </TouchableOpacity>
               <Text style={styles.modalText}>
                 Would you like to check available PACAFACO Collection Points?
               </Text>
@@ -659,14 +599,9 @@ const RewardDescription = () => {
                 <TouchableOpacity
                   style={[styles.choiceButton, { backgroundColor: "#5F934A" }]}
                   onPress={() => {
-                    if (actionLocked) return;
-                    setActionLocked(true);
                     setConfirmMapModalVisible(false);
                     router.push("Main/map");
-                    // keep locked briefly to avoid duplicate navigation
-                    setTimeout(() => setActionLocked(false), 800);
                   }}
-                  disabled={actionLocked}
                 >
                   <Text style={styles.okButtonText}>Yes, Go</Text>
                 </TouchableOpacity>
@@ -685,12 +620,6 @@ const RewardDescription = () => {
         <Modal visible={cashModalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.cashModalCard}>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setCashModalVisible(false)}
-              >
-                <Text style={styles.modalCloseText}>←</Text>
-              </TouchableOpacity>
               <Text style={styles.cashModalTitle}>Redeem Cash Amount</Text>
               <Text style={styles.cashModalSubtitle}>
                 Enter or select the amount you want to redeem
@@ -736,17 +665,9 @@ const RewardDescription = () => {
 
               {/* Buttons */}
               <TouchableOpacity
-                style={[styles.redeemButton, (isSubmitting || actionLocked) && { opacity: 0.7 }]}
-                onPress={async () => {
-                  if (actionLocked || isSubmitting) return;
-                  setActionLocked(true);
-                  try {
-                    await handleCashRedeem();
-                  } finally {
-                    setActionLocked(false);
-                  }
-                }}
-                disabled={isSubmitting || actionLocked}
+                style={[styles.redeemButton, isSubmitting && { opacity: 0.7 }]}
+                onPress={handleCashRedeem}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -769,34 +690,16 @@ const RewardDescription = () => {
         <Modal visible={successModalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => {
-                  if (actionLocked) return;
-                  setActionLocked(true);
-                  setSuccessModalVisible(false);
-                  router.back();
-                  // keep locked briefly to avoid duplicate navigation
-                  setTimeout(() => setActionLocked(false), 800);
-                }}
-                disabled={actionLocked}
-              >
-                <Text style={styles.modalCloseText}>←</Text>
-              </TouchableOpacity>
               <Text style={styles.modalText}>
                 Your redemption request has been sent successfully!{"\n"}Waiting
                 for PACAFACO approval.
               </Text>
               <TouchableOpacity
-                style={[styles.okButton, actionLocked && { opacity: 0.7 }]}
+                style={styles.okButton}
                 onPress={() => {
-                  if (actionLocked) return;
-                  setActionLocked(true);
                   setSuccessModalVisible(false);
                   router.back();
-                  setTimeout(() => setActionLocked(false), 800);
                 }}
-                disabled={actionLocked}
               >
                 <Text style={styles.okButtonText}>OKAY</Text>
               </TouchableOpacity>
@@ -808,12 +711,6 @@ const RewardDescription = () => {
         <Modal visible={failedModalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setFailedModalVisible(false)}
-              >
-                <Text style={styles.modalCloseText}>←</Text>
-              </TouchableOpacity>
               <Text
                 style={[
                   styles.modalText,
@@ -942,23 +839,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 20,
     color: "#333",
-  },
-  modalCloseButton: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.04)",
-    zIndex: 10,
-  },
-  modalCloseText: {
-    fontSize: 20,
-    color: "#444",
-    fontFamily: "Poppins_600SemiBold",
   },
   okButton: {
     backgroundColor: "#008243",
