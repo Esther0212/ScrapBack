@@ -8,16 +8,23 @@ import {
   Alert,
   ScrollView,
   Dimensions,
-  ActivityIndicator, // ✅ added
+  ActivityIndicator,
+  ToastAndroid, // ✅ added for toast
+  Modal, // ✅ added for modal
+  Pressable, // ✅ added for close button
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth"; // ✅ added sendEmailVerification
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+} from "firebase/auth"; // ✅ added sendEmailVerification
 import { setDoc, doc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
 import { Menu, Provider as PaperProvider } from "react-native-paper";
+import Checkbox from "react-native-paper/lib/commonjs/components/Checkbox/Checkbox"; // ✅ correct import path
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import axios from "axios";
 
@@ -60,11 +67,23 @@ const Signup = () => {
   // ✅ Added loading state
   const [loading, setLoading] = useState(false);
 
+  // ✅ Privacy consent states
+  const [privacyChecked, setPrivacyChecked] = useState(false);
+  const [privacyError, setPrivacyError] = useState(false);
+
+  // ✅ Privacy Policy modal visibility
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+
   // Preload API data to reduce lag (done at component mount)
   useEffect(() => {
     const preloadAddressData = async () => {
       try {
-        const regionRes = await axios.get("https://psgc.gitlab.io/api/regions/");
+        const regionRes = await axios.get(
+          "https://psgc.gitlab.io/api/regions/"
+        );
         setRegions(regionRes.data);
 
         // Default selections
@@ -111,6 +130,15 @@ const Signup = () => {
   }, []);
 
   const handleSignup = async () => {
+    if (!privacyChecked) {
+      setPrivacyError(true);
+      ToastAndroid.show(
+        "Please agree to the privacy policy to proceed.",
+        ToastAndroid.SHORT
+      );
+      return;
+    }
+
     if (
       !firstName ||
       !lastName ||
@@ -126,26 +154,27 @@ const Signup = () => {
       !city ||
       !barangay
     ) {
-      Alert.alert("Please fill in all fields");
+      ToastAndroid.show("Please fill in all fields", ToastAndroid.SHORT);
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Passwords do not match");
+      ToastAndroid.show("Passwords do not match", ToastAndroid.SHORT);
       return;
     }
 
     try {
-      setLoading(true); // ✅ start loading
+      setLoading(true);
 
-      // ✅ Create user with Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
 
-      // ✅ Send actual email verification to provided email
       await sendEmailVerification(user);
 
-      // ✅ Save user info in Firestore
       await setDoc(doc(db, "user", user.uid), {
         firstName,
         lastName,
@@ -153,7 +182,7 @@ const Signup = () => {
         contact,
         gender,
         dob,
-        userType: "user", // ✅ role
+        userType: "user",
         address: {
           street,
           region: region.name,
@@ -165,18 +194,13 @@ const Signup = () => {
         createdAt: new Date(),
       });
 
-      // ✅ Notify user
-      Alert.alert(
-        "Verification email sent!",
-        "A verification link has been sent to your email. Please verify your account before logging in."
-      );
-
-      router.push("/login");
+      // ✅ show modal instead of alert
+      setShowSuccessModal(true);
     } catch (error) {
       console.error("Signup Error:", error);
-      Alert.alert("Signup Error", error.message);
+      ToastAndroid.show("Signup failed: " + error.message, ToastAndroid.LONG);
     } finally {
-      setLoading(false); // ✅ stop loading after done
+      setLoading(false);
     }
   };
 
@@ -187,7 +211,9 @@ const Signup = () => {
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
               <Text style={styles.title}>Sign up to earn points!</Text>
-              <Text style={styles.subtitle}>Create your ScrapBack account now</Text>
+              <Text style={styles.subtitle}>
+                Create your ScrapBack account now
+              </Text>
 
               {/* First Name & Last Name side by side */}
               <View style={styles.row}>
@@ -329,9 +355,52 @@ const Signup = () => {
 
               <View style={styles.inputContainer}>
                 <Text style={styles.subLabel}>Postal Code</Text>
-                <TextInput value={postalCode} editable={false} style={styles.input} />
+                <TextInput
+                  value={postalCode}
+                  editable={false}
+                  style={styles.input}
+                />
               </View>
-
+              {/* ✅ Privacy Agreement Checkbox */}
+              <View style={styles.checkboxContainer}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setPrivacyChecked(!privacyChecked);
+                    if (privacyError) setPrivacyError(false);
+                  }}
+                  style={[
+                    styles.checkboxRow,
+                    privacyError && !privacyChecked && { borderColor: "red" },
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <Checkbox
+                    status={privacyChecked ? "checked" : "unchecked"}
+                    onPress={() => {
+                      setPrivacyChecked(!privacyChecked);
+                      if (privacyError) setPrivacyError(false);
+                    }}
+                    color="#008243"
+                  />
+                  <Text style={styles.checkboxLabel}>
+                    I allow PACAFACO. to process my data in accordance with the{" "}
+                    <Text
+                      style={{
+                        color: "#008243",
+                        textDecorationLine: "underline",
+                      }}
+                      onPress={() => setShowPrivacyModal(true)} // ✅ open modal on click
+                    >
+                      Privacy Policy
+                    </Text>
+                  </Text>
+                </TouchableOpacity>
+                {privacyError && !privacyChecked && (
+                  <Text style={styles.errorText}>
+                    You must agree to continue.
+                  </Text>
+                )}
+              </View>
               {/* ✅ Sign Up Button with loader */}
               <TouchableOpacity
                 style={styles.signupButton}
@@ -344,7 +413,6 @@ const Signup = () => {
                   <Text style={styles.signupButtonText}>Sign Up</Text>
                 )}
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={styles.loginLink}
                 onPress={() => router.push("/login")}
@@ -355,6 +423,69 @@ const Signup = () => {
                 </Text>
               </TouchableOpacity>
             </View>
+            {/* ✅ Privacy Policy Modal */}
+            <Modal
+              visible={showPrivacyModal}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setShowPrivacyModal(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContainer}>
+                  <Text style={styles.modalTitle}>Privacy Policy</Text>
+                  <ScrollView style={styles.modalContent}>
+                    <Text style={styles.modalText}>
+                      PACAFACO. respects your privacy and ensures your personal
+                      information is protected. We collect and process your data
+                      only to provide services and improve your experience.
+                      {"\n\n"}
+                      By signing up, you agree that PACAFACO. may store and
+                      process your data in accordance with this Privacy Policy.
+                    </Text>
+                  </ScrollView>
+
+                  <Pressable
+                    style={styles.closeButton}
+                    onPress={() => setShowPrivacyModal(false)}
+                  >
+                    <Text style={styles.closeButtonText}>Close</Text>
+                  </Pressable>
+                </View>
+              </View>
+              {/* ✅ Success Modal */}
+              <Modal
+                visible={showSuccessModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowSuccessModal(false)}
+              >
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalContainer}>
+                    <Text style={styles.modalTitle}>
+                      Verification Email Sent
+                    </Text>
+                    <ScrollView style={styles.modalContent}>
+                      <Text style={styles.modalText}>
+                        A verification link has been sent to your email address.
+                        {"\n\n"}
+                        Please check your inbox and verify your account before
+                        logging in.
+                      </Text>
+                    </ScrollView>
+
+                    <Pressable
+                      style={styles.closeButton}
+                      onPress={() => {
+                        setShowSuccessModal(false);
+                        router.push("/login");
+                      }}
+                    >
+                      <Text style={styles.closeButtonText}>OK</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </Modal>
+            </Modal>
           </ScrollView>
         </SafeAreaView>
       </CustomBgColor>
@@ -363,7 +494,15 @@ const Signup = () => {
 };
 
 // ✅ Input, Password, Dropdown components remain unchanged
-const InputField = ({ label, value, setValue, keyboardType, containerStyle, subLabel, ...props }) => (
+const InputField = ({
+  label,
+  value,
+  setValue,
+  keyboardType,
+  containerStyle,
+  subLabel,
+  ...props
+}) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
     <TextInput
@@ -532,6 +671,74 @@ const styles = StyleSheet.create({
   dropdownText: {
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
+  },
+  checkboxContainer: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: "#F1E3D3",
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 13,
+    color: "#3A2E2E",
+    fontFamily: "Poppins_400Regular",
+  },
+  errorText: {
+    color: "red",
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 8,
+    fontFamily: "Poppins_400Regular",
+  },
+  // ✅ Privacy Policy Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "Poppins_700Bold",
+    color: "#008243",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  modalContent: {
+    marginBottom: 20,
+  },
+  modalText: {
+    fontSize: 14,
+    color: "#333",
+    fontFamily: "Poppins_400Regular",
+    lineHeight: 22,
+  },
+  closeButton: {
+    backgroundColor: "#008243",
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 16,
   },
 });
 
