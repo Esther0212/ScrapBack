@@ -14,7 +14,8 @@ import CustomBgColor from "../../../components/customBgColor";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { db } from "../../../../firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const { width } = Dimensions.get("window");
 
@@ -23,6 +24,9 @@ const RewardItem = () => {
   const { category } = useLocalSearchParams(); // e.g. "cash", "load", "sack", "other"
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [userPoints, setUserPoints] = useState(0); // start at 0 until loaded
+  const auth = getAuth(); // 🔹 get current Firebase user
 
   // 🔹 Fetch Firestore rewards filtered by category and sorted by lowest points
   useEffect(() => {
@@ -37,7 +41,8 @@ const RewardItem = () => {
         // ✅ Filter by category
         const filtered = allRewards.filter((r) => {
           const cat = r.category?.toLowerCase()?.trim();
-          if (category === "other") return !["sack", "load", "cash"].includes(cat);
+          if (category === "other")
+            return !["sack", "load", "cash"].includes(cat);
           return cat === category?.toLowerCase()?.trim();
         });
 
@@ -59,6 +64,43 @@ const RewardItem = () => {
     fetchRewards();
   }, [category]);
 
+  useEffect(() => {
+    const fetchUserPoints = async () => {
+      try {
+        const authInstance = getAuth();
+
+        // ✅ Wait for user to be ready (handles async auth)
+        const user = await new Promise((resolve) => {
+          if (authInstance.currentUser)
+            return resolve(authInstance.currentUser);
+          const unsub = onAuthStateChanged(authInstance, (u) => {
+            unsub();
+            resolve(u || null);
+          });
+        });
+
+        if (!user) {
+          console.warn("No user logged in yet");
+          return;
+        }
+
+        // ✅ Correct collection name and field (matches your RewardDescription)
+        const userRef = doc(db, "user", user.uid);
+        const snap = await getDoc(userRef);
+
+        if (snap.exists()) {
+          setUserPoints(Number(snap.data().points || 0));
+        } else {
+          console.warn("User document not found in Firestore");
+        }
+      } catch (err) {
+        console.error("Error fetching user points:", err);
+      }
+    };
+
+    fetchUserPoints();
+  }, []);
+
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
@@ -75,57 +117,70 @@ const RewardItem = () => {
         ) : (
           <ScrollView contentContainerStyle={styles.scrollView}>
             <View style={styles.cardContainer}>
-              {offers.map((offer, index) => (
-                <TouchableOpacity
-                  key={`${offer.id}-${index}`}
-                  style={styles.card}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/Main/rewards/reward_description",
-                      params: { id: offer.id },
-                    })
-                  }
-                >
-                  {/* 🖼️ Image */}
-                  <View style={styles.imageWrapper}>
-                    {offer.image ? (
-                      <Image
-                        source={{ uri: offer.image }}
-                        style={styles.image}
-                      />
-                    ) : (
-                      <View style={styles.imagePlaceholder}>
-                        <Text style={styles.placeholderText}>No Image</Text>
-                      </View>
-                    )}
+              {offers.map((offer, index) => {
+                const notEnoughPoints = Number(offer.points) > userPoints; // 👈 check user points
 
-                    {/* Gradient overlay */}
-                    <LinearGradient
-                      colors={["rgba(0,0,0,0.25)", "transparent"]}
-                      style={styles.imageOverlay}
-                    />
-
-                    {/* ✅ Points Badge (hide for cash/gcash) */}
-                    {category !== "cash" && (
-                      <View style={styles.pointsBadge}>
+                return (
+                  <TouchableOpacity
+                    key={`${offer.id}-${index}`}
+                    style={[
+                      styles.card,
+                      notEnoughPoints && styles.disabledCard, // 👈 still gray if not enough points
+                    ]}
+                    activeOpacity={0.85} // 👈 always clickable
+                    onPress={() => {
+                      router.push({
+                        pathname: "/Main/rewards/reward_description",
+                        params: { id: offer.id },
+                      });
+                    }}
+                  >
+                    <View style={styles.imageWrapper}>
+                      {offer.image ? (
                         <Image
-                          source={require("../../../assets/home/lettermarkLogo.png")}
-                          style={styles.logoIcon}
+                          source={{ uri: offer.image }}
+                          style={[
+                            styles.image,
+                            notEnoughPoints && { opacity: 0.4 }, // 👈 dim image
+                          ]}
                         />
-                        <Text style={styles.pointsText}>
-                          {offer.points} pts
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+                      ) : (
+                        <View style={styles.imagePlaceholder}>
+                          <Text style={styles.placeholderText}>No Image</Text>
+                        </View>
+                      )}
 
-                  {/* 🏷️ Title */}
-                  <Text style={styles.cardTitle}>
-                    {offer.title || "Untitled Reward"}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                      {category !== "cash" && (
+                        <View style={styles.pointsBadge}>
+                          <Image
+                            source={require("../../../assets/home/lettermarkLogo.png")}
+                            style={styles.logoIcon}
+                          />
+                          <Text style={styles.pointsText}>
+                            {offer.points} pts
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.cardTitle,
+                        notEnoughPoints && { color: "#aaa" }, // 👈 gray title
+                      ]}
+                    >
+                      {offer.title || "Untitled Reward"}
+                    </Text>
+
+                    {/* 👇 show message if not enough points */}
+                    {notEnoughPoints && (
+                      <Text style={styles.insufficientText}>
+                        Not enough points
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </ScrollView>
         )}
@@ -223,5 +278,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginLeft: 6,
     marginTop: 2,
+  },
+  disabledCard: {
+    backgroundColor: "#f2f2f2",
+  },
+  insufficientText: {
+    textAlign: "center",
+    fontSize: 12,
+    color: "#999",
+    fontFamily: "Poppins_500Medium",
+    marginBottom: 8,
   },
 });
