@@ -76,7 +76,6 @@ const Signup = () => {
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-
   // Preload API data to reduce lag (done at component mount)
   useEffect(() => {
     const preloadAddressData = async () => {
@@ -154,18 +153,22 @@ const Signup = () => {
       !city ||
       !barangay
     ) {
-      ToastAndroid.show("Please fill in all fields", ToastAndroid.SHORT);
+      ToastAndroid.show(
+        "Please fill in all required fields.",
+        ToastAndroid.SHORT
+      );
       return;
     }
 
     if (password !== confirmPassword) {
-      ToastAndroid.show("Passwords do not match", ToastAndroid.SHORT);
+      ToastAndroid.show("Passwords do not match.", ToastAndroid.SHORT);
       return;
     }
 
     try {
       setLoading(true);
 
+      // ✅ Create the user account
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -173,8 +176,10 @@ const Signup = () => {
       );
       const user = userCredential.user;
 
+      // ✅ Send email verification
       await sendEmailVerification(user);
 
+      // ✅ Store user info in Firestore
       await setDoc(doc(db, "user", user.uid), {
         firstName,
         lastName,
@@ -192,13 +197,30 @@ const Signup = () => {
           postalCode,
         },
         createdAt: new Date(),
+        points: 0,
+        online: false,
       });
 
-      // ✅ show modal instead of alert
+      // ✅ Show success modal only (no toast)
       setShowSuccessModal(true);
     } catch (error) {
       console.error("Signup Error:", error);
-      ToastAndroid.show("Signup failed: " + error.message, ToastAndroid.LONG);
+
+      // 🎯 Friendlier error messages
+      let message = "Signup failed. Please try again.";
+      if (error.code === "auth/email-already-in-use") {
+        message = "This email is already registered. Please log in instead.";
+      } else if (error.code === "auth/invalid-email") {
+        message = "Please enter a valid email address.";
+      } else if (error.code === "auth/weak-password") {
+        message = "Password is too weak. Use at least 6 characters.";
+      } else if (error.code === "auth/network-request-failed") {
+        message = "Network error. Please check your internet connection.";
+      } else if (error.code === "auth/too-many-requests") {
+        message = "Too many attempts. Please try again later.";
+      }
+
+      ToastAndroid.show(message, ToastAndroid.LONG);
     } finally {
       setLoading(false);
     }
@@ -309,6 +331,29 @@ const Signup = () => {
               />
 
               <DropdownField
+                label="Barangay"
+                visible={barangayMenu}
+                setVisible={setBarangayMenu}
+                selected={barangay ? barangay.name : ""}
+                setSelected={setBarangay}
+                options={barangays}
+                optionKey="name"
+                subLabel
+              />
+
+              <DropdownField
+                label="City"
+                visible={false}
+                setVisible={() => {}}
+                selected={city ? city.name : ""}
+                setSelected={() => {}}
+                options={cities}
+                optionKey="name"
+                readOnly
+                subLabel
+              />
+
+              <DropdownField
                 label="Region"
                 visible={false}
                 setVisible={() => {}}
@@ -328,28 +373,6 @@ const Signup = () => {
                 options={provinces}
                 optionKey="name"
                 readOnly
-                subLabel
-              />
-              <DropdownField
-                label="City"
-                visible={false}
-                setVisible={() => {}}
-                selected={city ? city.name : ""}
-                setSelected={() => {}}
-                options={cities}
-                optionKey="name"
-                readOnly
-                subLabel
-              />
-
-              <DropdownField
-                label="Barangay"
-                visible={barangayMenu}
-                setVisible={setBarangayMenu}
-                selected={barangay ? barangay.name : ""}
-                setSelected={setBarangay}
-                options={barangays}
-                optionKey="name"
                 subLabel
               />
 
@@ -452,39 +475,38 @@ const Signup = () => {
                   </Pressable>
                 </View>
               </View>
-              {/* ✅ Success Modal */}
-              <Modal
-                visible={showSuccessModal}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowSuccessModal(false)}
-              >
-                <View style={styles.modalOverlay}>
-                  <View style={styles.modalContainer}>
-                    <Text style={styles.modalTitle}>
-                      Verification Email Sent
-                    </Text>
-                    <ScrollView style={styles.modalContent}>
-                      <Text style={styles.modalText}>
-                        A verification link has been sent to your email address.
-                        {"\n\n"}
-                        Please check your inbox and verify your account before
-                        logging in.
-                      </Text>
-                    </ScrollView>
+            </Modal>
 
-                    <Pressable
-                      style={styles.closeButton}
-                      onPress={() => {
-                        setShowSuccessModal(false);
-                        router.push("/login");
-                      }}
-                    >
-                      <Text style={styles.closeButtonText}>OK</Text>
-                    </Pressable>
-                  </View>
+            {/* ✅ Success Modal */}
+            <Modal
+              visible={showSuccessModal}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setShowSuccessModal(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContainer}>
+                  <Text style={styles.modalTitle}>Verification Email Sent</Text>
+                  <ScrollView style={styles.modalContent}>
+                    <Text style={styles.modalText}>
+                      A verification link has been sent to your email address.
+                      {"\n\n"}
+                      Please check your inbox and verify your account before
+                      logging in.
+                    </Text>
+                  </ScrollView>
+
+                  <Pressable
+                    style={styles.closeButton}
+                    onPress={() => {
+                      setShowSuccessModal(false);
+                      router.push("/login");
+                    }}
+                  >
+                    <Text style={styles.closeButtonText}>OK</Text>
+                  </Pressable>
                 </View>
-              </Modal>
+              </View>
             </Modal>
           </ScrollView>
         </SafeAreaView>

@@ -35,88 +35,97 @@ const Login = () => {
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const handleLogin = async () => {
-    let tempErrors = { email: "", password: "" };
-    let isValid = true;
+const handleLogin = async () => {
+  let tempErrors = { email: "", password: "" };
+  let isValid = true;
 
-    if (!email) {
-      tempErrors.email = "Email is required";
-      isValid = false;
-    } else if (!validateEmail(email)) {
-      tempErrors.email = "Enter a valid email address";
-      isValid = false;
-    }
+  if (!email) {
+    tempErrors.email = "Email is required";
+    isValid = false;
+  } else if (!validateEmail(email)) {
+    tempErrors.email = "Enter a valid email address";
+    isValid = false;
+  }
 
-    if (!password) {
-      tempErrors.password = "Password is required";
-      isValid = false;
-    }
+  if (!password) {
+    tempErrors.password = "Password is required";
+    isValid = false;
+  }
 
-    setErrors(tempErrors);
-    if (!isValid) return;
+  setErrors(tempErrors);
+  if (!isValid) return;
 
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      // 🔐 Firebase sign-in
-      const { user } = await signInWithEmailAndPassword(auth, email, password);
-      console.log("✅ Logged in:", user.uid);
+    // 🔐 Firebase sign-in
+    const { user } = await signInWithEmailAndPassword(auth, email, password);
+    console.log("✅ Logged in:", user.uid);
 
-      // ✅ No email verification check here (handled in Signup)
-
-      // 🔔 Get push token
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        await setDoc(
-          doc(db, "user", user.uid),
-          { expoPushToken: token },
-          { merge: true }
-        );
-      }
-
-      // 🔎 Fetch user profile
-      const userDocRef = doc(db, "user", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (userDocSnap.exists()) {
-        const profile = userDocSnap.data();
-
-        // ✅ Update context
-        setUserData({
-          uid: user.uid,
-          email: user.email,
-          ...profile,
-        });
-      } else {
-        console.warn("⚠️ No profile found for user:", user.uid);
-        setUserData({ uid: user.uid, email: user.email });
-      }
-
-      // 💾 Remember credentials
-      if (rememberMe) {
-        await AsyncStorage.setItem("savedEmail", email);
-        await AsyncStorage.setItem("savedPassword", password);
-      } else {
-        await AsyncStorage.removeItem("savedEmail");
-        await AsyncStorage.removeItem("savedPassword");
-      }
-
-      Alert.alert("Login Success", "You have successfully logged in!");
-      router.replace("/Main");
-    } catch (error) {
-      console.error("❌ FULL LOGIN ERROR:", error);
-      let message = "Login failed. Please try again.";
-      if (error.code === "auth/invalid-email")
-        message = "Invalid email address.";
-      else if (error.code === "auth/user-not-found")
-        message = "User not found.";
-      else if (error.code === "auth/wrong-password")
-        message = "Incorrect password.";
-      Alert.alert("Login Error", message);
-    } finally {
+    // 🚫 Block login if email not verified
+    if (!user.emailVerified) {
+      Alert.alert(
+        "Email Not Verified",
+        "Please verify your email before logging in. Check your inbox for the verification link."
+      );
+      await auth.signOut();
       setLoading(false);
+      return;
     }
-  };
+
+    // 🔔 Get push token
+    const token = await registerForPushNotificationsAsync();
+    if (token) {
+      await setDoc(
+        doc(db, "user", user.uid),
+        { expoPushToken: token },
+        { merge: true }
+      );
+    }
+
+    // 🔎 Fetch user profile
+    const userDocRef = doc(db, "user", user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (userDocSnap.exists()) {
+      const profile = userDocSnap.data();
+
+      // ✅ Update context
+      setUserData({
+        uid: user.uid,
+        email: user.email,
+        ...profile,
+      });
+    } else {
+      console.warn("⚠️ No profile found for user:", user.uid);
+      setUserData({ uid: user.uid, email: user.email });
+    }
+
+    // 💾 Remember credentials
+    if (rememberMe) {
+      await AsyncStorage.setItem("savedEmail", email);
+      await AsyncStorage.setItem("savedPassword", password);
+    } else {
+      await AsyncStorage.removeItem("savedEmail");
+      await AsyncStorage.removeItem("savedPassword");
+    }
+
+    Alert.alert("Login Success", "You have successfully logged in!");
+    router.replace("/Main");
+  } catch (error) {
+    console.error("❌ FULL LOGIN ERROR:", error);
+    let message = "Login failed. Please try again.";
+    if (error.code === "auth/invalid-email")
+      message = "Invalid email address.";
+    else if (error.code === "auth/user-not-found")
+      message = "User not found.";
+    else if (error.code === "auth/wrong-password")
+      message = "Incorrect password.";
+    Alert.alert("Login Error", message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Auto-load saved creds
   useEffect(() => {
