@@ -27,6 +27,7 @@ import {
   getDocs,
   query,
   where, 
+  updateDoc,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
@@ -36,6 +37,7 @@ const RewardDescription = () => {
 
   const [reward, setReward] = useState(null);
   const [userPoints, setUserPoints] = useState(0);
+  const [lockedPoints, setLockedPoints] = useState(0);
   const [loading, setLoading] = useState(true);
   const [hasPendingRedemption, setHasPendingRedemption] = useState(false);
 
@@ -105,7 +107,9 @@ const RewardDescription = () => {
         const userRef = doc(db, "user", user.uid);
         const snap = await getDoc(userRef);
         if (snap.exists()) {
-          setUserPoints(Number(snap.data().points || 0));
+          const data = snap.data();
+          setUserPoints(Number(data.points || 0));
+          setLockedPoints(Number(data.locked_points || 0));
         }
       } catch (err) {
         console.error("Error fetching user points:", err);
@@ -245,6 +249,14 @@ const RewardDescription = () => {
         createdAt: serverTimestamp(),
       });
 
+      // 🔒 Move points to locked_points
+      const newPoints = userPoints - requiredPoints;
+      const prevLocked = Number(userProfile.locked_points || 0);
+      await updateDoc(userDocRef, {
+        points: newPoints,
+        locked_points: prevLocked + requiredPoints,
+      });
+
       // 🔔 Notify admins
       await notifyAdmins(
         "New Redemption Request",
@@ -320,6 +332,14 @@ const RewardDescription = () => {
         seenByAdmin: false, // 👈 add this
         status: "pending",
         createdAt: serverTimestamp(),
+      });
+
+      // 🔒 Move points to locked_points
+      const newPoints = userPoints - requiredPoints;
+      const prevLocked = Number(userData.locked_points || 0);
+      await updateDoc(doc(db, "user", user.uid), {
+        points: newPoints,
+        locked_points: prevLocked + requiredPoints,
       });
       // 🔔 Notify admins
       await notifyAdmins(
@@ -497,6 +517,20 @@ const RewardDescription = () => {
         >
           Your Points: {userPoints} pts
         </Text>
+
+        {lockedPoints > 0 && (
+          <Text
+            style={{
+              textAlign: "center",
+              fontFamily: "Poppins_500Medium",
+              fontSize: 14,
+              color: "#777",
+              marginBottom: 10,
+            }}
+          >
+            ({lockedPoints} pts locked – waiting for approval)
+          </Text>
+        )}
 
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
