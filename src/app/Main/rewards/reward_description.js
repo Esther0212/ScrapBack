@@ -26,7 +26,8 @@ import {
   serverTimestamp,
   getDocs,
   query,
-  where, 
+  where,
+  updateDoc,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
@@ -36,9 +37,9 @@ const RewardDescription = () => {
 
   const [reward, setReward] = useState(null);
   const [userPoints, setUserPoints] = useState(0);
+  const [lockedPoints, setLockedPoints] = useState(0);
   const [loading, setLoading] = useState(true);
   const [hasPendingRedemption, setHasPendingRedemption] = useState(false);
-
 
   // 🔹 Modals
   const [choiceModalVisible, setChoiceModalVisible] = useState(false);
@@ -105,7 +106,9 @@ const RewardDescription = () => {
         const userRef = doc(db, "user", user.uid);
         const snap = await getDoc(userRef);
         if (snap.exists()) {
-          setUserPoints(Number(snap.data().points || 0));
+          const data = snap.data();
+          setUserPoints(Number(data.points || 0));
+          setLockedPoints(Number(data.locked_points || 0));
         }
       } catch (err) {
         console.error("Error fetching user points:", err);
@@ -245,6 +248,14 @@ const RewardDescription = () => {
         createdAt: serverTimestamp(),
       });
 
+      // 🔒 Move points to locked_points
+      const newPoints = userPoints - requiredPoints;
+      const prevLocked = Number(userProfile.locked_points || 0);
+      await updateDoc(userDocRef, {
+        points: newPoints,
+        locked_points: prevLocked + requiredPoints,
+      });
+
       // 🔔 Notify admins
       await notifyAdmins(
         "New Redemption Request",
@@ -320,6 +331,14 @@ const RewardDescription = () => {
         seenByAdmin: false, // 👈 add this
         status: "pending",
         createdAt: serverTimestamp(),
+      });
+
+      // 🔒 Move points to locked_points
+      const newPoints = userPoints - requiredPoints;
+      const prevLocked = Number(userData.locked_points || 0);
+      await updateDoc(doc(db, "user", user.uid), {
+        points: newPoints,
+        locked_points: prevLocked + requiredPoints,
       });
       // 🔔 Notify admins
       await notifyAdmins(
@@ -459,11 +478,10 @@ const RewardDescription = () => {
 
   const isUnavailable = reward.status?.toLowerCase() === "unavailable";
   const canRedeem =
-  reward &&
-  reward.category?.toLowerCase() !== "cash" &&
-  userPoints >= Number(reward.points || 0) &&
-  !hasPendingRedemption;
-
+    reward &&
+    reward.category?.toLowerCase() !== "cash" &&
+    userPoints >= Number(reward.points || 0) &&
+    !hasPendingRedemption;
 
   // ✅ Header title logic
   const getHeaderTitle = (category) => {
@@ -484,21 +502,6 @@ const RewardDescription = () => {
       <Stack.Screen options={{ title: getHeaderTitle(reward?.category) }} />
 
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
-        <Text
-          style={{
-            textAlign: "center",
-            fontFamily: "Poppins_700Bold",
-            fontSize: 24,
-            color: userPoints >= reward.points ? "#2E7D32" : "#B00020",
-            marginBottom: 3,
-            marginTop: -10
-          }}
-        >
-          Your Points: {userPoints} pts
-        </Text>
-
-
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Reward Image with Redeemable Badge */}
           <LinearGradient
@@ -548,18 +551,24 @@ const RewardDescription = () => {
 
             {/* Redeem Button */}
             <TouchableOpacity
-              activeOpacity={canRedeem && !isUnavailable && !isSubmitting ? 0.85 : 1}
+              activeOpacity={
+                canRedeem && !isUnavailable && !isSubmitting ? 0.85 : 1
+              }
               onPress={() => {
-                if (canRedeem && !isUnavailable && !isSubmitting) handleRedeemClick();
+                if (canRedeem && !isUnavailable && !isSubmitting)
+                  handleRedeemClick();
               }}
               style={[
                 styles.ctaButtonSolid,
-                (!canRedeem || isUnavailable || isSubmitting) && styles.disabledButton,
+                (!canRedeem || isUnavailable || isSubmitting) &&
+                  styles.disabledButton,
               ]}
               disabled={!canRedeem || isUnavailable || isSubmitting}
             >
               {isSubmitting ? (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
                   <ActivityIndicator size="small" color="#fff" />
                   <Text style={styles.ctaText}>Processing...</Text>
                 </View>
@@ -571,17 +580,37 @@ const RewardDescription = () => {
                   ]}
                 >
                   {hasPendingRedemption
-                  ? "Already Redeemed (Pending Approval)"
-                  : !canRedeem
-                  ? `Redeem for ${reward.points} Points`
-                  : isUnavailable
-                  ? "Not Available"
-                  : reward.category?.toLowerCase() === "cash"
-                  ? "Redeem Cash Amount"
-                  : `Redeem for ${reward.points} Points`}
+                    ? "Already Redeemed (Pending Approval)"
+                    : !canRedeem
+                      ? `Redeem for ${reward.points} Points`
+                      : isUnavailable
+                        ? "Not Available"
+                        : reward.category?.toLowerCase() === "cash"
+                          ? "Redeem Cash Amount"
+                          : `Redeem for ${reward.points} Points`}
                 </Text>
               )}
             </TouchableOpacity>
+            {/* ✅ Subtle points info below the redeem button */}
+            {/* ✅ Points status below the redeem button */}
+            <View style={{ alignItems: "center", marginTop: 10 }}>
+              <Text
+                style={[
+                  styles.userPointsFooter,
+                  userPoints >= (reward.points || 0)
+                    ? styles.enoughPoints
+                    : styles.notEnoughPoints,
+                ]}
+              >
+                You currently have {userPoints.toLocaleString()} pts
+              </Text>
+
+              {lockedPoints > 0 && (
+                <Text style={styles.lockedFooterText}>
+                  ({lockedPoints} pts locked – pending approval)
+                </Text>
+              )}
+            </View>
           </View>
         </ScrollView>
 
@@ -1026,5 +1055,37 @@ const styles = StyleSheet.create({
     color: "#444",
     fontFamily: "Poppins_600SemiBold",
     fontSize: 15,
+  },
+  userPointsFooter: {
+    textAlign: "center",
+    fontFamily: "Poppins_600SemiBold",
+    color: "#2E7D32",
+    fontSize: 14,
+  },
+  lockedFooterText: {
+    textAlign: "center",
+    fontFamily: "Poppins_500Medium",
+    color: "#777",
+    fontSize: 13,
+    marginTop: 2,
+  },
+  userPointsFooter: {
+    textAlign: "center",
+    fontFamily: "Poppins_700Bold",
+    fontSize: 15,
+    marginTop: 2,
+  },
+  enoughPoints: {
+    color: "#2E7D32", // green
+  },
+  notEnoughPoints: {
+    color: "#D32F2F", // red
+  },
+  lockedFooterText: {
+    textAlign: "center",
+    fontFamily: "Poppins_500Medium",
+    color: "#777",
+    fontSize: 13,
+    marginTop: 3,
   },
 });
