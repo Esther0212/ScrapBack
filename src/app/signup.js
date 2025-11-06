@@ -452,7 +452,10 @@ const Signup = () => {
                   </Pressable>
                 </View>
               </View>
-              {/* ✅ Success Modal */}
+              
+            </Modal>
+
+            {/* ✅ Success Modal */}
               <Modal
                 visible={showSuccessModal}
                 transparent
@@ -485,7 +488,6 @@ const Signup = () => {
                   </View>
                 </View>
               </Modal>
-            </Modal>
           </ScrollView>
         </SafeAreaView>
       </CustomBgColor>
