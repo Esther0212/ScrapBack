@@ -57,19 +57,6 @@ export default function profileLayout() {
         }}
       />
       <Stack.Screen
-        name="switchAccount"
-        options={{
-          title: "Account Information",
-          headerShown: false,
-          headerBackVisible: false,
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="chevron-back-outline" size={24} color="black" />
-            </TouchableOpacity>
-          ),
-        }}
-      />
-      <Stack.Screen
         name="contributionLogs"
         options={{
           title: "Waste Contribution Receipt",
