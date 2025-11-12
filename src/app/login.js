@@ -109,14 +109,14 @@ const Login = () => {
       }
 
       // ✅ Success toast
-      showToast("✅ Login successful! Welcome back!");
+      showToast("Login successful! Welcome back!");
 
       // Small delay for a smooth transition
       setTimeout(() => {
         router.replace("/Main");
       }, 1000);
     } catch (error) {
-      console.error("❌ FULL LOGIN ERROR:", error);
+      console.error("FULL LOGIN ERROR:", error);
       let message = "Login failed. Please try again.";
       if (error.code === "auth/invalid-email")
         message = "Invalid email address.";

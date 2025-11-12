@@ -361,12 +361,28 @@ const AccountInfo = () => {
               setValue={setEmail}
               editable={editMode}
             />
-            <InputField
-              label="Contact Number"
-              value={contact}
-              setValue={setContact}
-              editable={editMode}
-            />
+<InputField
+  label="Contact Number"
+  value={contact}
+  setValue={(text) => {
+    // allow only numbers and "+"
+    let cleaned = text.replace(/[^0-9+]/g, "");
+
+    // allow "+" only at the start
+    if (cleaned.includes("+") && !cleaned.startsWith("+")) {
+      cleaned = cleaned.replace("+", "");
+    }
+
+    // limit length: 11 for 09..., 13 for +639...
+    if (cleaned.startsWith("+")) {
+      if (cleaned.length <= 13) setContact(cleaned);
+    } else {
+      if (cleaned.length <= 11) setContact(cleaned);
+    }
+  }}
+  keyboardType="phone-pad"
+  editable={editMode}
+/>
 
             {/* Gender */}
             <DropdownField

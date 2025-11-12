@@ -104,8 +104,11 @@ const ChangePassword = () => {
         showToast("Passwords do not match");
         return;
       }
-      if (newPassword.length < 6) {
-        showToast("Password must be at least 6 characters");
+      const strongPass = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+      if (!strongPass.test(newPassword)) {
+        showToast(
+          "Password must be at least 8 characters, include uppercase, lowercase, and number."
+        );
         return;
       }
 
@@ -133,7 +136,6 @@ const ChangePassword = () => {
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.container}>
-
             {/* Current Password */}
             <Text style={styles.label}>Current Password</Text>
             <View style={styles.inputWrapper}>
@@ -165,7 +167,9 @@ const ChangePassword = () => {
             {checkingPass ? (
               <Text style={styles.checkingText}>Checking password...</Text>
             ) : passwordStatus === "correct" ? (
-              <Text style={styles.correctText}>✓ Current password verified</Text>
+              <Text style={styles.correctText}>
+                ✓ Current password verified
+              </Text>
             ) : passwordStatus === "wrong" ? (
               <Text style={styles.errorText}>✗ Incorrect password</Text>
             ) : null}
@@ -178,7 +182,7 @@ const ChangePassword = () => {
                 placeholder="Enter new password"
                 secureTextEntry={!showNew}
                 value={newPassword}
-                onChangeText={setNewPassword}
+                onChangeText={(text) => setNewPassword(text)}
                 placeholderTextColor="#777"
               />
               <TouchableOpacity
@@ -192,6 +196,15 @@ const ChangePassword = () => {
                 />
               </TouchableOpacity>
             </View>
+
+            {/* ✅ live feedback for password strength */}
+            {newPassword.length > 0 &&
+            !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(newPassword) ? (
+              <Text style={styles.errorText}>
+                Password must be at least 8 characters, include uppercase,
+                lowercase, and number.
+              </Text>
+            ) : null}
 
             {/* Confirm Password */}
             <Text style={styles.label}>Confirm New Password</Text>
