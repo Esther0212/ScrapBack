@@ -16,17 +16,23 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import CustomBgColor from "../components/customBgColor";
 import { auth, db } from "../../firebase";
-import { setDoc, doc } from "firebase/firestore";
-import { getTempConfirmation } from "./signup"; // ✅ get stored confirmation object
+import { setDoc, getDoc, doc } from "firebase/firestore";
+import { getTempConfirmation } from "./signup";
+import { getTempLoginConfirmation } from "./login";
 
 const OtpVerification = () => {
   const params = useLocalSearchParams();
-  const confirmation = getTempConfirmation(); // ✅ use memory-stored object
 
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [error, setError] = useState("");
+
+  // detect whether this OTP is for login or signup
+  const isLoginFlow = params?.fromLogin === "true" || params?.fromLogin === true;
+
+  // pick confirmation object from correct temp store
+  const confirmation = isLoginFlow ? getTempLoginConfirmation() : getTempConfirmation();
 
   const handleVerify = async () => {
     if (!code || code.length < 4) {
@@ -35,38 +41,49 @@ const OtpVerification = () => {
     }
 
     if (!confirmation) {
-      ToastAndroid.show("Missing confirmation session. Please sign up again.", ToastAndroid.LONG);
-      router.push("/signup");
+      ToastAndroid.show(
+        "Missing OTP session. Please try again.",
+        ToastAndroid.LONG
+      );
+      router.push(isLoginFlow ? "/login" : "/signup");
       return;
     }
 
     try {
       setLoading(true);
+
+      // ✅ Verify OTP - Creates real Firebase user
       const userCredential = await confirmation.confirm(code);
       const user = userCredential.user;
+      const userData = params?.userData ? JSON.parse(params.userData) : {};
 
-      await setDoc(doc(db, "user", user.uid), {
-        firstName: params.firstName || "",
-        lastName: params.lastName || "",
-        email: params.email || "",
-        contact: params.contact || "",
-        gender: params.gender || "",
-        dob: params.dob || "",
-        userType: "user",
-        address: {
-          street: params.street || "",
-          region: params.region || "",
-          province: params.province || "",
-          city: params.city || "",
-          barangay: params.barangay || "",
-          postalCode: params.postalCode || "",
-        },
-        createdAt: new Date(),
-        points: 0,
-        online: false,
-      });
+      if (isLoginFlow) {
+        // 🟢 LOGIN FLOW - User is already signed in by Firebase
+        const userRef = doc(db, "user", user.uid);
+        const userSnap = await getDoc(userRef);
 
-      setShowSuccessModal(true);
+        if (!userSnap.exists()) {
+          ToastAndroid.show("Account not found in database.", ToastAndroid.LONG);
+          router.push("/signup");
+          return;
+        }
+
+        ToastAndroid.show("Welcome back!", ToastAndroid.SHORT);
+        router.replace("/Main");
+      } else {
+        // 🟢 SIGNUP FLOW - Create user profile in Firestore
+        // User is now authenticated with Firebase Auth
+        await setDoc(doc(db, "user", user.uid), {
+          ...userData,
+          uid: user.uid,
+          createdAt: new Date(),
+          points: 0,
+          online: false,
+        });
+
+        console.log("✅ User account created:", user.uid);
+        setShowSuccessModal(true);
+      }
     } catch (err) {
       console.error("OTP verify error:", err);
       let msg = "Failed to verify code. Please try again.";
@@ -84,9 +101,11 @@ const OtpVerification = () => {
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.container}>
-            <Text style={styles.title}>Enter verification code</Text>
+            <Text style={styles.title}>
+              {isLoginFlow ? "Login Verification" : "Phone Verification"}
+            </Text>
             <Text style={styles.subtitle}>
-              We sent a 6-digit code to {params.contact || "your phone"}
+              We sent a 6-digit code to {params.contact || params.phone || "your phone"}
             </Text>
 
             <View style={styles.inputContainer}>
@@ -117,12 +136,13 @@ const OtpVerification = () => {
 
             <TouchableOpacity
               style={styles.resendLink}
-              onPress={() => router.push("/signup")}
+              onPress={() => router.push(isLoginFlow ? "/login" : "/signup")}
             >
               <Text style={styles.resendText}>Didn’t get code? Resend</Text>
             </TouchableOpacity>
           </View>
 
+          {/* ✅ Signup Success Modal */}
           <Modal
             visible={showSuccessModal}
             transparent
