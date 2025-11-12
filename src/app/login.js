@@ -6,9 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
+  Alert,
   ActivityIndicator,
-  ToastAndroid,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -36,14 +35,6 @@ const Login = () => {
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const showToast = (message) => {
-    if (Platform.OS === "android") {
-      ToastAndroid.show(message, ToastAndroid.SHORT);
-    } else {
-      console.log("Toast:", message);
-    }
-  };
-
   const handleLogin = async () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
@@ -70,6 +61,8 @@ const Login = () => {
       // 🔐 Firebase sign-in
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
+
+      // ✅ No email verification check here (handled in Signup)
 
       // 🔔 Get push token
       const token = await registerForPushNotificationsAsync();
@@ -108,13 +101,8 @@ const Login = () => {
         await AsyncStorage.removeItem("savedPassword");
       }
 
-      // ✅ Success toast
-      showToast("✅ Login successful! Welcome back!");
-
-      // Small delay for a smooth transition
-      setTimeout(() => {
-        router.replace("/Main");
-      }, 1000);
+      Alert.alert("Login Success", "You have successfully logged in!");
+      router.replace("/Main");
     } catch (error) {
       console.error("❌ FULL LOGIN ERROR:", error);
       let message = "Login failed. Please try again.";
@@ -124,9 +112,7 @@ const Login = () => {
         message = "User not found.";
       else if (error.code === "auth/wrong-password")
         message = "Incorrect password.";
-
-      // ⚠️ Error toast
-      showToast("❌ " + message);
+      Alert.alert("Login Error", message);
     } finally {
       setLoading(false);
     }
