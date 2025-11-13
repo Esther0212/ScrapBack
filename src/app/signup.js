@@ -38,6 +38,7 @@ const Signup = () => {
   const [contact, setContact] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
 
@@ -137,6 +138,32 @@ const Signup = () => {
       );
       return;
     }
+    if (!dob) {
+      ToastAndroid.show(
+        "Please select your date of birth.",
+        ToastAndroid.SHORT
+      );
+      return;
+    }
+
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+
+    if (age < 18) {
+      ToastAndroid.show(
+        `You must be 18 or older to sign up. Your age is ${age}.`,
+        ToastAndroid.LONG
+      );
+      return;
+    }
 
     if (
       !firstName ||
@@ -165,8 +192,27 @@ const Signup = () => {
       return;
     }
 
+    // ✅ Check for strong password before signup
+    const strongPass = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!strongPass.test(password)) {
+      ToastAndroid.show(
+        "Password must be at least 8 characters, include uppercase, lowercase, and number.",
+        ToastAndroid.LONG
+      );
+      return;
+    }
+
     try {
       setLoading(true);
+
+      const phoneRegex = /^(09|\+639)\d{9}$/;
+      if (!phoneRegex.test(contact)) {
+        ToastAndroid.show(
+          "Please enter a valid phone number.",
+          ToastAndroid.LONG
+        );
+        return;
+      }
 
       // ✅ Create the user account
       const userCredential = await createUserWithEmailAndPassword(
@@ -226,6 +272,33 @@ const Signup = () => {
     }
   };
 
+  // ✅ Password validation function
+  const validatePassword = (pass) => {
+    const strongPass = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (pass.length === 0) {
+      setPasswordError("");
+    } else if (!strongPass.test(pass)) {
+      setPasswordError(
+        "Password must be at least 8 characters, include uppercase, lowercase, and number."
+      );
+    } else {
+      setPasswordError("");
+    }
+  };
+  const isFormValid =
+    firstName &&
+    lastName &&
+    email &&
+    contact &&
+    password &&
+    confirmPassword &&
+    gender &&
+    dob &&
+    street &&
+    barangay &&
+    privacyChecked;
+
   return (
     <PaperProvider>
       <CustomBgColor>
@@ -263,17 +336,43 @@ const Signup = () => {
               <InputField
                 label="Contact Number"
                 value={contact}
-                setValue={setContact}
+                setValue={(text) => {
+                  let cleaned = text.replace(/[^0-9+]/g, "");
+                  if (cleaned.includes("+") && !cleaned.startsWith("+")) {
+                    cleaned = cleaned.replace("+", "");
+                  }
+                  if (cleaned.startsWith("+")) {
+                    if (cleaned.length <= 13) setContact(cleaned);
+                  } else {
+                    if (cleaned.length <= 11) setContact(cleaned);
+                  }
+                }}
                 keyboardType="phone-pad"
+                style={[
+                  styles.input,
+                  contact && !/^(09|\+639)\d{9}$/.test(contact)
+                    ? { borderColor: "red" } // highlight invalid number
+                    : {},
+                ]}
               />
 
-              <PasswordField
-                label="Password"
-                value={password}
-                setValue={setPassword}
-                visible={passwordVisible}
-                setVisible={setPasswordVisible}
-              />
+              {/* ✅ Password with live validation */}
+              <View>
+                <PasswordField
+                  label="Password"
+                  value={password}
+                  setValue={(text) => {
+                    setPassword(text);
+                    validatePassword(text);
+                  }}
+                  visible={passwordVisible}
+                  setVisible={setPasswordVisible}
+                />
+                {passwordError ? (
+                  <Text style={styles.errorText}>{passwordError}</Text>
+                ) : null}
+              </View>
+
               <PasswordField
                 label="Confirm Password"
                 value={confirmPassword}
@@ -312,6 +411,11 @@ const Signup = () => {
                 <DateTimePickerModal
                   isVisible={datePickerVisible}
                   mode="date"
+                  maximumDate={
+                    new Date(
+                      new Date().setFullYear(new Date().getFullYear() - 18)
+                    )
+                  } // ✅ limit
                   onConfirm={(date) => {
                     setDob(date.toISOString());
                     setDatePickerVisible(false);
@@ -426,9 +530,10 @@ const Signup = () => {
               </View>
               {/* ✅ Sign Up Button with loader */}
               <TouchableOpacity
-                style={styles.signupButton}
+                style={[styles.signupButton, { opacity: loading ? 0.6 : 1 }]}
                 activeOpacity={0.85}
                 onPress={handleSignup}
+                disabled={loading} // ✅ prevents re-press
               >
                 {loading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />

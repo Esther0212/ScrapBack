@@ -9,12 +9,13 @@ import {
   Dimensions,
   Image,
   Alert,
+  FlatList,
   Modal,
   ActivityIndicator,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, FontAwesome, AntDesign } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import CustomBgColor from "../../../components/customBgColor";
@@ -25,6 +26,8 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db, storage } from "../../../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Animated, Easing } from "react-native";
+import MapView, { Marker } from "react-native-maps";
+import * as Location from "expo-location";
 
 const { width } = Dimensions.get("window");
 
@@ -57,6 +60,14 @@ const AccountInfo = () => {
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const [isSaving, setIsSaving] = useState(false);
+
+  const [mapRegion, setMapRegion] = useState(null);
+  const [marker, setMarker] = useState(null);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [isSatellite, setIsSatellite] = useState(false);
+  const [initialCoordsSet, setInitialCoordsSet] = useState(false);
+  const [prevStreet, setPrevStreet] = useState(userData?.address?.street || "");
+  const [prevBarangay, setPrevBarangay] = useState(userData?.address?.barangay || "");
 
   useEffect(() => {
     const fetchBarangays = async () => {
@@ -148,6 +159,10 @@ const AccountInfo = () => {
       };
 
       const userRef = doc(db, "user", userData.uid);
+      const userLocation = marker
+        ? { lat: marker.latitude, lng: marker.longitude }
+        : userData?.location || null;
+
       await updateDoc(userRef, {
         profilePic: finalProfilePic || null,
         firstName,
@@ -157,6 +172,7 @@ const AccountInfo = () => {
         gender,
         dob,
         address: updatedAddress,
+        location: userLocation, // ✅ save pinpointed lat/lng
       });
 
       setUserData({
@@ -169,7 +185,13 @@ const AccountInfo = () => {
         gender,
         dob,
         address: updatedAddress,
+        location: userLocation,
       });
+
+      // keep internal tracking in sync to avoid stale geocoding/initial coords
+      setPrevStreet(street);
+      setPrevBarangay(barangay?.name || "");
+      setInitialCoordsSet(true);
 
       // ✅ Success toast animation
       setToastMessage("Profile updated successfully!");
@@ -198,6 +220,103 @@ const AccountInfo = () => {
       setIsSaving(false); // ✅ stop spinner
     }
   };
+
+  useEffect(() => {
+    const fetchInitialCoords = async () => {
+      try {
+        // 🧭 1️⃣ Use saved coordinates if available (and not yet set)
+        if (userData?.location && !initialCoordsSet) {
+          const { lat, lng } = userData.location;
+          setMapRegion({
+            latitude: lat,
+            longitude: lng,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
+          setMarker({ latitude: lat, longitude: lng });
+          setInitialCoordsSet(true);
+          console.log("📍 Loaded saved coordinates from Firestore");
+          return; // ✅ Exit early, don’t geocode automatically
+        }
+
+        // 🧭 2️⃣ Only run geocode if the user *really* changed address fields
+        const barangayChanged = barangay?.name !== prevBarangay;
+        const streetChanged = street !== prevStreet;
+
+        if (!barangayChanged && !streetChanged) return; // ⛔ no changes, do nothing
+        if (!street && !barangay?.name) return; // ⛔ invalid address fields
+
+        let geocode = [];
+        let tried = "";
+
+        // 3️⃣ Try Street + Barangay first
+        if (street && barangay?.name) {
+          const address = `${street}, ${barangay.name}, ${userData?.address?.city || "City of Cagayan De Oro"
+            }, ${userData?.address?.province || "Misamis Oriental"}, ${userData?.address?.region || "Northern Mindanao"
+            }, Philippines`;
+          geocode = await Location.geocodeAsync(address);
+          tried = "Street + Barangay";
+        }
+
+        // 4️⃣ Try Street only
+        if ((!geocode || geocode.length === 0) && street) {
+          const address = `${street}, ${userData?.address?.city || "City of Cagayan De Oro"
+            }, ${userData?.address?.province || "Misamis Oriental"}, ${userData?.address?.region || "Northern Mindanao"
+            }, Philippines`;
+          geocode = await Location.geocodeAsync(address);
+          tried = "Street only";
+        }
+
+        // 5️⃣ Try Barangay only
+        if ((!geocode || geocode.length === 0) && barangay?.name) {
+          const address = `${barangay.name}, ${userData?.address?.city || "City of Cagayan De Oro"
+            }, ${userData?.address?.province || "Misamis Oriental"}, ${userData?.address?.region || "Northern Mindanao"
+            }, Philippines`;
+          geocode = await Location.geocodeAsync(address);
+          tried = "Barangay only";
+        }
+
+        // ✅ Update only if we got coordinates
+        if (geocode.length > 0) {
+          const { latitude, longitude } = geocode[0];
+          setMapRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
+          setMarker({ latitude, longitude });
+          setPrevStreet(street);
+          setPrevBarangay(barangay?.name || "");
+          console.log(`📍 Updated via geocoding (${tried})`);
+        }
+      } catch (err) {
+        console.error("Error fetching geocode:", err);
+      }
+    };
+
+    fetchInitialCoords();
+  }, [barangay, street]);
+
+  // Ensure map centers / focuses on the current user's saved pinpoint when entering edit mode
+  useEffect(() => {
+    if (!editMode) return;
+    if (userData?.location) {
+      const { lat, lng } = userData.location;
+      // avoid unnecessary updates/flicker
+      if (!marker || marker.latitude !== lat || marker.longitude !== lng) {
+        setMapRegion({
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+        setMarker({ latitude: lat, longitude: lng });
+        setInitialCoordsSet(true);
+        console.log("📍 Focused map on saved user location");
+      }
+    }
+  }, [editMode, userData?.location]);
 
   const handleCancel = () => {
     setProfilePic(userData?.profilePic || null);
@@ -410,50 +529,119 @@ const AccountInfo = () => {
               )}
             </View>
 
-              {/* Address */}
-              <Text style={styles.label}>Address</Text>
-              <InputField
-                label="Street Name, Building, House No., etc."
-                value={street}
-                setValue={setStreet}
-                editable={editMode}
-                subLabel
-              />
-              <InputField
-                label="Region"
-                value={userData?.address?.region || "Northern Mindanao"}
-                editable={false}
-                subLabel
-              />
-              <InputField
-                label="Province"
-                value={userData?.address?.province || "Misamis Oriental"}
-                editable={false}
-                subLabel
-              />
-              <InputField
-                label="City"
-                value={userData?.address?.city || "City of Cagayan De Oro"}
-                editable={false}
-                subLabel
-              />
-              <DropdownField
-                label="Barangay"
-                visible={barangayMenuVisible}
-                setVisible={setBarangayMenuVisible}
-                selected={barangay ? barangay.name : ""}
-                setSelected={setBarangay}
-                options={barangays}
-                optionKey="name"
-                editable={editMode}
-                subLabel
-              />
-              <InputField
-                label="Postal Code"
-                value={userData?.address?.postalCode || "9000"}
-                editable={false}
-                subLabel
-              />
+            {/* Address */}
+            <Text style={styles.label}>Address</Text>
+            <InputField
+              label="Street Name, Building, House No., etc."
+              value={street}
+              setValue={setStreet}
+              editable={editMode}
+              subLabel
+            />
+            <DropdownField
+              label="Barangay"
+              visible={barangayMenuVisible}
+              setVisible={setBarangayMenuVisible}
+              selected={barangay ? barangay.name : ""}
+              setSelected={setBarangay}
+              options={barangays}
+              optionKey="name"
+              editable={editMode}
+              subLabel
+            />
+            <InputField
+              label="City"
+              value={userData?.address?.city || "City of Cagayan De Oro"}
+              editable={false}
+              subLabel
+            />
+            <InputField
+              label="Region"
+              value={userData?.address?.region || "Northern Mindanao"}
+              editable={false}
+              subLabel
+            />
+            <InputField
+              label="Province"
+              value={userData?.address?.province || "Misamis Oriental"}
+              editable={false}
+              subLabel
+            />
+            <InputField
+              label="Postal Code"
+              value={userData?.address?.postalCode || "9000"}
+              editable={false}
+              subLabel
+            />
+            {/* Map Input Field */}
+            {editMode && (
+              <>
+                <Text style={styles.subLabel}>Pinpoint Location</Text>
+
+                <View style={styles.mapContainer}>
+                  {mapRegion && (
+                    <>
+                      <MapView
+                        style={isMapExpanded ? styles.fullMap : styles.map}
+                        region={mapRegion}
+                        mapType={isSatellite ? "hybrid" : "standard"}
+                        onPress={(e) => {
+                          const { latitude, longitude } = e.nativeEvent.coordinate;
+                          setMarker({ latitude, longitude });
+                        }}
+                      >
+                        {marker && (
+                          <Marker
+                            coordinate={marker}
+                            draggable
+                            onDragEnd={(e) => {
+                              const { latitude, longitude } = e.nativeEvent.coordinate;
+                              setMarker({ latitude, longitude });
+                              setMapRegion((prev) => ({
+                                ...prev,
+                                latitude,
+                                longitude,
+                              }));
+
+                              // Optional feedback toast
+                              setToastMessage("📍 Pin moved to new location");
+                              setToastVisible(true);
+                              Animated.timing(fadeAnim, {
+                                toValue: 1,
+                                duration: 300,
+                                useNativeDriver: true,
+                              }).start(() => {
+                                setTimeout(() => {
+                                  Animated.timing(fadeAnim, {
+                                    toValue: 0,
+                                    duration: 300,
+                                    useNativeDriver: true,
+                                  }).start(() => setToastVisible(false));
+                                }, 1500);
+                              });
+                            }}
+                          />
+                        )}
+                      </MapView>
+
+                      {/* 🛰 Map Type Toggle Button */}
+                      <TouchableOpacity
+                        style={styles.mapToggleButton}
+                        onPress={() => setIsSatellite(!isSatellite)}
+                      >
+                        <FontAwesome
+                          name={isSatellite ? "map" : "map-o"}
+                          size={24}
+                          color="black"
+                        />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </>
+            )}
+
+
 
             {/* Buttons */}
             {editMode ? (
@@ -519,56 +707,104 @@ const InputField = ({
 // DropdownField
 const DropdownField = ({
   label,
-  visible,
-  setVisible,
   selected,
   setSelected,
   options,
   optionKey,
   editable = false,
   subLabel,
-}) => (
-  <View style={styles.inputContainer}>
-    <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
-    <Menu
-      visible={visible && editable}
-      onDismiss={() => setVisible(false)}
-      anchor={
-        <TouchableOpacity
-          style={[styles.input, { alignItems: "flex-start" }]}
-          onPress={editable ? () => setVisible(true) : null}
-          disabled={!editable}
-        >
-          <Text
-            style={[
-              styles.dropdownText,
-              { color: editable ? (selected ? "#3A2E2E" : "#777") : "#777" },
-            ]}
-          >
-            {selected || `Select ${label}`}
-          </Text>
-        </TouchableOpacity>
-      }
-      contentStyle={styles.menuContent}
-    >
-      {options.map((o) => (
-        <Menu.Item
-          key={optionKey ? o.code : o}
-          onPress={() => {
-            setSelected(o);
-            setVisible(false);
-          }}
-          title={optionKey ? o[optionKey] : o}
-          titleStyle={{
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(""); // ✅ state for search
+
+  // ✅ Filtered list (only for Barangay)
+  const filteredOptions =
+    label === "Barangay" && searchQuery
+      ? options.filter((item) =>
+        (optionKey ? item[optionKey] : item.name || item)
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())
+      )
+      : options;
+
+  return (
+    <View style={[styles.inputContainer, { zIndex: 1000 }]}>
+      <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
+
+      {/* Dropdown Button */}
+      <TouchableOpacity
+        style={[
+          styles.input,
+          { flexDirection: "row", justifyContent: "space-between" },
+        ]}
+        onPress={() => editable && setIsOpen(!isOpen)}
+        disabled={!editable}
+        activeOpacity={0.8}
+      >
+        <Text
+          style={{
+            color: editable ? (selected ? "#3A2E2E" : "#777") : "#777",
             fontSize: 15,
             fontFamily: "Poppins_400Regular",
-            color: "#3A2E2E",
           }}
-        />
-      ))}
-    </Menu>
-  </View>
-);
+        >
+          {selected || `Select ${label}`}
+        </Text>
+        {editable && (
+          <Text style={{ color: "#3A2E2E", fontSize: 16 }}>
+            {isOpen ? "▲" : "▼"}
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      {/* Dropdown List */}
+      {isOpen && editable && (
+        <View style={styles.dropdownContainer}>
+          {/* ✅ Only show search bar if Barangay */}
+          {label === "Barangay" && (
+            <TextInput
+              placeholder="Search barangay..."
+              placeholderTextColor="#3A2E2E"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+            />
+          )}
+
+          <ScrollView
+            style={styles.dropdownList}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.dropdownItem,
+                    index !== filteredOptions.length - 1 &&
+                    styles.dropdownItemBorder,
+                  ]}
+                  onPress={() => {
+                    setSelected(optionKey ? item : item.name || item);
+                    setIsOpen(false);
+                    setSearchQuery(""); // ✅ clear after select
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>
+                    {optionKey ? item[optionKey] : item.name || item}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noResultText}>No results found</Text>
+            )}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
@@ -633,7 +869,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    backgroundColor: "#F1E3D3",
+    backgroundColor: "#fff",
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 18,
@@ -644,7 +880,104 @@ const styles = StyleSheet.create({
     borderColor: "#E0D4C3",
     width: "100%",
   },
-  menuContent: { backgroundColor: "#fff", borderRadius: 12 },
+  dropdownContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+    zIndex: 1000,
+  },
+  dropdownList: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    maxHeight: 230, // scrollable height
+    zIndex: 1000,
+  },
+  dropdownItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5D6C7", // soft beige tone to match your ScrapBack palette
+  },
+  searchInput: {
+    backgroundColor: "#F6F6E9",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+    margin: 8,
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+  },
+
+  noResultText: {
+    textAlign: "center",
+    color: "#777",
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    paddingVertical: 10,
+  },
+
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+
+  dropdownItemText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+  },
+  mapContainer: {
+    borderRadius: 10,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+    height: 300,
+    position: "relative",
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  fullMap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2000,
+  },
+  mapToggleButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "white",
+    padding: 8,
+    borderRadius: 8,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    zIndex: 5,
+  },
+
+  expandButton: {
+    position: "absolute",
+    top: 10,
+    right: 50,
+    backgroundColor: "white",
+    padding: 8,
+    borderRadius: 8,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    zIndex: 5,
+  },
+
   editButton: {
     flexDirection: "row",
     justifyContent: "center",
@@ -693,7 +1026,9 @@ const styles = StyleSheet.create({
   confirmModal: {
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 20,
+    paddingLeft: 20,
+    paddingTop: 20,
+    paddingRight: 20,
     width: "90%",
     alignItems: "center",
   },
