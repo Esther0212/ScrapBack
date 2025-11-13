@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
-import MapView, { Marker, Callout } from "react-native-maps";
+import MapView, { Marker, Callout, PROVIDER_GOOGLE } from "react-native-maps";
 import CustomBgColor from "../../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
 import { Entypo } from "@expo/vector-icons";
@@ -491,7 +491,7 @@ export default function MapSelector() {
 
           {/* Map or List */}
           {selectedView === "map" ? (
-            <MapView style={{ flex: 1 }} region={region} ref={mapRef}>
+            <MapView style={{ flex: 1 }} region={region} ref={mapRef} provider={PROVIDER_GOOGLE}>
               {marker && (
                 <Marker
                   coordinate={marker}

@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
-import MapView, { UrlTile, Marker } from "react-native-maps";
+import MapView, { UrlTile, Marker,  PROVIDER_GOOGLE  } from "react-native-maps";
 
 export default function MapSelector() {
   const router = useRouter();
@@ -78,13 +78,16 @@ export default function MapSelector() {
       <MapView
         style={{ flex: 1 }}
         initialRegion={region}
+        provider={PROVIDER_GOOGLE}
         ref={mapRef}
         onLongPress={e => setMarker(e.nativeEvent.coordinate)}
       >
-        <UrlTile
-          urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-          maximumZ={19}
-        />
+   {/* 
+<UrlTile
+  urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+  maximumZ={19}
+/> 
+*/}
 
         {marker && <Marker coordinate={marker} />}
       </MapView>

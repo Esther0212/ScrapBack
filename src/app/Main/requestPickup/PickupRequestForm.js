@@ -15,7 +15,7 @@ import {
   ToastAndroid,
   Animated,
 } from "react-native";
-import MapView, { Marker, UrlTile, Callout } from "react-native-maps";
+import MapView, { Marker, Callout, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
@@ -685,6 +685,7 @@ export default function PickupRequestForm() {
                 <ActivityIndicator style={{ marginTop: 20 }} size="large" />
               ) : (
                 <MapView
+                provider={PROVIDER_GOOGLE}
                   style={{ flex: 1 }}
                   initialRegion={initialRegion}
                   onPress={(e) => {
