@@ -1,6 +1,6 @@
 // _layout.js
 import { Slot, useRouter } from "expo-router";
-import { View } from "react-native";
+import { View, AppState } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   useFonts as useGoogleFonts,
@@ -13,13 +13,12 @@ import { useCallback, useEffect } from "react";
 import { UserProvider } from "../context/userContext";
 import { EducationalProvider } from "../context/educationalContext";
 import * as Notifications from "expo-notifications";
-import { AppState } from "react-native";
 import { auth, db } from "../../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { Provider as PaperProvider } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 
-// 👇 Make sure notifications show as toast banners (not full-screen)
+// 👇 Notification appearance settings
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -28,12 +27,13 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Keep splash visible until fonts are ready
+// Keep splash visible until fonts load
 SplashScreen.preventAutoHideAsync();
 
 export default function Layout() {
   const router = useRouter();
 
+  // Load fonts
   const [googleFontsLoaded] = useGoogleFonts({
     Poppins_400Regular,
     Poppins_700Bold,
@@ -52,7 +52,9 @@ export default function Layout() {
     onLayoutRootView();
   }, [fontsLoaded]);
 
-  // ✅ Track user online/offline dynamically based on login state
+  // ------------------------------------------------------------
+  // ✅ USER ONLINE STATUS TRACKING
+  // ------------------------------------------------------------
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (!user) return;
@@ -76,7 +78,8 @@ export default function Layout() {
         else handleOnlineStatus(false);
       });
 
-      handleOnlineStatus(true); // mark online immediately
+      handleOnlineStatus(true);
+
       return () => {
         sub.remove();
         handleOnlineStatus(false);
@@ -86,40 +89,50 @@ export default function Layout() {
     return () => unsubscribeAuth();
   }, []);
 
-  // ✅ Global Notification Listeners (with guards)
+  // ------------------------------------------------------------
+  // ✅ SAFE NOTIFICATION LISTENERS (NO CRASHING)
+  // ------------------------------------------------------------
   useEffect(() => {
-    const sub1 = Notifications.addNotificationReceivedListener(() => {
-      console.log("📬 Notification received in foreground");
-    });
+    let sub1, sub2;
 
-    const sub2 = Notifications.addNotificationResponseReceivedListener(
-      (resp) => {
+    try {
+      // When notification arrives
+      sub1 = Notifications.addNotificationReceivedListener(() => {
+        console.log("📬 Notification received (foreground)");
+      });
+
+      // When user taps a notification
+      sub2 = Notifications.addNotificationResponseReceivedListener((resp) => {
         try {
           const screen = resp?.notification?.request?.content?.data?.screen;
+
           const currentRoute =
             router.getState()?.routes?.at(-1)?.name?.toLowerCase() || "";
 
-          // 🚫 Guard: Don't hijack login/signup/navigation while logging in
+          // 🚫 Prevent routing during login/signup screens
           if (
             currentRoute.includes("login") ||
             currentRoute.includes("signup") ||
             currentRoute.includes("forgot")
           ) {
-            console.log("🛑 Ignored notification tap during login/signup.");
+            console.log("🛑 Ignored notification tap during login/signup");
             return;
           }
 
           if (screen) router.push(screen);
           else router.push("/Main/notifications");
         } catch (err) {
-          console.log("⚠️ Notification routing error:", err);
+          console.log("⚠️ Error handling notification tap:", err);
         }
-      }
-    );
+      });
+    } catch (err) {
+      // 👇 THIS PREVENTS CRASHES WHEN FIREBASEAPP IS NOT INITIALIZED
+      console.log("⚠️ Notifications not initialized yet:", err);
+    }
 
     return () => {
-      sub1.remove();
-      sub2.remove();
+      sub1?.remove?.();
+      sub2?.remove?.();
     };
   }, []);
 
@@ -131,7 +144,10 @@ export default function Layout() {
       <PaperProvider theme={{ dark: false }}>
         <UserProvider>
           <EducationalProvider>
-            <View style={{ flex: 1, backgroundColor: "#ffffff" }} onLayout={onLayoutRootView}>
+            <View
+              style={{ flex: 1, backgroundColor: "#ffffff" }}
+              onLayout={onLayoutRootView}
+            >
               <Slot />
             </View>
           </EducationalProvider>

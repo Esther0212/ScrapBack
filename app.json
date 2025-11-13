@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Scrapback-User",
+    "name": "ScrapBack",
     "slug": "ScrapBack",
     "scheme": "com.scrapback.app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/logo.png",
+    "icon": "./src/assets/scrapback-icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -17,25 +17,29 @@
       "supportsTablet": true
     },
     "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDAd_vfevQT0mQAnOV2ZbRBcGpLMMdVnXg"
+        }
+      },
       "adaptiveIcon": {
-        "foregroundImage": "./src/assets/splash-icon.png",
+        "foregroundImage": "./src/assets/app-icon.png",
         "backgroundColor": "#F0F1C5"
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.scrapback.app"
     },
     "web": {
       "favicon": "./src/assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": [
-      "expo-router",
-      "expo-font",
-      "expo-notifications"
-    ],
+    "plugins": ["expo-router", "expo-font", "expo-notifications"],
     "extra": {
       "router": {},
       "eas": {
