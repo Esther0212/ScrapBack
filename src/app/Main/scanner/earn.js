@@ -20,14 +20,21 @@ export default function EarnPointsQR() {
   const [loading, setLoading] = useState(true);
 
   // ⏳ countdown state
-  const [timeLeft, setTimeLeft] = useState(3 * 60); // 5 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(5 * 60); // 5 minutes in seconds
+  const [expiryTimestamp, setExpiryTimestamp] = useState(
+    Date.now() + 5 * 60 * 1000
+  );
+  //const [timeLeft, setTimeLeft] = useState(10); // 10 seconds for testing expired code, dont remove
+  //const [expiryTimestamp] = useState(Date.now() + 10 * 1000); // 10 seconds for testing expired code, dont remove
 
-  // ❗ expiryTimestamp is created once ONLY
-  const [expiryTimestamp] = useState(Date.now() + 5 * 60 * 1000);
-
-  // ❗ Remove auto-reset behavior — once expired, it stays expired
   useEffect(() => {
-    if (timeLeft <= 0) return; // expiration stops timer permanently
+    if (timeLeft <= 0) {
+      // ⏱ When expired → regenerate QR
+      const newExpiry = Date.now() + 5 * 60 * 1000;
+      setExpiryTimestamp(newExpiry);
+      setTimeLeft(5 * 60); // reset countdown
+      return;
+    }
 
     const interval = setInterval(() => {
       setTimeLeft((t) => (t > 0 ? t - 1 : 0));
@@ -61,6 +68,7 @@ export default function EarnPointsQR() {
     fetchUserData();
   }, [user]);
 
+  // ⏳ countdown logic
   useEffect(() => {
     if (timeLeft <= 0) return;
 
@@ -99,11 +107,11 @@ export default function EarnPointsQR() {
           {userData && timeLeft > 0 ? (
             <QRCode
               value={JSON.stringify({
-                type: "earn",
+                type: "earn", // 👈 add this line
                 uid: user.uid,
                 email: user.email,
                 name: `${userData.firstName || ""} ${userData.lastName || ""}`,
-                exp: expiryTimestamp,
+                exp: expiryTimestamp, // ✅ stays constant for 5 min
               })}
               size={180}
             />
@@ -176,8 +184,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 18,
     textAlign: "center",
-    marginVertical: 40,
+    marginVertical: 40, // pushes it away from description and button
   },
+
   closeButtonText: {
     fontSize: 15,
     fontFamily: "Poppins_700Bold",
