@@ -20,19 +20,14 @@ export default function RedeemRewardsQR() {
   const [loading, setLoading] = useState(true);
 
   // countdown state
-  const [timeLeft, setTimeLeft] = useState(5 * 60); // 5 minutes
-  const [expiryTimestamp, setExpiryTimestamp] = useState(
-    Date.now() + 5 * 60 * 1000
-  );
+  const [timeLeft, setTimeLeft] = useState(3 * 60); // 1 minute
+
+  // ❗ Removed auto-reset of expiry timestamp (no more resetting)
+  const [expiryTimestamp] = useState(Date.now() + 1 * 60 * 1000);
 
   // countdown logic
   useEffect(() => {
-    if (timeLeft <= 0) {
-      const newExpiry = Date.now() + 5 * 60 * 1000;
-      setExpiryTimestamp(newExpiry);
-      setTimeLeft(5 * 60);
-      return;
-    }
+    if (timeLeft <= 0) return; // ❗ STOP here. Do NOT reset.
 
     const interval = setInterval(() => {
       setTimeLeft((t) => (t > 0 ? t - 1 : 0));
@@ -95,7 +90,7 @@ export default function RedeemRewardsQR() {
           {userData && timeLeft > 0 ? (
             <QRCode
               value={JSON.stringify({
-                type: "redeem", // 👈 add this line
+                type: "redeem",
                 uid: user.uid,
                 email: user.email,
                 name: `${userData.firstName || ""} ${userData.lastName || ""}`,
