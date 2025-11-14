@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   useFonts as useGoogleFonts,
   Poppins_400Regular,
+  Poppins_500Medium, // ✅ ADD THIS
   Poppins_700Bold,
   Poppins_800ExtraBold,
 } from "@expo-google-fonts/poppins";
@@ -36,6 +37,7 @@ export default function Layout() {
   // Load fonts
   const [googleFontsLoaded] = useGoogleFonts({
     Poppins_400Regular,
+    Poppins_500Medium, // ✅ added
     Poppins_700Bold,
     Poppins_800ExtraBold,
   });
