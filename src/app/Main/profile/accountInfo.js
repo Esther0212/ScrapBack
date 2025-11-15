@@ -98,6 +98,7 @@ const AccountInfo = () => {
 
   const [streetDebounceTimer, setStreetDebounceTimer] = useState(null);
   const [streetReady, setStreetReady] = useState(false);
+  const [streetHeight, setStreetHeight] = useState(55); // default height
 
   // Debounce street input
   useEffect(() => {
@@ -487,17 +488,17 @@ const AccountInfo = () => {
   const handleSave = async () => {
     try {
       if (!userData?.uid) return;
-  
+
       // 🚫 Require pinpointed location before saving
       if (!marker) {
         showToast("Please tap the map to pinpoint your exact location.", 2500);
         return;
       }
-  
+
       setIsSaving(true);
-  
+
       let finalProfilePic = profilePic;
-  
+
       if (profilePic && profilePic.startsWith("file://")) {
         const uploadedUrl = await uploadImageToStorage(
           profilePic,
@@ -505,7 +506,7 @@ const AccountInfo = () => {
         );
         if (uploadedUrl) finalProfilePic = uploadedUrl;
       }
-  
+
       const updatedAddress = {
         street,
         region: userData?.address?.region || "Northern Mindanao",
@@ -514,10 +515,10 @@ const AccountInfo = () => {
         barangay: barangay ? barangay.name : "",
         postalCode: userData?.address?.postalCode || "9000",
       };
-  
+
       const userRef = doc(db, "user", userData.uid);
       const userLocation = { lat: marker.latitude, lng: marker.longitude };
-  
+
       await updateDoc(userRef, {
         profilePic: finalProfilePic || null,
         firstName,
@@ -529,7 +530,7 @@ const AccountInfo = () => {
         address: updatedAddress,
         location: userLocation,
       });
-  
+
       setUserData({
         ...userData,
         profilePic: finalProfilePic || "",
@@ -542,13 +543,13 @@ const AccountInfo = () => {
         address: updatedAddress,
         location: userLocation,
       });
-  
+
       setPrevStreet(street);
       setPrevBarangay(barangay?.name || "");
       setInitialCoordsSet(true);
-  
+
       setValidationTriggered(false);
-  
+
       showToast("Profile updated successfully!", 2000);
       setEditMode(false);
     } catch (err) {
@@ -557,7 +558,7 @@ const AccountInfo = () => {
     } finally {
       setIsSaving(false);
     }
-  };  
+  };
 
   const handleCancel = () => {
     setProfilePic(userData?.profilePic || null);
@@ -803,7 +804,8 @@ const AccountInfo = () => {
             {/* Address */}
             <Text style={styles.label}>Address</Text>
             <InputField
-              label="Street Name, Building, House No., etc."
+              label="Describe Your Exact Location"
+              placeholder="(street, house no., building, landmarks, directions, etc.)"
               value={street}
               setValue={(value) => {
                 // First input: STREET
@@ -817,6 +819,9 @@ const AccountInfo = () => {
               }}
               editable={editMode}
               subLabel
+              multiline={true}
+              dynamicHeight={streetHeight}
+              onHeightChange={setStreetHeight}
             />
             <DropdownField
               label="Barangay"
@@ -1039,6 +1044,10 @@ const InputField = ({
   containerStyle,
   subLabel,
   keyboardType,
+  multiline = false,
+  dynamicHeight,
+  onHeightChange,
+  placeholder,
 }) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
@@ -1046,8 +1055,25 @@ const InputField = ({
       value={value}
       editable={editable}
       onChangeText={setValue}
-      style={[styles.input, { color: editable ? "#3A2E2E" : "#777" }]}
-      keyboardType={keyboardType}
+      placeholder={placeholder}                 // ← ADD THIS
+  placeholderTextColor="#9F9F9F"
+      multiline={multiline}
+      onContentSizeChange={(e) => {
+        if (multiline && onHeightChange) {
+          const newHeight = e.nativeEvent.contentSize.height;
+
+          // Prevent shrinking below normal height
+          onHeightChange(Math.max(55, Math.min(newHeight, 160)));
+        }
+      }}
+      style={[
+        styles.input,
+        {
+          color: editable ? "#3A2E2E" : "#777",
+          height: multiline ? dynamicHeight : 55,
+          textAlignVertical: multiline ? "top" : "center",
+        },
+      ]}
     />
   </View>
 );
