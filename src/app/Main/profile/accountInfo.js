@@ -902,6 +902,8 @@ const AccountInfo = () => {
                               setMarker(null);
                               setMapRegion((prev) => ({
                                 ...(prev || {}),
+                                latitude: barangayCenter.latitude,
+                                longitude: barangayCenter.longitude,
                                 latitudeDelta: prev?.latitudeDelta ?? 0.03,
                                 longitudeDelta: prev?.longitudeDelta ?? 0.03,
                               }));
@@ -912,6 +914,8 @@ const AccountInfo = () => {
                           setMarker({ latitude, longitude });
                           setMapRegion((prev) => ({
                             ...(prev || {}),
+                            latitude,
+                            longitude,
                             latitudeDelta: prev?.latitudeDelta ?? 0.03,
                             longitudeDelta: prev?.longitudeDelta ?? 0.03,
                           }));
@@ -958,6 +962,8 @@ const AccountInfo = () => {
                                   setMarker(barangayCenter);
                                   setMapRegion((prev) => ({
                                     ...(prev || {}),
+                                    latitude: barangayCenter.latitude,
+                                    longitude: barangayCenter.longitude,
                                     latitudeDelta: prev?.latitudeDelta ?? 0.03,
                                     longitudeDelta:
                                       prev?.longitudeDelta ?? 0.03,
@@ -969,6 +975,8 @@ const AccountInfo = () => {
                               setMarker({ latitude, longitude });
                               setMapRegion((prev) => ({
                                 ...(prev || {}),
+                                latitude,
+                                longitude,
                                 latitudeDelta: prev?.latitudeDelta ?? 0.03,
                                 longitudeDelta: prev?.longitudeDelta ?? 0.03,
                               }));
@@ -1055,8 +1063,8 @@ const InputField = ({
       value={value}
       editable={editable}
       onChangeText={setValue}
-      placeholder={placeholder}                 // ← ADD THIS
-  placeholderTextColor="#9F9F9F"
+      placeholder={placeholder} // ← ADD THIS
+      placeholderTextColor="#9F9F9F"
       multiline={multiline}
       onContentSizeChange={(e) => {
         if (multiline && onHeightChange) {
