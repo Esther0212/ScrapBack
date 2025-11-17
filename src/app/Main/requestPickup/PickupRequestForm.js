@@ -701,6 +701,9 @@ export default function PickupRequestForm() {
           <Modal visible={modalVisible} animationType="slide">
             <View style={{ flex: 1 }}>
               <View style={styles.topOverlay}>
+                <Text style={styles.toggleLabel}>
+                  Edit Address
+                </Text>
                 <View style={styles.searchBox}>
                   <Animated.View
                     style={{
@@ -719,10 +722,9 @@ export default function PickupRequestForm() {
                         styles.searchOverlay,
                         {
                           height: searchHeight,
-                          textAlignVertical: "top",
                         },
                       ]}
-                      placeholder="Search"
+                      placeholder="Edit or Pinpoint Location"
                       value={addressName}
                       onChangeText={setAddressName}
                       multiline={true}
@@ -745,6 +747,9 @@ export default function PickupRequestForm() {
                     />
                   </Animated.View>
                 </View>
+                <Text style={styles.toggleLabel}>
+                  Pinpoint Location
+                </Text>
               </View>
 
               {loadingLocation ? (
@@ -779,7 +784,7 @@ export default function PickupRequestForm() {
               <TouchableOpacity
                 style={[
                   styles.accountInfoToggle,
-                  { top: searchHeight + 50 }, // 👈 dynamic offset based on search height
+                  { top: searchHeight + 80 }, // 👈 dynamic offset based on search height
                 ]}
                 onPress={() => setIsSatellite(!isSatellite)}
                 activeOpacity={0.8}
@@ -1217,8 +1222,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    marginBottom: 10,
   },
-  searchOverlay: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
+  searchOverlay: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular", },
+  toggleLabel: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333", marginBottom: 5, },
+  toggleLabel1: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333", },
   footerOverlay: {
     position: "absolute",
     bottom: 40,
