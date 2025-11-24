@@ -16,7 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { registerForPushNotificationsAsync } from "../utils/notifications";
+
+import messaging from "@react-native-firebase/messaging";   // ✅ FCM
 
 import { auth, db } from "../../firebase";
 import CustomBgColor from "../components/customBgColor";
@@ -71,31 +72,33 @@ const Login = () => {
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
 
-      // 🔔 Get push token
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
+      // ✅ Ask permission
+      await messaging().requestPermission();
+
+      // ✅ FCM TOKEN
+      const fcmToken = await messaging().getToken();
+      console.log("✅ FCM Token:", fcmToken);
+
+      if (fcmToken) {
         await setDoc(
           doc(db, "user", user.uid),
-          { expoPushToken: token },
+          { fcmToken },
           { merge: true }
         );
       }
 
-      // 🔎 Fetch user profile
+      // 🔎 Fetch profile
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
         const profile = userDocSnap.data();
-
-        // ✅ Update context
         setUserData({
           uid: user.uid,
           email: user.email,
           ...profile,
         });
       } else {
-        console.warn("⚠️ No profile found for user:", user.uid);
         setUserData({ uid: user.uid, email: user.email });
       }
 
@@ -108,43 +111,34 @@ const Login = () => {
         await AsyncStorage.removeItem("savedPassword");
       }
 
-      // ✅ Success toast
       showToast("Login successful! Welcome back!");
 
-      // Small delay for a smooth transition
       setTimeout(() => {
         router.replace("/Main");
       }, 1000);
+
     } catch (error) {
       console.error("FULL LOGIN ERROR:", error);
       let message = "Login failed. Please try again.";
-      if (error.code === "auth/invalid-email")
-        message = "Invalid email address.";
-      else if (error.code === "auth/user-not-found")
-        message = "User not found.";
-      else if (error.code === "auth/wrong-password")
-        message = "Incorrect password.";
 
-      // ⚠️ Error toast
+      if (error.code === "auth/invalid-email") message = "Invalid email address.";
+      else if (error.code === "auth/user-not-found") message = "User not found.";
+      else if (error.code === "auth/wrong-password") message = "Incorrect password.";
+
       showToast("❌ " + message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-load saved creds
   useEffect(() => {
     const loadSaved = async () => {
-      try {
-        const savedEmail = await AsyncStorage.getItem("savedEmail");
-        const savedPassword = await AsyncStorage.getItem("savedPassword");
-        if (savedEmail && savedPassword) {
-          setEmail(savedEmail);
-          setPassword(savedPassword);
-          setRememberMe(true);
-        }
-      } catch (e) {
-        console.log("Error loading saved creds:", e);
+      const savedEmail = await AsyncStorage.getItem("savedEmail");
+      const savedPassword = await AsyncStorage.getItem("savedPassword");
+      if (savedEmail && savedPassword) {
+        setEmail(savedEmail);
+        setPassword(savedPassword);
+        setRememberMe(true);
       }
     };
     loadSaved();

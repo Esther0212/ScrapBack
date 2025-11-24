@@ -1,11 +1,12 @@
-// _layout.js
-import { Slot, useRouter } from "expo-router";
+// app/_layout.js
+
+import { Slot } from "expo-router";
 import { View, AppState } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   useFonts as useGoogleFonts,
   Poppins_400Regular,
-  Poppins_500Medium, // ✅ ADD THIS
+  Poppins_500Medium,
   Poppins_700Bold,
   Poppins_800ExtraBold,
 } from "@expo-google-fonts/poppins";
@@ -13,36 +14,29 @@ import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect } from "react";
 import { UserProvider } from "../context/userContext";
 import { EducationalProvider } from "../context/educationalContext";
-import * as Notifications from "expo-notifications";
 import { auth, db } from "../../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { Provider as PaperProvider } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 
-// 👇 Notification appearance settings
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// ✅ FCM FUNCTIONS
+import {
+  registerForPushNotificationsAsync,
+  listenForTokenRefresh,
+  listenForForegroundMessages,
+} from "../utils/notifications";
 
 // Keep splash visible until fonts load
 SplashScreen.preventAutoHideAsync();
 
 export default function Layout() {
-  const router = useRouter();
-
   // Load fonts
-  const [googleFontsLoaded] = useGoogleFonts({
+  const [fontsLoaded] = useGoogleFonts({
     Poppins_400Regular,
-    Poppins_500Medium, // ✅ added
+    Poppins_500Medium,
     Poppins_700Bold,
     Poppins_800ExtraBold,
   });
-
-  const fontsLoaded = googleFontsLoaded;
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {
@@ -55,87 +49,68 @@ export default function Layout() {
   }, [fontsLoaded]);
 
   // ------------------------------------------------------------
-  // ✅ USER ONLINE STATUS TRACKING
+  // ✅ USER STATUS + FCM (ONLY RUNS IF LOGGED IN)
   // ------------------------------------------------------------
   useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-      if (!user) return;
+    let appState = AppState.currentState;
+    let stateSub = null;
+    let tokenSub = null;
+    let foregroundSub = null;
 
-      const handleOnlineStatus = async (isOnline) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        console.log("⚠️ No user logged in — skipping FCM + status");
+        return;
+      }
+
+      console.log("✅ User detected:", user.email);
+
+      // ✅ Register FCM token
+      await registerForPushNotificationsAsync();
+
+      // ✅ Listen for token refresh
+      tokenSub = listenForTokenRefresh();
+
+      // ✅ Listen for foreground messages
+      foregroundSub = listenForForegroundMessages();
+
+      const userRef = doc(db, "user", user.uid);
+
+      const setStatus = async (isOnline) => {
         try {
-          await updateDoc(doc(db, "user", user.uid), {
+          await updateDoc(userRef, {
             online: isOnline,
             lastActive: serverTimestamp(),
           });
+
           console.log(
-            `✅ ${user.email} marked as ${isOnline ? "Online" : "Offline"}`
+            `✅ ${user.email} set to ${isOnline ? "ONLINE" : "OFFLINE"}`
           );
         } catch (err) {
-          console.log("❌ Error updating online status:", err);
+          console.log("❌ Error updating status:", err);
         }
       };
 
-      const sub = AppState.addEventListener("change", (state) => {
-        if (state === "active") handleOnlineStatus(true);
-        else handleOnlineStatus(false);
+      // Listen to app background / active state
+      stateSub = AppState.addEventListener("change", (next) => {
+        if (appState !== next) {
+          appState = next;
+          setStatus(next === "active");
+        }
       });
 
-      handleOnlineStatus(true);
+      // Initial status
+      setStatus(true);
 
       return () => {
-        sub.remove();
-        handleOnlineStatus(false);
+        stateSub?.remove?.();
+        tokenSub?.();
+        foregroundSub?.();
+        setStatus(false);
       };
     });
 
-    return () => unsubscribeAuth();
-  }, []);
-
-  // ------------------------------------------------------------
-  // ✅ SAFE NOTIFICATION LISTENERS (NO CRASHING)
-  // ------------------------------------------------------------
-  useEffect(() => {
-    let sub1, sub2;
-
-    try {
-      // When notification arrives
-      sub1 = Notifications.addNotificationReceivedListener(() => {
-        console.log("📬 Notification received (foreground)");
-      });
-
-      // When user taps a notification
-      sub2 = Notifications.addNotificationResponseReceivedListener((resp) => {
-        try {
-          const screen = resp?.notification?.request?.content?.data?.screen;
-
-          const currentRoute =
-            router.getState()?.routes?.at(-1)?.name?.toLowerCase() || "";
-
-          // 🚫 Prevent routing during login/signup screens
-          if (
-            currentRoute.includes("login") ||
-            currentRoute.includes("signup") ||
-            currentRoute.includes("forgot")
-          ) {
-            console.log("🛑 Ignored notification tap during login/signup");
-            return;
-          }
-
-          if (screen) router.push(screen);
-          else router.push("/Main/notifications");
-        } catch (err) {
-          console.log("⚠️ Error handling notification tap:", err);
-        }
-      });
-    } catch (err) {
-      // 👇 THIS PREVENTS CRASHES WHEN FIREBASEAPP IS NOT INITIALIZED
-      console.log("⚠️ Notifications not initialized yet:", err);
-    }
-
-    return () => {
-      sub1?.remove?.();
-      sub2?.remove?.();
-    };
+    return () => unsubscribe();
   }, []);
 
   if (!fontsLoaded) return null;
@@ -143,6 +118,7 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" backgroundColor="#ffffff" />
+
       <PaperProvider theme={{ dark: false }}>
         <UserProvider>
           <EducationalProvider>

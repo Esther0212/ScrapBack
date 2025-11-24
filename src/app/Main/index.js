@@ -1,4 +1,3 @@
-// src/app/Main/Home.jsx
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -7,7 +6,6 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  Platform,
   Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,52 +17,15 @@ import {
   query,
   where,
   onSnapshot,
-  setDoc,
   doc,
 } from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useUser } from "../../context/userContext";
 import { useEducational } from "../../context/educationalContext";
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
-import Constants from "expo-constants";
+
+
 
 const { width } = Dimensions.get("window");
-
-async function registerForPushNotificationsAsync() {
-  if (!Device.isDevice) {
-    alert("Must use physical device for Push Notifications");
-    return null;
-  }
-
-  let { status } = await Notifications.getPermissionsAsync();
-  if (status !== "granted") {
-    const { status: newStatus } = await Notifications.requestPermissionsAsync();
-    status = newStatus;
-  }
-  if (status !== "granted") {
-    alert("Push notification permissions not granted!");
-    return null;
-  }
-
-  const projectId =
-    Constants?.expoConfig?.extra?.eas?.projectId ??
-    Constants?.easConfig?.projectId;
-
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  console.log("Expo push token:", token);
-
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#FF231F7C",
-    });
-  }
-
-  return token;
-}
 
 const Home = () => {
   const { userData } = useUser();
@@ -100,22 +61,6 @@ const Home = () => {
     return unsub;
   }, []);
 
-  // ✅ Save Expo Push Token to Firestore
-  useEffect(() => {
-    const saveToken = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        await setDoc(
-          doc(db, "user", user.uid),
-          { expoPushToken: token },
-          { merge: true }
-        );
-      }
-    };
-    saveToken();
-  }, []);
 
   // ✅ Real-time badge for nested notifications path
   useEffect(() => {

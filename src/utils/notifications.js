@@ -1,48 +1,103 @@
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
-import Constants from "expo-constants";
-import { Platform } from "react-native";
+import messaging from "@react-native-firebase/messaging";
+import { Platform, PermissionsAndroid } from "react-native";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "../../firebase";
 
-// Always show notification even when app is open
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowNotification: true, // 👈 correct for SDK 53
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+/* =========================================================
+   ✅ REQUEST NOTIFICATION PERMISSION (ANDROID 13+ & IOS)
+   ========================================================= */
+async function requestUserPermission() {
+  if (Platform.OS === "android" && Platform.Version >= 33) {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+    );
 
-export async function registerForPushNotificationsAsync() {
-  if (!Device.isDevice) {
-    alert("Must use physical device for Push Notifications");
-    return null;
+    if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+      console.log("❌ Android notification permission denied");
+      return false;
+    }
+
+    console.log("✅ Android notification permission granted");
+    return true;
   }
 
-  // Ask permission
-  let { status } = await Notifications.getPermissionsAsync();
-  if (status !== "granted") {
-    const { status: newStatus } = await Notifications.requestPermissionsAsync();
-    status = newStatus;
-  }
-  if (status !== "granted") {
-    alert("Push notification permissions not granted!");
-    return null;
-  }
+  // iOS
+  const authStatus = await messaging().requestPermission();
+  const enabled =
+    authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+    authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
-  // Get Expo push token
-  const projectId =
-    Constants?.expoConfig?.extra?.eas?.projectId ??
-    Constants?.easConfig?.projectId;
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  console.log("Expo push token:", token);
-
-  // For Android: create channel
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-    });
+  if (!enabled) {
+    console.log("❌ iOS notification permission denied");
+    return false;
   }
 
-  return token; // You can save this in Firestore under the user
+  console.log("✅ iOS notification permission granted");
+  return true;
 }
+
+/* =========================================================
+   ✅ GET AND STORE FCM TOKEN
+   ========================================================= */
+export async function registerForPushNotificationsAsync() {
+  try {
+    const permissionGranted = await requestUserPermission();
+    if (!permissionGranted) return null;
+
+    const fcmToken = await messaging().getToken();
+    console.log("✅ FCM TOKEN:", fcmToken);
+
+    const user = auth.currentUser;
+    if (user && fcmToken) {
+      await setDoc(
+        doc(db, "user", user.uid),
+        { fcmToken },
+        { merge: true }
+      );
+    }
+
+    return fcmToken;
+  } catch (err) {
+    console.log("❌ Error getting FCM token:", err);
+    return null;
+  }
+}
+
+/* =========================================================
+   ✅ TOKEN REFRESH
+   ========================================================= */
+export function listenForTokenRefresh() {
+  return messaging().onTokenRefresh(async (newToken) => {
+    try {
+      const user = auth.currentUser;
+
+      if (user && newToken) {
+        await setDoc(
+          doc(db, "user", user.uid),
+          { fcmToken: newToken },
+          { merge: true }
+        );
+      }
+
+      console.log("🔄 Token refreshed:", newToken);
+    } catch (err) {
+      console.log("❌ Error updating refreshed token:", err);
+    }
+  });
+}
+
+/* =========================================================
+   ✅ FOREGROUND NOTIFICATIONS
+   ========================================================= */
+export function listenForForegroundMessages() {
+  return messaging().onMessage(async (remoteMessage) => {
+    console.log("📲 FOREGROUND NOTIFICATION:", remoteMessage);
+  });
+}
+
+/* =========================================================
+   ✅ BACKGROUND + QUIT NOTIFICATIONS
+   ========================================================= */
+messaging().setBackgroundMessageHandler(async (remoteMessage) => {
+  console.log("📨 BACKGROUND NOTIFICATION:", remoteMessage);
+});
