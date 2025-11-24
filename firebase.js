@@ -1,11 +1,10 @@
-// Import the functions you need from the SDKs you need
+// ✅ Import Firebase JS SDK (Web SDK compatible with React Native)
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// ✅ Your Firebase Web App config (this works in both Expo and APK)
 const firebaseConfig = {
   apiKey: "AIzaSyCx8xp6oZDH_tojkX6TZSkDHMqRjrOBzHw",
   authDomain: "scrapback.firebaseapp.com",
@@ -13,14 +12,13 @@ const firebaseConfig = {
   storageBucket: "scrapback.firebasestorage.app",
   messagingSenderId: "982925588158",
   appId: "1:982925588158:web:966a341afbf3d60c4110ef",
-  measurementId: "G-26CLPX2974"
 };
 
-// Initialize Firebase
+// ✅ Initialize Firebase (only once)
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// ✅ Export services for use in your components
 export { auth, db, storage };

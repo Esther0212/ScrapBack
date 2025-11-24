@@ -9,7 +9,7 @@ import {
   Keyboard,
   FlatList,
   Linking,
-  SafeAreaView,
+  SafeAreaView, Image
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
@@ -301,7 +301,7 @@ export default function MapSelector() {
         style={[styles.scheduleCard, { borderLeftColor: borderColor }]}
         onPress={() => openGoogleMaps(item.lat, item.lng)}
       >
-        <View style={styles.cardHeader}>
+      <View style={styles.cardTitleWrapper}>
           <Text style={styles.cardTitle}>{item.name}</Text>
           <StatusBadge status={item.status} />
         </View>
@@ -491,7 +491,12 @@ export default function MapSelector() {
 
           {/* Map or List */}
           {selectedView === "map" ? (
-            <MapView style={{ flex: 1 }} region={region} ref={mapRef} provider={PROVIDER_GOOGLE}>
+            <MapView
+              style={{ flex: 1 }}
+              region={region}
+              ref={mapRef}
+              provider={PROVIDER_GOOGLE}
+            >
               {marker && (
                 <Marker
                   coordinate={marker}
@@ -528,12 +533,17 @@ export default function MapSelector() {
                         ? `${p.address}\nStatus: ${sched.status}\nDate: ${sched.collectionDate} ${sched.collectionTime}`
                         : p.address
                     }
-                    image={
-                      isClosed
-                        ? closedCollectionPointMarker
-                        : collectionPointMarker
-                    } // ✅ dynamic icon
-                  />
+                  >
+                    <Image
+                      source={
+                        isClosed
+                          ? closedCollectionPointMarker
+                          : collectionPointMarker
+                      }
+                      style={{ width: 32, height: 32 }} // adjust size here
+                      resizeMode="contain"
+                    />
+                  </Marker>
                 );
               })}
             </MapView>
@@ -654,6 +664,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
     color: "#117D2E",
+  },
+    cardTitleWrapper: {
+    flex: 1,
+    paddingRight: 10,
   },
   cardAddress: {
     fontSize: 14,
