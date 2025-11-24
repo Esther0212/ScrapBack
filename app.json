@@ -37,7 +37,17 @@
     },
     "web": {
       "favicon": "./src/assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "config": {
+        "firebase": {
+          "apiKey": "AIzaSyCx8xp6oZDH_tojkX6TZSkDHMqRjrOBzHw",
+          "authDomain": "scrapback.firebaseapp.com",
+          "projectId": "scrapback",
+          "storageBucket": "scrapback.firebasestorage.app",
+          "messagingSenderId": "982925588158",
+          "appId": "1:982925588158:web:966a341afbf3d60c4110ef"
+        }
+      }
     },
     "plugins": ["expo-router", "expo-font", "expo-notifications"],
     "extra": {

@@ -1,10 +1,14 @@
 // ✅ Import Firebase JS SDK (Web SDK compatible with React Native)
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+
+// ✅ AUTH WITH PERSISTENCE (AsyncStorage)
+import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
+
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
-// ✅ Your Firebase Web App config (this works in both Expo and APK)
+// ✅ Your Firebase Web App config (works in Expo + APK)
 const firebaseConfig = {
   apiKey: "AIzaSyCx8xp6oZDH_tojkX6TZSkDHMqRjrOBzHw",
   authDomain: "scrapback.firebaseapp.com",
@@ -16,9 +20,15 @@ const firebaseConfig = {
 
 // ✅ Initialize Firebase (only once)
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+
+// ✅ FIX: Auth now persists between app restarts
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+});
+
+// ✅ Other services
 const db = getFirestore(app);
 const storage = getStorage(app);
 
 // ✅ Export services for use in your components
-export { auth, db, storage };
+export { auth, db, storage, firebaseConfig };

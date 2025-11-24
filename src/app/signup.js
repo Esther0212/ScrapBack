@@ -20,10 +20,13 @@ import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
+  signInWithPhoneNumber,
 } from "firebase/auth";
 
 import { setDoc, doc } from "firebase/firestore";
-import { auth, db } from "../../firebase";
+import { auth, db, firebaseConfig } from "../../firebase";
+
+import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 
 import CustomBgColor from "../components/customBgColor";
 import { Provider as PaperProvider } from "react-native-paper";
@@ -44,6 +47,12 @@ import cdoGeoJSON from "../utils/cdo_barangays.json";
 const { width } = Dimensions.get("window");
 
 /* ------------------------------------------------
+   TEMP OTP STORAGE (for OTP verification screen)
+-------------------------------------------------- */
+let tempConfirmationResult = null;
+export const getTempConfirmation = () => tempConfirmationResult;
+
+/* ------------------------------------------------
    NORMALIZE BARANGAY NAME (remove (Pob.), spacing)
 -------------------------------------------------- */
 const normalizeBrgyName = (name) =>
@@ -56,7 +65,33 @@ const normalizeBrgyName = (name) =>
 /* ------------------------------------------------
    SIGNUP SCREEN
 -------------------------------------------------- */
+/* ----------------------------
+  PHONE FORMAT HELPER
+----------------------------- */
+const formatPhone = (text) => {
+  const digits = text.replace(/\D/g, "").slice(0, 11);
+  const part1 = digits.slice(0, 4);
+  const part2 = digits.slice(4, 7);
+  const part3 = digits.slice(7, 11);
+
+  if (digits.length <= 4) return part1;
+  if (digits.length <= 7) return `${part1}-${part2}`;
+  return `${part1}-${part2}-${part3}`;
+};
+
 const Signup = () => {
+  /* ----------------------------
+     EMAIL / PHONE TOGGLE STATE
+  ----------------------------- */
+  const [useEmail, setUseEmail] = useState(true);
+  // true = Email signup
+  // false = Phone (OTP) signup
+
+  /* ----------------------------
+     RECAPTCHA VERIFIER
+  ----------------------------- */
+  const recaptchaVerifier = useRef(null);
+
   /* ----------------------------
      BASIC SIGNUP STATES
   ----------------------------- */
@@ -387,127 +422,199 @@ const Signup = () => {
       return;
     }
 
-    // Required fields
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !password ||
-      !contact ||
-      !confirmPassword ||
-      !gender ||
-      !dob ||
-      !street ||
-      !barangay
-    ) {
-      ToastAndroid.show(
-        "Please fill in all required fields.",
-        ToastAndroid.SHORT
-      );
-      return;
-    }
-
-    // Password match
-    if (password !== confirmPassword) {
-      ToastAndroid.show("Passwords do not match.", ToastAndroid.SHORT);
-      return;
-    }
-
-    // Strong password
-    const strongPass = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-    if (!strongPass.test(password)) {
-      ToastAndroid.show(
-        "Password must be at least 8 characters, include uppercase, lowercase, and number.",
-        ToastAndroid.LONG
-      );
-      return;
-    }
-
-    // Phone number format
-    const phoneRegex = /^(09|\+639)\d{9}$/;
-    if (!phoneRegex.test(contact)) {
-      ToastAndroid.show(
-        "Please enter a valid phone number.",
-        ToastAndroid.LONG
-      );
-      return;
-    }
-
-    // Require map pinpoint
-    if (!marker) {
-      ToastAndroid.show(
-        "Please tap the map to pinpoint your exact location.",
-        ToastAndroid.LONG
-      );
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Create user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
-
-      // Send email verification
-      await sendEmailVerification(user);
-
-      // Fixed location metadata
-      const region = "Northern Mindanao";
-      const province = "Misamis Oriental";
-      const city = "City of Cagayan De Oro";
-      const postalCode = "9000";
-
-      // Save user document to Firestore
-      await setDoc(doc(db, "user", user.uid), {
-        firstName,
-        lastName,
-        email,
-        contact,
-        gender,
-        dob,
-        userType: "user",
-        address: {
-          street,
-          region,
-          province,
-          city,
-          barangay: barangay?.name || "",
-          postalCode,
-        },
-        location: {
-          lat: marker.latitude,
-          lng: marker.longitude,
-        },
-        createdAt: new Date(),
-        points: 0,
-        online: false,
-      });
-
-      setShowSuccessModal(true);
-    } catch (error) {
-      console.error("Signup Error:", error);
-
-      let message = "Signup failed. Please try again.";
-      if (error.code === "auth/email-already-in-use") {
-        message = "This email is already registered. Please log in instead.";
-      } else if (error.code === "auth/invalid-email") {
-        message = "Please enter a valid email address.";
-      } else if (error.code === "auth/weak-password") {
-        message = "Password is too weak. Use at least 6 characters.";
-      } else if (error.code === "auth/network-request-failed") {
-        message = "Network error. Please check your internet connection.";
-      } else if (error.code === "auth/too-many-requests") {
-        message = "Too many attempts. Please try again later.";
+    // EMAIL SIGNUP
+    if (useEmail) {
+      if (!firstName || !lastName || !email || !gender || !dob || !street || !barangay) {
+        ToastAndroid.show(
+          "Please fill in all required fields.",
+          ToastAndroid.SHORT
+        );
+        return;
       }
 
-      ToastAndroid.show(message, ToastAndroid.LONG);
-    } finally {
-      setLoading(false);
+      if (!password || !confirmPassword) {
+        ToastAndroid.show("Password is required.", ToastAndroid.SHORT);
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        ToastAndroid.show("Passwords do not match.", ToastAndroid.SHORT);
+        return;
+      }
+
+      const strongPass = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+      if (!strongPass.test(password)) {
+        ToastAndroid.show(
+          "Password must be 8+ characters & include upper, lower, and number.",
+          ToastAndroid.LONG
+        );
+        return;
+      }
+
+      // Require map pinpoint
+      if (!marker) {
+        ToastAndroid.show(
+          "Please tap the map to pinpoint your exact location.",
+          ToastAndroid.LONG
+        );
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+        const user = userCredential.user;
+
+        await sendEmailVerification(user);
+
+        // Fixed location metadata
+        const region = "Northern Mindanao";
+        const province = "Misamis Oriental";
+        const city = "City of Cagayan De Oro";
+        const postalCode = "9000";
+
+        await setDoc(doc(db, "user", user.uid), {
+          firstName,
+          lastName,
+          email,
+          contact,
+          gender,
+          dob,
+          userType: "user",
+          address: {
+            street,
+            region,
+            province,
+            city,
+            barangay: barangay?.name || "",
+            postalCode,
+          },
+          location: {
+            lat: marker.latitude,
+            lng: marker.longitude,
+          },
+          createdAt: new Date(),
+          points: 0,
+          online: false,
+        });
+
+        ToastAndroid.show("Verification email sent!", ToastAndroid.LONG);
+        setShowSuccessModal(true);
+      } catch (error) {
+        console.error("Email Signup Error:", error);
+
+        let message = "Signup failed. Please try again.";
+        if (error.code === "auth/email-already-in-use") {
+          message = "This email is already registered. Please log in instead.";
+        } else if (error.code === "auth/invalid-email") {
+          message = "Please enter a valid email address.";
+        } else if (error.code === "auth/weak-password") {
+          message = "Password is too weak. Use at least 6 characters.";
+        } else if (error.code === "auth/network-request-failed") {
+          message = "Network error. Please check your internet connection.";
+        } else if (error.code === "auth/too-many-requests") {
+          message = "Too many attempts. Please try again later.";
+        }
+
+        ToastAndroid.show(message, ToastAndroid.LONG);
+      } finally {
+        setLoading(false);
+      }
+    }
+    // PHONE OTP SIGNUP
+    else {
+      if (!firstName || !lastName || !contact || !gender || !dob || !street || !barangay) {
+        ToastAndroid.show(
+          "Please fill in all required fields.",
+          ToastAndroid.SHORT
+        );
+        return;
+      }
+
+      // Normalize by removing dashes
+      const rawNumber = contact.replace(/-/g, "");
+      const phoneRegex = /^09\d{9}$/;
+
+      if (!phoneRegex.test(rawNumber)) {
+        ToastAndroid.show("Enter a valid 11-digit phone number.", ToastAndroid.LONG);
+        return;
+      }
+
+      // Require map pinpoint
+      if (!marker) {
+        ToastAndroid.show(
+          "Please tap the map to pinpoint your exact location.",
+          ToastAndroid.LONG
+        );
+        return;
+      }
+
+      const formattedPhone = "+63" + rawNumber.slice(1);
+
+      if (!recaptchaVerifier.current) {
+        ToastAndroid.show("Recaptcha not ready. Try again.", ToastAndroid.LONG);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        ToastAndroid.show("Sending OTP...", ToastAndroid.SHORT);
+
+        const confirmation = await signInWithPhoneNumber(
+          auth,
+          formattedPhone,
+          recaptchaVerifier.current
+        );
+
+        tempConfirmationResult = confirmation;
+
+        const userData = {
+          firstName,
+          lastName,
+          contact: formattedPhone,
+          gender,
+          dob,
+          street,
+          region: "Northern Mindanao",
+          province: "Misamis Oriental",
+          city: "City of Cagayan De Oro",
+          barangay: barangay?.name || "",
+          postalCode: "9000",
+          userType: "user",
+          locationLat: marker.latitude,
+          locationLng: marker.longitude,
+        };
+
+        ToastAndroid.show("OTP sent!", ToastAndroid.SHORT);
+
+        router.push({
+          pathname: "/OtpVerification",
+          params: {
+            verificationId: confirmation.verificationId,
+            userData: JSON.stringify(userData),
+          },
+        });
+      } catch (error) {
+        console.error("Phone OTP Error:", error);
+
+        let message = "Failed to send OTP. Please try again.";
+        if (error.code === "auth/invalid-phone-number") {
+          message = "Invalid phone number format.";
+        } else if (error.code === "auth/too-many-requests") {
+          message = "Too many attempts. Please try again later.";
+        } else if (error.code === "auth/network-request-failed") {
+          message = "Network error. Please check your internet connection.";
+        }
+
+        ToastAndroid.show(message, ToastAndroid.LONG);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -518,6 +625,13 @@ const Signup = () => {
     <PaperProvider>
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
+          {/* RECAPTCHA VERIFIER MODAL */}
+          <FirebaseRecaptchaVerifierModal
+            ref={recaptchaVerifier}
+            firebaseConfig={firebaseConfig}
+            attemptInvisibleVerification={true}
+          />
+
           <ScrollView
             contentContainerStyle={styles.scrollContainer}
             keyboardShouldPersistTaps="always"
@@ -528,6 +642,51 @@ const Signup = () => {
               <Text style={styles.subtitle}>
                 Create your ScrapBack account now
               </Text>
+
+              {/* EMAIL / PHONE TOGGLE */}
+              <View style={styles.toggleContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    useEmail && styles.toggleButtonActive,
+                  ]}
+                  onPress={() => {
+                    setUseEmail(true);
+                    setContact("");
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.toggleButtonText,
+                      useEmail && styles.toggleButtonTextActive,
+                    ]}
+                  >
+                    Email
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    !useEmail && styles.toggleButtonActive,
+                  ]}
+                  onPress={() => {
+                    setUseEmail(false);
+                    setEmail("");
+                    setPassword("");
+                    setConfirmPassword("");
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.toggleButtonText,
+                      !useEmail && styles.toggleButtonTextActive,
+                    ]}
+                  >
+                    Phone (OTP)
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
               {/* FIRST & LAST NAME */}
               <View style={styles.row}>
@@ -546,55 +705,56 @@ const Signup = () => {
               </View>
 
               {/* EMAIL */}
-              <InputField
-                label="Email"
-                value={email}
-                setValue={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+              {useEmail && (
+                <InputField
+                  label="Email"
+                  value={email}
+                  setValue={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              )}
 
               {/* CONTACT */}
               <InputField
                 label="Contact Number"
                 value={contact}
+                placeholder="0000-000-0000"
+                keyboardType="number-pad"
+
                 setValue={(text) => {
-                  let cleaned = text.replace(/[^0-9+]/g, "");
-                  if (cleaned.includes("+") && !cleaned.startsWith("+")) {
-                    cleaned = cleaned.replace("+", "");
-                  }
-                  if (cleaned.startsWith("+")) {
-                    if (cleaned.length <= 13) setContact(cleaned);
-                  } else {
-                    if (cleaned.length <= 11) setContact(cleaned);
-                  }
+                  const formatted = formatPhone(text);
+                  setContact(formatted);
                 }}
-                keyboardType="phone-pad"
               />
 
-              {/* PASSWORD */}
-              <PasswordField
-                label="Password"
-                value={password}
-                setValue={(text) => {
-                  setPassword(text);
-                  validatePassword(text);
-                }}
-                visible={passwordVisible}
-                setVisible={setPasswordVisible}
-              />
-              {passwordError ? (
-                <Text style={styles.errorText}>{passwordError}</Text>
-              ) : null}
+              {/* PASSWORD (Email signup only) */}
+              {useEmail && (
+                <>
+                  <PasswordField
+                    label="Password"
+                    value={password}
+                    setValue={(text) => {
+                      setPassword(text);
+                      validatePassword(text);
+                    }}
+                    visible={passwordVisible}
+                    setVisible={setPasswordVisible}
+                  />
+                  {passwordError ? (
+                    <Text style={styles.errorText}>{passwordError}</Text>
+                  ) : null}
 
-              {/* CONFIRM PASSWORD */}
-              <PasswordField
-                label="Confirm Password"
-                value={confirmPassword}
-                setValue={setConfirmPassword}
-                visible={confirmPasswordVisible}
-                setVisible={setConfirmPasswordVisible}
-              />
+                  {/* CONFIRM PASSWORD */}
+                  <PasswordField
+                    label="Confirm Password"
+                    value={confirmPassword}
+                    setValue={setConfirmPassword}
+                    visible={confirmPasswordVisible}
+                    setVisible={setConfirmPasswordVisible}
+                  />
+                </>
+              )}
 
               {/* GENDER DROPDOWN */}
               <DropdownField
@@ -1181,6 +1341,34 @@ const styles = StyleSheet.create({
     color: "#555",
     textAlign: "center",
     marginBottom: 40,
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    marginBottom: 24,
+    backgroundColor: "#F1E3D3",
+    borderRadius: 10,
+    padding: 4,
+    gap: 8,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toggleButtonActive: {
+    backgroundColor: "#008243",
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#3A2E2E",
+  },
+  toggleButtonTextActive: {
+    color: "#FFFFFF",
   },
   row: { flexDirection: "row" },
   inputContainer: { marginBottom: 16 },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -13,19 +13,38 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { signInWithEmailAndPassword, signInWithPhoneNumber } from "firebase/auth";
+import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerForPushNotificationsAsync } from "../utils/notifications";
 
-import { auth, db } from "../../firebase";
+import { auth, db, firebaseConfig } from "../../firebase";
+import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 import CustomBgColor from "../components/customBgColor";
 import { useUser } from "../context/userContext";
 
 const { width } = Dimensions.get("window");
 
+/* ------------------------------------------------
+  TEMP OTP STORAGE (for OTP verification screen)
+-------------------------------------------------- */
+let tempLoginConfirmation = null;
+export const getTempLoginConfirmation = () => tempLoginConfirmation;
+
 const Login = () => {
   const { setUserData } = useUser();
+
+  /* ----------------------------
+    EMAIL / PHONE TOGGLE STATE
+  ----------------------------- */
+  const [useEmail, setUseEmail] = useState(true);
+  // true = Email/password login
+  // false = Phone (OTP) login
+
+  /* ----------------------------
+    RECAPTCHA VERIFIER
+  ----------------------------- */
+  const recaptchaVerifier = useRef(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,6 +52,7 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
+  const [contact, setContact] = useState("");
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -132,6 +152,85 @@ const Login = () => {
     }
   };
 
+  /* ----------------------------
+     PHONE OTP SEND (login)
+  ----------------------------- */
+  const handleSendOtp = async () => {
+    if (!contact) {
+      showToast("Please enter your contact number.");
+      return;
+    }
+
+    // Remove dashes
+    const digitsOnly = contact.replace(/\D/g, "");
+
+    // Must be exactly 11 digits
+    if (digitsOnly.length !== 11) {
+      showToast("Contact number must be 11 digits.");
+      return;
+    }
+
+    // Must start with 09
+    if (!digitsOnly.startsWith("09")) {
+      showToast("Number must start with 09.");
+      return;
+    }
+
+    // Convert to +639XXXXXXXXX
+    const formattedPhone = "+63" + digitsOnly.slice(1);
+
+    if (!recaptchaVerifier.current) {
+      showToast("Recaptcha not ready. Try again.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // 🔎 CHECK DATABASE FIRST
+      const snapshot = await getDocs(collection(db, "user"));
+      const userExists = snapshot.docs.some(
+        (d) => d.data().contact === formattedPhone
+      );
+
+      if (!userExists) {
+        setLoading(false);
+        showToast("❌ No account found using this phone number.");
+        return;
+      }
+
+      // 📱 Send OTP
+      showToast("Sending OTP...");
+
+      const confirmation = await signInWithPhoneNumber(
+        auth,
+        formattedPhone,
+        recaptchaVerifier.current
+      );
+
+      tempLoginConfirmation = confirmation;
+
+      router.push({
+        pathname: "/OtpVerification",
+        params: {
+          fromLogin: true,
+          contact: formattedPhone,
+        },
+      });
+
+    } catch (err) {
+      console.error("Send OTP error:", err);
+
+      let msg = "Failed to send OTP.";
+      if (err.code === "auth/too-many-requests")
+        msg = "Too many attempts. Try later.";
+
+      showToast(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Auto-load saved creds
   useEffect(() => {
     const loadSaved = async () => {
@@ -153,92 +252,175 @@ const Login = () => {
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
+        {/* RECAPTCHA VERIFIER */}
+        <FirebaseRecaptchaVerifierModal
+          ref={recaptchaVerifier}
+          firebaseConfig={firebaseConfig}
+          attemptInvisibleVerification={true}
+        />
         <View style={styles.container}>
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Login to your account</Text>
-
-          {/* Email */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email address</Text>
-            <TextInput
-              placeholder="Your email"
-              placeholderTextColor="#888"
-              style={styles.input}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                setErrors((prev) => ({ ...prev, email: "" }));
+          {/* Email / Phone Toggle */}
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={[styles.toggleButton, useEmail && styles.toggleButtonActive]}
+              onPress={() => {
+                setUseEmail(true);
+                setContact("");
               }}
-            />
-            {errors.email ? (
-              <Text style={styles.errorText}>{errors.email}</Text>
-            ) : null}
+            >
+              <Text style={[styles.toggleButtonText, useEmail && styles.toggleButtonTextActive]}>Email</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.toggleButton, !useEmail && styles.toggleButtonActive]}
+              onPress={() => {
+                setUseEmail(false);
+                setEmail("");
+                setPassword("");
+              }}
+            >
+              <Text style={[styles.toggleButtonText, !useEmail && styles.toggleButtonTextActive]}>Phone (OTP)</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Password */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.passwordWrapper}>
+          {useEmail ? (
+            <>
+              {/* Email */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email address</Text>
+                <TextInput
+                  placeholder="Your email"
+                  placeholderTextColor="#888"
+                  style={styles.input}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    setErrors((prev) => ({ ...prev, email: "" }));
+                  }}
+                />
+                {errors.email ? (
+                  <Text style={styles.errorText}>{errors.email}</Text>
+                ) : null}
+              </View>
+
+              {/* Password */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password</Text>
+                <View style={styles.passwordWrapper}>
+                  <TextInput
+                    placeholder="Password"
+                    placeholderTextColor="#888"
+                    style={styles.input}
+                    secureTextEntry={!passwordVisible}
+                    value={password}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      setErrors((prev) => ({ ...prev, password: "" }));
+                    }}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => setPasswordVisible(!passwordVisible)}
+                  >
+                    <Ionicons
+                      name={passwordVisible ? "eye" : "eye-off"}
+                      size={20}
+                      color="#555"
+                    />
+                  </TouchableOpacity>
+                </View>
+                {errors.password ? (
+                  <Text style={styles.errorText}>{errors.password}</Text>
+                ) : null}
+              </View>
+            </>
+          ) : (
+            /* Phone (OTP) input */
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Contact Number</Text>
               <TextInput
-                placeholder="Password"
+                placeholder="0912-345-6789"
                 placeholderTextColor="#888"
                 style={styles.input}
-                secureTextEntry={!passwordVisible}
-                value={password}
+                keyboardType="phone-pad"
+                value={contact}
+                maxLength={13} // 0000-000-0000 = 13 chars
                 onChangeText={(text) => {
-                  setPassword(text);
-                  setErrors((prev) => ({ ...prev, password: "" }));
+                  // Remove non-digits
+                  let digits = text.replace(/\D/g, "");
+
+                  // Limit to 11 digits max
+                  if (digits.length > 11) {
+                    digits = digits.slice(0, 11);
+                  }
+
+                  // Format: 0000-000-0000
+                  let formatted = digits;
+
+                  if (digits.length > 4 && digits.length <= 7) {
+                    formatted = `${digits.slice(0, 4)}-${digits.slice(4)}`;
+                  } 
+                  else if (digits.length > 7) {
+                    formatted = `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+                  }
+
+                  setContact(formatted);
                 }}
               />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setPasswordVisible(!passwordVisible)}
-              >
-                <Ionicons
-                  name={passwordVisible ? "eye" : "eye-off"}
-                  size={20}
-                  color="#555"
-                />
-              </TouchableOpacity>
             </View>
-            {errors.password ? (
-              <Text style={styles.errorText}>{errors.password}</Text>
-            ) : null}
-          </View>
+          )}
 
-          {/* Remember Me + Forgot Password */}
-          <View style={styles.row}>
+          {useEmail ? (
+            <>
+              {/* Remember Me + Forgot Password */}
+              <View style={styles.row}>
+                <TouchableOpacity
+                  style={styles.rememberMe}
+                  onPress={() => setRememberMe(!rememberMe)}
+                >
+                  <Ionicons
+                    name={rememberMe ? "checkmark-circle" : "ellipse-outline"}
+                    size={20}
+                    color={rememberMe ? "#008243" : "#555"}
+                  />
+                  <Text style={styles.rememberText}>Remember me</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => router.push("/forgotpass")}>
+                  <Text style={styles.forgotText}>Forgot password?</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Login button */}
+              <TouchableOpacity
+                style={styles.loginButton}
+                activeOpacity={0.8}
+                onPress={handleLogin}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Log in</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
             <TouchableOpacity
-              style={styles.rememberMe}
-              onPress={() => setRememberMe(!rememberMe)}
+              style={styles.loginButton}
+              activeOpacity={0.8}
+              onPress={handleSendOtp}
             >
-              <Ionicons
-                name={rememberMe ? "checkmark-circle" : "ellipse-outline"}
-                size={20}
-                color={rememberMe ? "#008243" : "#555"}
-              />
-              <Text style={styles.rememberText}>Remember me</Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.loginButtonText}>Send OTP</Text>
+              )}
             </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => router.push("/forgotpass")}>
-              <Text style={styles.forgotText}>Forgot password?</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Login button */}
-          <TouchableOpacity
-            style={styles.loginButton}
-            activeOpacity={0.8}
-            onPress={handleLogin}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.loginButtonText}>Log in</Text>
-            )}
-          </TouchableOpacity>
+          )}
 
           {/* Signup link */}
           <TouchableOpacity
@@ -272,6 +454,32 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_400Regular",
     textAlign: "center",
     marginBottom: 42,
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    marginBottom: 16,
+    backgroundColor: "#F1E3D3",
+    borderRadius: 10,
+    padding: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toggleButtonActive: {
+    backgroundColor: "#008243",
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#3A2E2E",
+  },
+  toggleButtonTextActive: {
+    color: "#FFFFFF",
   },
   inputContainer: { marginBottom: 24 },
   label: {
