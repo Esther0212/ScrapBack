@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerForPushNotificationsAsync } from "../utils/notifications";
@@ -71,6 +71,15 @@ const Login = () => {
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
 
+      // ✅ Check if email is verified
+      if (!user.emailVerified) {
+        await signOut(auth); // log them out again
+
+        showToast("Please verify your email before logging in.");
+        setLoading(false);
+        return;
+      }
+
       // 🔔 Get push token
       const token = await registerForPushNotificationsAsync();
       if (token) {
@@ -88,7 +97,6 @@ const Login = () => {
       if (userDocSnap.exists()) {
         const profile = userDocSnap.data();
 
-        // ✅ Update context
         setUserData({
           uid: user.uid,
           email: user.email,
@@ -108,15 +116,15 @@ const Login = () => {
         await AsyncStorage.removeItem("savedPassword");
       }
 
-      // ✅ Success toast
       showToast("Login successful! Welcome back!");
 
-      // Small delay for a smooth transition
       setTimeout(() => {
         router.replace("/Main");
       }, 1000);
+
     } catch (error) {
       console.error("FULL LOGIN ERROR:", error);
+
       let message = "Login failed. Please try again.";
       if (error.code === "auth/invalid-email")
         message = "Invalid email address.";
@@ -125,8 +133,8 @@ const Login = () => {
       else if (error.code === "auth/wrong-password")
         message = "Incorrect password.";
 
-      // ⚠️ Error toast
       showToast("❌ " + message);
+
     } finally {
       setLoading(false);
     }
@@ -138,6 +146,7 @@ const Login = () => {
       try {
         const savedEmail = await AsyncStorage.getItem("savedEmail");
         const savedPassword = await AsyncStorage.getItem("savedPassword");
+
         if (savedEmail && savedPassword) {
           setEmail(savedEmail);
           setPassword(savedPassword);
@@ -147,6 +156,7 @@ const Login = () => {
         console.log("Error loading saved creds:", e);
       }
     };
+
     loadSaved();
   }, []);
 
@@ -230,8 +240,8 @@ const Login = () => {
           {/* Login button */}
           <TouchableOpacity
             style={styles.loginButton}
-            activeOpacity={0.8}
             onPress={handleLogin}
+            activeOpacity={0.8}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -317,17 +327,12 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 14,
     alignItems: "center",
-    shadowColor: "rgba(0, 0, 0, 1)",
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 5,
     elevation: 4,
   },
   loginButtonText: {
     color: "#FFFFFF",
     fontSize: 18,
     fontFamily: "Poppins_700Bold",
-    letterSpacing: 0.5,
   },
   signupLink: { marginTop: 24, alignItems: "center" },
   signupText: {
