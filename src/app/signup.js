@@ -94,7 +94,8 @@ const Signup = () => {
   const [barangayMenuVisible, setBarangayMenuVisible] = useState(false);
   const [barangay, setBarangay] = useState(null);
 
-  const [selectedBarangayFeature, setSelectedBarangayFeature] = useState(null);
+  const [selectedBarangayFeature, setSelectedBarangayFeature] =
+    useState(null);
   const [barangayPolygonCoords, setBarangayPolygonCoords] = useState([]);
   const [barangayCenter, setBarangayCenter] = useState(null);
 
@@ -122,13 +123,49 @@ const Signup = () => {
   }, []);
 
   /* ----------------------------
+     LOCATION PERMISSION HELPER
+  ----------------------------- */
+  const ensureLocationPermission = async () => {
+    try {
+      let { status } = await Location.getForegroundPermissionsAsync();
+
+      if (status !== "granted") {
+        const res = await Location.requestForegroundPermissionsAsync();
+        status = res.status;
+      }
+
+      if (status !== "granted") {
+        if (Platform.OS === "android") {
+          ToastAndroid.show(
+            "Please enable location permission to validate your address.",
+            ToastAndroid.LONG
+          );
+        } else {
+          // On iOS you might want an Alert instead
+          console.log(
+            "Location permission not granted. Please enable it in Settings."
+          );
+        }
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.log("Permission check error:", err);
+      return false;
+    }
+  };
+
+  /* ----------------------------
      LOAD NAMRIA BARANGAYS
   ----------------------------- */
   useEffect(() => {
     if (cdoGeoJSON?.features?.length) {
       const uniqueNames = Array.from(
         new Set(
-          cdoGeoJSON.features.map((f) => f.properties?.barangay).filter(Boolean)
+          cdoGeoJSON.features
+            .map((f) => f.properties?.barangay)
+            .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b));
 
@@ -195,6 +232,9 @@ const Signup = () => {
 
       /* Geocode barangay center */
       try {
+        const hasPerm = await ensureLocationPermission();
+        if (!hasPerm) return;
+
         const geo = await Location.geocodeAsync(
           `${barangay.name}, Cagayan de Oro City, Philippines`
         );
@@ -265,6 +305,9 @@ const Signup = () => {
         return;
 
       try {
+        const hasPerm = await ensureLocationPermission();
+        if (!hasPerm) return;
+
         // Try street + barangay
         let addr = `${street}, ${barangay.name}, Cagayan de Oro City, Philippines`;
         let geo = await Location.geocodeAsync(addr);
@@ -298,7 +341,6 @@ const Signup = () => {
 
         // Street outside polygon → revert to barangay center
         if (!inside) {
-
           if (barangayCenter) {
             setMapRegion({
               latitude: barangayCenter.latitude,
@@ -727,7 +769,7 @@ const Signup = () => {
                       style={styles.map}
                       region={mapRegion}
                       mapType={isSatellite ? "hybrid" : "standard"}
-                      onPress={(e) => {
+                      onPress={async (e) => {
                         const { latitude, longitude } =
                           e.nativeEvent.coordinate;
 
@@ -856,7 +898,8 @@ const Signup = () => {
                   }}
                   style={[
                     styles.checkboxRow,
-                    privacyError && !privacyChecked && { borderColor: "red" },
+                    privacyError &&
+                      !privacyChecked && { borderColor: "red" },
                   ]}
                   activeOpacity={0.8}
                 >
@@ -954,7 +997,9 @@ const Signup = () => {
             >
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContainer}>
-                  <Text style={styles.modalTitle}>Verification Email Sent</Text>
+                  <Text style={styles.modalTitle}>
+                    Verification Email Sent
+                  </Text>
                   <ScrollView style={styles.modalContent}>
                     <Text style={styles.modalText}>
                       A verification link has been sent to your email address.
@@ -1047,7 +1092,8 @@ const DropdownField = ({
       ? options.filter((item) =>
           (optionKey ? item[optionKey] : item.name || item)
             .toLowerCase()
-            .includes(searchQuery.toLowerCase())
+            .includes(searchQuery.toLowerCase()
+          )
         )
       : options;
 
@@ -1147,7 +1193,7 @@ const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
         secureTextEntry={!visible}
         autoCorrect={false}
         autoCapitalize="none"
-        importantForAutofill="no" // <- FIX
+        importantForAutofill="no"
       />
 
       <TouchableOpacity
