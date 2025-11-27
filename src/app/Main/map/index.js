@@ -17,11 +17,7 @@ import {
   Linking,
   SafeAreaView,
 } from "react-native";
-import {
-  useRouter,
-  useLocalSearchParams,
-  useFocusEffect,
-} from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import CustomBgColor from "../../../components/customBgColor";
@@ -105,7 +101,9 @@ export default function MapSelector() {
 
   const mapRef = useRef(null);
   const userRegionRef = useRef(null);
-  const isFocusedRef = useRef(false);
+
+  // ✅ Prevent infinite zoom
+  const hasAnimatedRef = useRef(false);
 
   const [searchText, setSearchText] = useState("");
   const [selectedView, setSelectedView] = useState("map");
@@ -113,7 +111,7 @@ export default function MapSelector() {
   const [region, setRegion] = useState(ORIGINAL_REGION);
   const [marker, setMarker] = useState(null); // user location
   const [searchMarker, setSearchMarker] = useState(null); // searched location
-  const [pickupFocusMarker, setPickupFocusMarker] = useState(null); // scheduled pickup marker
+  const [pickupFocusMarker, setPickupFocusMarker] = useState(null); // scheduled pickup marker (state kept, but no purple pin rendered)
 
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -128,9 +126,9 @@ export default function MapSelector() {
   ===================================== */
   useFocusEffect(
     useCallback(() => {
-      return () => {
-        setPickupFocusMarker(null);
+      hasAnimatedRef.current = false;
 
+      return () => {
         if (userRegionRef.current) {
           setRegion(userRegionRef.current);
         }
@@ -190,35 +188,39 @@ export default function MapSelector() {
     })();
   }, [params?.navKey]);
 
-  /* ===========================================
-     FROM SCHEDULED NOTIF (ALWAYS RE-TRIGGERS)
-  ============================================ */
-  /* =================================
-     ONLY triggered by notification
-  ================================= */
+  /* =========================================
+     ✅ SMOOTH ONE-TIME ZOOM FROM NOTIF
+  ========================================== */
   useEffect(() => {
     if (params.from !== "pickupScheduled") return;
     if (!params.lat || !params.lng) return;
+    if (hasAnimatedRef.current) return;
 
     const lat = parseFloat(params.lat);
     const lng = parseFloat(params.lng);
 
-    setPickupFocusMarker({ latitude: lat, longitude: lng });
+    if (isNaN(lat) || isNaN(lng)) return;
 
-    const newRegion = {
-      latitude: lat,
-      longitude: lng,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
+    hasAnimatedRef.current = true;
+    setSelectedView("map");
+
+    const camera = {
+      center: {
+        latitude: lat,
+        longitude: lng,
+      },
+      zoom: 18, // ✅ zoom level (adjust if needed)
+      heading: 0,
+      pitch: 0,
+      altitude: 800,
     };
 
-    setSelectedView("map");
-    setRegion(newRegion);
-
     setTimeout(() => {
-      mapRef.current?.animateToRegion(newRegion, 600);
-    }, 200);
-  }, [params.navKey]);
+      if (mapRef.current) {
+        mapRef.current.animateCamera(camera, { duration: 1500 }); // ✅ smooth animation
+      }
+    }, 400);
+  }, [params]);
 
   /* ================================
      COMBINE SCHEDULES + POINT DATA
@@ -611,16 +613,7 @@ export default function MapSelector() {
                 />
               )}
 
-              {/* Scheduled pickup marker */}
-              {pickupFocusMarker && (
-                <Marker
-                  coordinate={pickupFocusMarker}
-                  title="Scheduled Pickup Address"
-                  description="Pickup location for your scheduled request."
-                  pinColor="#8F71D2"
-                />
-              )}
-
+              {/* ❌ REMOVED PURPLE PIN FOR SCHEDULED PICKUP */}
               {/* Collection points with status-based icons */}
               {points.map((p) => {
                 const sched = schedules.find((s) => s.pointId === p.id);

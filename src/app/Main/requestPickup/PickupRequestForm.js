@@ -1,3 +1,4 @@
+// src/app/Main/requestPickup/PickupRequestForm.jsx
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -97,6 +98,15 @@ export default function PickupRequestForm() {
 
   const [editAddressModalVisible, setEditAddressModalVisible] = useState(false);
   const glowAnim = useRef(new Animated.Value(0)).current;
+
+  const [isLocked, setIsLocked] = useState(false);
+
+  const [region, setRegion] = useState({
+    latitude: 8.4542,
+    longitude: 124.6319,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
 
   // 📡 Fetch wasteConversionRates
   useEffect(() => {
@@ -226,12 +236,18 @@ export default function PickupRequestForm() {
 
   // 👇 fetch existing request if editing
   useEffect(() => {
+    let mounted = true;
     const loadRequest = async () => {
-      if (!requestId) return;
+      if (!requestId) {
+        // Not editing — nothing to load here
+        return;
+      }
 
       try {
         const docRef = doc(db, "pickupRequests", requestId);
         const docSnap = await getDoc(docRef);
+
+        if (!mounted) return;
 
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -247,30 +263,62 @@ export default function PickupRequestForm() {
           setPickupDateTime(data.pickupDateTime || "");
           setPickupAddress(data.pickupAddress || "");
 
+          // 🔹 Lock if status is "scheduled"
+          if (data.status === "scheduled") {
+            setIsLocked(true);
+          }
+
           // 🔹 coords from request (stored as { latitude, longitude })
-          if (data.coords?.latitude && data.coords?.longitude) {
-            setMarkerCoords(data.coords);
+          if (
+            data.coords &&
+            typeof data.coords.latitude === "number" &&
+            typeof data.coords.longitude === "number"
+          ) {
+            const coords = {
+              latitude: data.coords.latitude,
+              longitude: data.coords.longitude,
+            };
+
+            setMarkerCoords(coords);
             setInitialRegion({
-              ...data.coords,
+              ...coords,
               latitudeDelta: 0.01,
               longitudeDelta: 0.01,
             });
-            fetchAddressName(data.coords);
+
+            // set human readable name if available
+            fetchAddressName(coords);
           }
 
           setPhoto(data.photoUrl || null);
         }
       } catch (err) {
         console.error("Failed to load request:", err);
+      } finally {
+        // ensure loadingLocation is false after loading edit data
+        if (mounted) setLoadingLocation(false);
       }
     };
 
     loadRequest();
+
+    return () => {
+      mounted = false;
+    };
   }, [requestId]);
 
   // 🔹 Load user default address & location (lat/lng) – same as AccountInfo
+  // IMPORTANT: Do NOT override edit-data when requestId exists.
   useEffect(() => {
+    let mounted = true;
     (async () => {
+      // If editing, we should not override the region/marker set from Firestore.
+      if (requestId) {
+        // Make sure we stop the loading spinner if edit-loading already handled it.
+        if (mounted) setLoadingLocation(false);
+        return;
+      }
+
       setLoadingLocation(true);
       try {
         const auth = getAuth();
@@ -278,6 +326,7 @@ export default function PickupRequestForm() {
 
         if (user) {
           const userDoc = await getDoc(doc(db, "user", user.uid));
+          if (!mounted) return;
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
@@ -304,40 +353,43 @@ export default function PickupRequestForm() {
             }
 
             // 📍 Use the same saved coords from AccountInfo: location: { lat, lng }
-            if (userData.location && !requestId) {
+            if (userData.location) {
               const { lat, lng } = userData.location;
-              const coords = {
-                latitude: lat,
-                longitude: lng,
-              };
+              if (typeof lat === "number" && typeof lng === "number") {
+                const coords = {
+                  latitude: lat,
+                  longitude: lng,
+                };
 
-              setMarkerCoords(coords);
-              setInitialRegion({
-                ...coords,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              });
+                setMarkerCoords(coords);
+                setInitialRegion({
+                  ...coords,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                });
 
-              // If no formatted address from profile, reverse-geocode this point
-              if (!userData.address) {
-                fetchAddressName(coords);
+                // If no formatted address from profile, reverse-geocode this point
+                if (!userData.address) {
+                  fetchAddressName(coords);
+                }
+
+                if (mounted) setLoadingLocation(false);
+                return;
               }
-
-              setLoadingLocation(false);
-              return;
             }
           }
         }
 
-        // fallback to GPS if no saved location
+        // fallback to GPS if no saved location and not editing
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           showAnimatedToast("Location permission is required.");
-          setLoadingLocation(false);
+          if (mounted) setLoadingLocation(false);
           return;
         }
 
         const location = await Location.getCurrentPositionAsync({});
+        if (!mounted) return;
         const coords = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
@@ -353,9 +405,13 @@ export default function PickupRequestForm() {
       } catch (err) {
         console.error("Error fetching user address:", err);
       } finally {
-        setLoadingLocation(false);
+        if (mounted) setLoadingLocation(false);
       }
     })();
+
+    return () => {
+      mounted = false;
+    };
   }, [requestId]);
 
   const confirmLocation = () => {
@@ -364,6 +420,8 @@ export default function PickupRequestForm() {
   };
 
   const onChangeDate = (event, selectedDate) => {
+    if (isLocked) return;
+
     if (event.type === "dismissed") {
       setShowDateOnlyPicker(false);
       setShowTimeOnlyPicker(false);
@@ -626,14 +684,15 @@ export default function PickupRequestForm() {
 
           {/* Date */}
           <TouchableOpacity
-            style={styles.infoBox}
+            style={[styles.infoBox, isLocked && { backgroundColor: "#eee" }]}
+            disabled={isLocked}
             onPress={() => setShowDateOnlyPicker(true)}
           >
             <View style={styles.iconWrapper}>
               <MaterialIcons name="date-range" size={30} color="green" />
             </View>
             <View style={styles.infoTextContainer}>
-              <Text style={styles.infoTitle}>Pickup Date & Time</Text>
+              <Text style={styles.infoTitle}>Preferred Pickup Date & Time</Text>
               <Text style={styles.infoSub}>
                 {pickupDateTime || "Select Date & Time"}
               </Text>
@@ -642,7 +701,8 @@ export default function PickupRequestForm() {
 
           {/* Address */}
           <TouchableOpacity
-            style={styles.infoBox}
+            style={[styles.infoBox, isLocked && { backgroundColor: "#eee" }]}
+            disabled={isLocked}
             onPress={() => {
               setOriginalAddress(addressName);
               setOriginalCoords(markerCoords);
@@ -654,7 +714,7 @@ export default function PickupRequestForm() {
               <FontAwesome name="map-marker" size={32} color="red" />
             </View>
             <View style={styles.infoTextContainer}>
-              <Text style={styles.infoTitle}>Pickup Address</Text>
+              <Text style={styles.infoTitle}>Preferred Pickup Address</Text>
               <Text style={styles.infoSub}>
                 {pickupAddress || "Select Location on Map"}
               </Text>
@@ -679,7 +739,7 @@ export default function PickupRequestForm() {
           </TouchableOpacity>
 
           {/* Date Pickers */}
-          {showDateOnlyPicker && (
+          {showDateOnlyPicker && !isLocked && (
             <DateTimePicker
               value={date}
               mode="date"
@@ -687,7 +747,7 @@ export default function PickupRequestForm() {
               onChange={onChangeDate}
             />
           )}
-          {showTimeOnlyPicker && (
+          {showTimeOnlyPicker && !isLocked && (
             <DateTimePicker
               value={date}
               mode="time"
@@ -754,9 +814,11 @@ export default function PickupRequestForm() {
                 <MapView
                   provider={PROVIDER_GOOGLE}
                   style={{ flex: 1 }}
-                  initialRegion={initialRegion}
+                  // Use the initialRegion chosen earlier (edit coords or user/default). If initialRegion is null fallback to region state.
+                  initialRegion={initialRegion || region}
                   mapType={isSatellite ? "hybrid" : "standard"}
                   onPress={(e) => {
+                    if (isLocked) return;
                     const coords = e.nativeEvent.coordinate;
                     setMarkerCoords(coords);
                     fetchAddressName(coords);
@@ -765,10 +827,11 @@ export default function PickupRequestForm() {
                   {markerCoords && (
                     <Marker
                       coordinate={markerCoords}
-                      draggable
+                      draggable={!isLocked}
                       title="Pinpointed Pickup Location"
                       description="This is your requested pickup location. Wait for confirmation from the admin."
                       onDragEnd={(e) => {
+                        if (isLocked) return;
                         const coords = e.nativeEvent.coordinate;
                         setMarkerCoords(coords);
                         fetchAddressName(coords);
@@ -805,7 +868,11 @@ export default function PickupRequestForm() {
                   <Text style={styles.footerText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.confirmBtnOverlay}
+                  style={[
+                    styles.confirmBtnOverlay,
+                    isLocked && { backgroundColor: "#999" },
+                  ]}
+                  disabled={isLocked}
                   onPress={() => setEditAddressModalVisible(true)}
                 >
                   <Text style={styles.footerText}>Confirm</Text>
@@ -1190,6 +1257,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EFEFEF",
   },
+  lockedText: {
+    marginTop: 10,
+    textAlign: "center",
+    color: "#00D26A",
+    fontWeight: "bold",
+  },
   iconWrapper: { width: 36, alignItems: "center" },
   infoTextContainer: { marginLeft: 12, flex: 1 },
   infoTitle: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
@@ -1265,6 +1338,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: "#008243",
     alignItems: "center",
+  },
+  lockedText: {
+    marginTop: 10,
+    textAlign: "center",
+    color: "#c0392b",
+    fontWeight: "bold",
   },
   footerText: { color: "#fff", fontSize: 16, fontFamily: "Poppins_700Bold" },
   modalHeader: {

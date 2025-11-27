@@ -157,6 +157,9 @@ export default function NotificationsScreen() {
   };
 
   // 🔹 Handle modal action (Go / Close)
+  // ✅ FINAL LOGIC:
+  // - scheduled → /Main/map (center on scheduledCoords)
+  // - pending, in progress, not approved, completed, cancelled → /Main/requestPickup
   const handleModalAction = async (confirm) => {
     if (!confirm || !selectedNotif) {
       setModalVisible(false);
@@ -166,66 +169,88 @@ export default function NotificationsScreen() {
 
     const type = selectedNotif.type;
 
-    // 🟢 Collection Point notifications still go to Map as usual
+    // 🔵 Collection point
     if (selectedNotif.title?.includes("Collection Point")) {
       router.push("/Main/map");
     }
-    // 🟢 Pickup status logic (special case for "scheduled")
+
+    // ✅ PICKUP STATUS
     else if (type === "pickupStatus") {
       try {
         const requestId =
           selectedNotif.requestId || selectedNotif.pickupRequestId;
 
-        if (requestId) {
-          const reqRef = doc(db, "pickupRequests", requestId);
-          const reqSnap = await getDoc(reqRef);
-
-          if (reqSnap.exists()) {
-            const reqData = reqSnap.data();
-            const status = (reqData.status || "").toLowerCase();
-            const coords = reqData.coords;
-
-            if (
-              status === "scheduled" &&
-              coords?.latitude != null &&
-              coords?.longitude != null
-            ) {
-              // 🔑 unique key so Map effect runs EVERY time
-              const navKey = `${requestId}_${Date.now()}`;
-
-              router.push({
-                pathname: "/Main/map",
-                params: {
-                  from: "pickupScheduled",
-                  pickupRequestId: requestId,
-                  lat: String(coords.latitude),
-                  lng: String(coords.longitude),
-                  navKey: Date.now().toString(),
-                },
-              });
-            } else {
-              router.push("/Main/requestPickup");
-            }
-          } else {
-            router.push("/Main/requestPickup");
-          }
-        } else {
+        if (!requestId) {
           router.push("/Main/requestPickup");
+          setModalVisible(false);
+          setSelectedNotif(null);
+          return;
+        }
+
+        const reqRef = doc(db, "pickupRequests", requestId);
+        const reqSnap = await getDoc(reqRef);
+
+        if (!reqSnap.exists()) {
+          router.push("/Main/requestPickup");
+          setModalVisible(false);
+          setSelectedNotif(null);
+          return;
+        }
+
+        const reqData = reqSnap.data();
+        const status = (reqData.status || "").toLowerCase();
+
+        // ✅ SCHEDULED → MAP TAB, CENTER ON scheduledCoords, NO PURPLE PIN
+        if (
+          status === "scheduled" &&
+          reqData.scheduledCoords?.latitude != null &&
+          reqData.scheduledCoords?.longitude != null
+        ) {
+          const navKey = `${requestId}_${Date.now()}`;
+
+          router.push({
+            pathname: "/Main/map",
+            params: {
+              from: "pickupScheduled",
+              pickupRequestId: requestId,
+              lat: String(reqData.scheduledCoords.latitude),
+              lng: String(reqData.scheduledCoords.longitude),
+              address: reqData.scheduledAddress || "",
+              date: reqData.scheduledDate || "",
+              time: reqData.scheduledTime || "",
+              navKey,
+            },
+          });
+        } else {
+          // 🟡 ALL OTHER STATUSES (pending, in progress, not approved, completed, cancelled)
+          // → REQUEST PICKUP PAGE
+          router.push({
+            pathname: "/Main/requestPickup",
+            params: {
+              pickupRequestId: requestId,
+              lat:
+                reqData.coords?.latitude != null
+                  ? String(reqData.coords.latitude)
+                  : "",
+              lng:
+                reqData.coords?.longitude != null
+                  ? String(reqData.coords.longitude)
+                  : "",
+              address: reqData.pickupAddress || "",
+              date: reqData.pickupDateTime || "",
+            },
+          });
         }
       } catch (err) {
-        console.error("Error handling pickupStatus notification:", err);
+        console.error("Error handling pickupStatus:", err);
         router.push("/Main/requestPickup");
       }
     }
-    // 🔸 Redemptions & points
-    else if (
-      type === "redemptionStatus" ||
-      type === "pointsEarned" // earned points
-    ) {
+
+    // ✅ OTHER TYPES
+    else if (type === "redemptionStatus" || type === "pointsEarned") {
       router.push("/Main/profile");
-    }
-    // 🔸 Staff transactions
-    else if (type === "staff_redemption" || type === "staff_contribution") {
+    } else if (type === "staff_redemption" || type === "staff_contribution") {
       router.push("/pages/Transactions");
     }
 
