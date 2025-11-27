@@ -19,6 +19,12 @@ export default function ScannerLayout() {
         options={{
           title: "Points Conversion Table",
           headerShown: true,
+          headerBackVisible: false,
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="chevron-back-outline" size={24} color="black" />
+            </TouchableOpacity>
+          ),
         }}
       />
     </Stack>

@@ -21,6 +21,7 @@ import {
   doc,
   updateDoc,
   orderBy,
+  getDoc,
 } from "firebase/firestore";
 import CustomBgColor from "../../components/customBgColor";
 import { useRouter } from "expo-router";
@@ -95,8 +96,8 @@ export default function NotificationsScreen() {
           d?.createdAt?.toDate
             ? d.createdAt.toDate().getTime()
             : typeof d?.createdAt === "number"
-              ? d.createdAt
-              : 0;
+            ? d.createdAt
+            : 0;
         return getTime(b) - getTime(a);
       });
 
@@ -155,8 +156,8 @@ export default function NotificationsScreen() {
     setModalVisible(true);
   };
 
-  // 🔹 Handle modal action
-  const handleModalAction = (confirm) => {
+  // 🔹 Handle modal action (Go / Close)
+  const handleModalAction = async (confirm) => {
     if (!confirm || !selectedNotif) {
       setModalVisible(false);
       setSelectedNotif(null);
@@ -165,16 +166,66 @@ export default function NotificationsScreen() {
 
     const type = selectedNotif.type;
 
+    // 🟢 Collection Point notifications still go to Map as usual
     if (selectedNotif.title?.includes("Collection Point")) {
       router.push("/Main/map");
-    } else if (type === "pickupStatus") {
-      router.push("/Main/requestPickup");
-    } else if (
+    }
+    // 🟢 Pickup status logic (special case for "scheduled")
+    else if (type === "pickupStatus") {
+      try {
+        const requestId =
+          selectedNotif.requestId || selectedNotif.pickupRequestId;
+
+        if (requestId) {
+          const reqRef = doc(db, "pickupRequests", requestId);
+          const reqSnap = await getDoc(reqRef);
+
+          if (reqSnap.exists()) {
+            const reqData = reqSnap.data();
+            const status = (reqData.status || "").toLowerCase();
+            const coords = reqData.coords;
+
+            if (
+              status === "scheduled" &&
+              coords?.latitude != null &&
+              coords?.longitude != null
+            ) {
+              // 🔑 unique key so Map effect runs EVERY time
+              const navKey = `${requestId}_${Date.now()}`;
+
+              router.push({
+                pathname: "/Main/map",
+                params: {
+                  from: "pickupScheduled",
+                  pickupRequestId: requestId,
+                  lat: String(coords.latitude),
+                  lng: String(coords.longitude),
+                  navKey: Date.now().toString(),
+                },
+              });
+            } else {
+              router.push("/Main/requestPickup");
+            }
+          } else {
+            router.push("/Main/requestPickup");
+          }
+        } else {
+          router.push("/Main/requestPickup");
+        }
+      } catch (err) {
+        console.error("Error handling pickupStatus notification:", err);
+        router.push("/Main/requestPickup");
+      }
+    }
+    // 🔸 Redemptions & points
+    else if (
       type === "redemptionStatus" ||
-      type === "pointsEarned" // 🟩 added earned points
+      type === "pointsEarned" // earned points
     ) {
       router.push("/Main/profile");
-    } else if (type === "staff_redemption" || type === "staff_contribution") {
+    }
+    // 🔸 Staff transactions
+    else if (type === "staff_redemption" || type === "staff_contribution") {
       router.push("/pages/Transactions");
     }
 
@@ -298,7 +349,7 @@ export default function NotificationsScreen() {
                 {(selectedNotif?.title?.includes("Collection Point") ||
                   selectedNotif?.type === "pickupStatus" ||
                   selectedNotif?.type === "redemptionStatus" ||
-                  selectedNotif?.type === "pointsEarned" || // 🟩 added this line
+                  selectedNotif?.type === "pointsEarned" ||
                   selectedNotif?.type === "staff_redemption" ||
                   selectedNotif?.type === "staff_contribution") && (
                   <TouchableOpacity

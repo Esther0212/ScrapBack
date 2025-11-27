@@ -701,9 +701,7 @@ export default function PickupRequestForm() {
           <Modal visible={modalVisible} animationType="slide">
             <View style={{ flex: 1 }}>
               <View style={styles.topOverlay}>
-                <Text style={styles.toggleLabel}>
-                  Edit Address
-                </Text>
+                <Text style={styles.toggleLabel}>Edit Address</Text>
                 <View style={styles.searchBox}>
                   <Animated.View
                     style={{
@@ -747,9 +745,7 @@ export default function PickupRequestForm() {
                     />
                   </Animated.View>
                 </View>
-                <Text style={styles.toggleLabel}>
-                  Pinpoint Location
-                </Text>
+                <Text style={styles.toggleLabel}>Pinpoint Location</Text>
               </View>
 
               {loadingLocation ? (
@@ -899,7 +895,7 @@ export default function PickupRequestForm() {
                               style={styles.weightInput}
                               placeholder="kg"
                               keyboardType="numeric"
-                              value={weights[item.type] ?? "0"}
+                              value={weights[item.type] ?? ""}
                               onChangeText={(val) => {
                                 // sanitize numbers
                                 const sanitized = val
@@ -907,30 +903,23 @@ export default function PickupRequestForm() {
                                   .replace(/^([^.]*\.)|\./g, "$1")
                                   .replace(/^(\d+\.?\d{0,2}).*$/, "$1");
 
-                                const num = parseFloat(sanitized);
-
-                                // if user enters 0 → unselect
-                                if (!num || num <= 0) {
-                                  setWeights((prev) => {
-                                    const updated = { ...prev };
-                                    delete updated[item.type];
-                                    return updated;
-                                  });
-
-                                  setSelectedTypes((types) =>
-                                    types.filter((t) => t !== item.type)
-                                  );
-
-                                  return;
-                                }
-
-                                // otherwise normal update
+                                // ✅ Always keep type selected if user is typing
                                 setSelectedTypes((types) =>
                                   types.includes(item.type)
                                     ? types
                                     : [...types, item.type]
                                 );
 
+                                // ✅ If user clears input, DO NOT unselect — just store empty
+                                if (sanitized === "") {
+                                  setWeights((prev) => ({
+                                    ...prev,
+                                    [item.type]: "",
+                                  }));
+                                  return;
+                                }
+
+                                // normal update
                                 setWeights((prev) => ({
                                   ...prev,
                                   [item.type]: sanitized,
@@ -967,7 +956,27 @@ export default function PickupRequestForm() {
               <View style={styles.modalFooter}>
                 <TouchableOpacity
                   style={styles.modalCloseBtn}
-                  onPress={() => setCategoryModalVisible(false)}
+                  onPress={() => {
+                    // ✅ Remove items with empty or zero weight on close
+                    setWeights((prev) => {
+                      const updated = { ...prev };
+
+                      Object.entries(updated).forEach(([key, value]) => {
+                        if (!value || parseFloat(value) <= 0) {
+                          delete updated[key];
+                        }
+                      });
+
+                      // also clean selectedTypes
+                      setSelectedTypes((prevTypes) =>
+                        prevTypes.filter((type) => updated[type] !== undefined)
+                      );
+
+                      return updated;
+                    });
+
+                    setCategoryModalVisible(false);
+                  }}
                 >
                   <Text style={styles.modalCloseText}>Close</Text>
                 </TouchableOpacity>
@@ -1224,9 +1233,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     marginBottom: 10,
   },
-  searchOverlay: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular", },
-  toggleLabel: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333", marginBottom: 5, },
-  toggleLabel1: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333", },
+  searchOverlay: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
+  toggleLabel: {
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
+    marginBottom: 5,
+  },
+  toggleLabel1: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
   footerOverlay: {
     position: "absolute",
     bottom: 40,

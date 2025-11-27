@@ -1,5 +1,11 @@
 // src/app/Main/map/MapSelector.jsx
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   View,
   Text,
@@ -11,9 +17,13 @@ import {
   Linking,
   SafeAreaView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import {
+  useRouter,
+  useLocalSearchParams,
+  useFocusEffect,
+} from "expo-router";
 import * as Location from "expo-location";
-import MapView, { Marker, Callout, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import CustomBgColor from "../../../components/customBgColor";
 import { Ionicons } from "@expo/vector-icons";
 import { Entypo } from "@expo/vector-icons";
@@ -23,6 +33,17 @@ import { collection, onSnapshot } from "firebase/firestore";
 import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
 import closedCollectionPointMarker from "../../../assets/map/closedCollectionPointMarker.png";
 import { useUser } from "../../../context/userContext";
+
+/* =========================
+   CONSTANTS
+========================= */
+
+const ORIGINAL_REGION = {
+  latitude: 8.4542,
+  longitude: 124.6319,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
+};
 
 // 🔹 Convert 24-hour to 12-hour format
 const formatTime12h = (time24) => {
@@ -79,20 +100,21 @@ const StatusBadge = ({ status }) => {
 
 export default function MapSelector() {
   const { userData } = useUser();
-
   const router = useRouter();
+  const params = useLocalSearchParams();
+
   const mapRef = useRef(null);
+  const userRegionRef = useRef(null);
+  const isFocusedRef = useRef(false);
 
   const [searchText, setSearchText] = useState("");
   const [selectedView, setSelectedView] = useState("map");
-  const [region, setRegion] = useState({
-    latitude: 8.4542,
-    longitude: 124.6319,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  });
-  const [marker, setMarker] = useState(null);
-  const [searchMarker, setSearchMarker] = useState(null);
+
+  const [region, setRegion] = useState(ORIGINAL_REGION);
+  const [marker, setMarker] = useState(null); // user location
+  const [searchMarker, setSearchMarker] = useState(null); // searched location
+  const [pickupFocusMarker, setPickupFocusMarker] = useState(null); // scheduled pickup marker
+
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const searchTimeout = useRef(null);
@@ -101,7 +123,24 @@ export default function MapSelector() {
   const [schedules, setSchedules] = useState([]);
   const [flattenedData, setFlattenedData] = useState([]);
 
-  // 🔥 Load Firestore data
+  /* ====================================
+     FOCUS HANDLING (ENTER / LEAVE MAP)
+  ===================================== */
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setPickupFocusMarker(null);
+
+        if (userRegionRef.current) {
+          setRegion(userRegionRef.current);
+        }
+      };
+    }, [])
+  );
+
+  /* =========================
+     FIRESTORE (POINTS + SCHED)
+  ========================== */
   useEffect(() => {
     const unsubPoints = onSnapshot(
       collection(db, "collectionPoint"),
@@ -123,30 +162,67 @@ export default function MapSelector() {
     };
   }, []);
 
-  // 📍 User location + distances
+  /* =====================
+     USER LOCATION
+  ====================== */
   useEffect(() => {
     (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
 
-        const location = await Location.getCurrentPositionAsync({});
-        const { latitude, longitude } = location.coords;
-        const newRegion = {
-          latitude,
-          longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        };
-        setRegion(newRegion);
-        setMarker({ latitude, longitude });
-      } catch (error) {
-        console.warn("Location error:", error);
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      const userRegion = {
+        latitude,
+        longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+
+      userRegionRef.current = userRegion;
+      setMarker({ latitude, longitude });
+
+      if (!params?.from) {
+        setRegion(userRegion);
+        mapRef.current?.animateToRegion(userRegion, 500);
       }
     })();
-  }, []);
+  }, [params?.navKey]);
 
-  // Combine schedules with their corresponding point data
+  /* ===========================================
+     FROM SCHEDULED NOTIF (ALWAYS RE-TRIGGERS)
+  ============================================ */
+  /* =================================
+     ONLY triggered by notification
+  ================================= */
+  useEffect(() => {
+    if (params.from !== "pickupScheduled") return;
+    if (!params.lat || !params.lng) return;
+
+    const lat = parseFloat(params.lat);
+    const lng = parseFloat(params.lng);
+
+    setPickupFocusMarker({ latitude: lat, longitude: lng });
+
+    const newRegion = {
+      latitude: lat,
+      longitude: lng,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    };
+
+    setSelectedView("map");
+    setRegion(newRegion);
+
+    setTimeout(() => {
+      mapRef.current?.animateToRegion(newRegion, 600);
+    }, 200);
+  }, [params.navKey]);
+
+  /* ================================
+     COMBINE SCHEDULES + POINT DATA
+  ================================= */
   useEffect(() => {
     if (!points.length || !schedules.length) return;
 
@@ -184,7 +260,7 @@ export default function MapSelector() {
   }, [points, schedules, marker]);
 
   /* ================================
-     Geoapify Autocomplete
+     GEOAPIFY AUTOCOMPLETE
   ================================= */
   const fetchGeoapifySuggestions = async (query) => {
     if (!query || query.length < 2) {
@@ -210,7 +286,7 @@ export default function MapSelector() {
   };
 
   /* ================================
-     Reset to current location (instant)
+     RESET TO CURRENT USER LOCATION
   ================================= */
   const resetToUserLocation = async () => {
     try {
@@ -232,8 +308,8 @@ export default function MapSelector() {
       setRegion(newRegion);
       setMarker({ latitude, longitude });
       setSearchMarker(null);
+      setPickupFocusMarker(null);
 
-      // ⚡ instant jump
       setTimeout(() => {
         mapRef.current?.animateToRegion(newRegion, 0);
       }, 0);
@@ -242,7 +318,9 @@ export default function MapSelector() {
     }
   };
 
-  // 🔹 Alternate color but group by pointId
+  /* ================================
+     GROUPED COLORS BY POINT ID
+  ================================= */
   const getGroupedColors = useMemo(() => {
     const colors = {};
     let lastColor = "#8CA34A";
@@ -250,7 +328,6 @@ export default function MapSelector() {
 
     flattenedData.forEach((item) => {
       if (item.pointId !== lastPointId) {
-        // Alternate color when new pointId appears
         lastColor = lastColor === "#8CA34A" ? "#C79E4B" : "#8CA34A";
       }
       colors[item.pointId] = lastColor;
@@ -260,7 +337,9 @@ export default function MapSelector() {
     return colors;
   }, [flattenedData]);
 
-  // 🔍 Search bar
+  /* ================================
+     SEARCH HANDLER
+  ================================= */
   const handleSearch = async () => {
     if (!searchText) return;
     try {
@@ -274,7 +353,8 @@ export default function MapSelector() {
           longitudeDelta: 0.05,
         };
         setRegion(newRegion);
-        setMarker({ latitude, longitude });
+        setSearchMarker({ latitude, longitude });
+        setPickupFocusMarker(null);
         mapRef.current?.animateToRegion(newRegion, 1000);
         Keyboard.dismiss();
       }
@@ -283,7 +363,9 @@ export default function MapSelector() {
     }
   };
 
-  // Open Google Maps navigation
+  /* ================================
+     OPEN GOOGLE MAPS
+  ================================= */
   const openGoogleMaps = (lat, lng) => {
     if (!marker) return;
     const { latitude, longitude } = marker;
@@ -291,7 +373,9 @@ export default function MapSelector() {
     Linking.openURL(url);
   };
 
-  // 🔹 Render each schedule card (with consistent color per collectionPoint)
+  /* ================================
+     RENDER SCHEDULE CARD
+  ================================= */
   const renderScheduleCard = ({ item }) => {
     const borderColor = getGroupedColors[item.pointId] || "#8CA34A";
 
@@ -365,10 +449,14 @@ export default function MapSelector() {
     );
   };
 
+  /* ================================
+     RENDER
+  ================================= */
   return (
     <CustomBgColor>
       <SafeAreaView style={{ flex: 1, paddingTop: 25 }}>
         <View style={styles.container}>
+          {/* 🔍 Search Suggestions Modal */}
           {showSearchModal && searchResults.length > 0 && (
             <View style={styles.searchModal}>
               <FlatList
@@ -387,6 +475,7 @@ export default function MapSelector() {
                       };
                       setRegion(newRegion);
                       setSearchMarker({ latitude: lat, longitude: lon });
+                      setPickupFocusMarker(null);
                       mapRef.current?.animateToRegion(newRegion, 1000);
                       setShowSearchModal(false);
                       setSearchText(formatted);
@@ -400,7 +489,8 @@ export default function MapSelector() {
               />
             </View>
           )}
-          {/* 🔍 Search + Tabs + Header Actions (copy UX; only LIST tab gets edit controls) */}
+
+          {/* 🔍 Search + Tabs */}
           <View
             style={[
               styles.topOverlayContainer,
@@ -409,7 +499,6 @@ export default function MapSelector() {
           >
             {/* Search */}
             <View style={styles.searchBox}>
-              {/* Input + Clear Button Row */}
               <View
                 style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
               >
@@ -421,9 +510,12 @@ export default function MapSelector() {
                     setSearchText(text);
                     setShowSearchModal(true);
 
+                    if (searchTimeout.current) {
+                      clearTimeout(searchTimeout.current);
+                    }
                     searchTimeout.current = setTimeout(() => {
                       fetchGeoapifySuggestions(text);
-                    }, 50); // super fast
+                    }, 80);
                   }}
                   onSubmitEditing={handleSearch}
                 />
@@ -433,8 +525,8 @@ export default function MapSelector() {
                       setSearchText("");
                       setSearchResults([]);
                       setShowSearchModal(false);
-                      setSearchMarker(null); // ✅ remove search pin
-                      await resetToUserLocation(); // ✅ re-center map
+                      setSearchMarker(null);
+                      await resetToUserLocation();
                     }}
                     style={{ marginLeft: 8 }}
                   >
@@ -444,6 +536,7 @@ export default function MapSelector() {
               </View>
             </View>
 
+            {/* Toggle Map/List */}
             <View style={styles.toggleContainer}>
               <View style={styles.toggleButtons}>
                 <TouchableOpacity
@@ -491,7 +584,13 @@ export default function MapSelector() {
 
           {/* Map or List */}
           {selectedView === "map" ? (
-            <MapView style={{ flex: 1 }} region={region} ref={mapRef} provider={PROVIDER_GOOGLE}>
+            <MapView
+              style={{ flex: 1 }}
+              region={region}
+              ref={mapRef}
+              provider={PROVIDER_GOOGLE}
+            >
+              {/* User location marker */}
               {marker && (
                 <Marker
                   coordinate={marker}
@@ -501,6 +600,8 @@ export default function MapSelector() {
                   description="This is where you are."
                 />
               )}
+
+              {/* Searched location marker */}
               {searchMarker && (
                 <Marker
                   coordinate={searchMarker}
@@ -510,12 +611,19 @@ export default function MapSelector() {
                 />
               )}
 
-              {/* ✅ Updated Marker Mapping with Status-Based Icon */}
-              {points.map((p) => {
-                // find the latest schedule for this point
-                const sched = schedules.find((s) => s.pointId === p.id);
+              {/* Scheduled pickup marker */}
+              {pickupFocusMarker && (
+                <Marker
+                  coordinate={pickupFocusMarker}
+                  title="Scheduled Pickup Address"
+                  description="Pickup location for your scheduled request."
+                  pinColor="#8F71D2"
+                />
+              )}
 
-                // if schedule found, use its status
+              {/* Collection points with status-based icons */}
+              {points.map((p) => {
+                const sched = schedules.find((s) => s.pointId === p.id);
                 const isClosed = sched?.status?.toLowerCase() === "closed";
 
                 return (
@@ -532,7 +640,7 @@ export default function MapSelector() {
                       isClosed
                         ? closedCollectionPointMarker
                         : collectionPointMarker
-                    } // ✅ dynamic icon
+                    }
                   />
                 );
               })}
