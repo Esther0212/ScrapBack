@@ -102,90 +102,94 @@ const RewardItem = () => {
   }, []);
 
   return (
-    <CustomBgColor>
-      <SafeAreaView style={styles.safeArea}>
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#2E7D32"
-            style={{ marginTop: 30 }}
-          />
-        ) : offers.length === 0 ? (
-          <Text style={styles.noDataText}>
-            No rewards found in this category.
+<CustomBgColor>
+  <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+    {loading ? (
+      <ActivityIndicator
+        size="large"
+        color="#2E7D32"
+        style={{ marginTop: 30 }}
+      />
+    ) : offers.length === 0 ? (
+      <Text style={styles.noDataText}>No rewards found in this category.</Text>
+    ) : (
+      <>
+        <View style={styles.totalPointsContainer}>
+          <Text style={styles.totalPointsLabel}>Your Total Points:</Text>
+          <Text style={styles.totalPointsValue}>
+            {userPoints.toLocaleString()} pts
           </Text>
-        ) : (
-          <ScrollView contentContainerStyle={styles.scrollView}>
-            <View style={styles.cardContainer}>
-              {offers.map((offer, index) => {
-                const notEnoughPoints = Number(offer.points) > userPoints; // 👈 check user points
-
-                return (
-                  <TouchableOpacity
-                    key={`${offer.id}-${index}`}
-                    style={[
-                      styles.card,
-                      notEnoughPoints && styles.disabledCard, // 👈 still gray if not enough points
-                    ]}
-                    activeOpacity={0.85} // 👈 always clickable
-                    onPress={() => {
-                      router.push({
-                        pathname: "/Main/rewards/reward_description",
-                        params: { id: offer.id },
-                      });
-                    }}
-                  >
-                    <View style={styles.imageWrapper}>
-                      {offer.image ? (
-                        <Image
-                          source={{ uri: offer.image }}
-                          style={[
-                            styles.image,
-                            notEnoughPoints && { opacity: 0.4 }, // 👈 dim image
-                          ]}
-                        />
-                      ) : (
-                        <View style={styles.imagePlaceholder}>
-                          <Text style={styles.placeholderText}>No Image</Text>
-                        </View>
-                      )}
-
-                      {category !== "cash" && (
-                        <View style={styles.pointsBadge}>
-                          <Image
-                            source={require("../../../assets/home/lettermarkLogo.png")}
-                            style={styles.logoIcon}
-                          />
-                          <Text style={styles.pointsText}>
-                            {offer.points} pts
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <Text
-                      style={[
-                        styles.cardTitle,
-                        notEnoughPoints && { color: "#aaa" }, // 👈 gray title
-                      ]}
-                    >
-                      {offer.title || "Untitled Reward"}
-                    </Text>
-
-                    {/* 👇 show message if not enough points */}
-                    {notEnoughPoints && (
-                      <Text style={styles.insufficientText}>
-                        Not enough points
-                      </Text>
+        </View>
+        <ScrollView contentContainerStyle={styles.scrollView}>
+          <View style={styles.cardContainer}>
+            {offers.map((offer, index) => {
+              const notEnoughPoints = Number(offer.points) > userPoints;
+              return (
+                <TouchableOpacity
+                  key={`${offer.id}-${index}`}
+                  style={[
+                    styles.card,
+                    notEnoughPoints && styles.disabledCard,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/Main/rewards/reward_description",
+                      params: { id: offer.id },
+                    })
+                  }
+                >
+                  <View style={styles.imageWrapper}>
+                    {offer.image ? (
+                      <Image
+                        source={{ uri: offer.image }}
+                        style={[
+                          styles.image,
+                          notEnoughPoints && { opacity: 0.4 },
+                        ]}
+                      />
+                    ) : (
+                      <View style={styles.imagePlaceholder}>
+                        <Text style={styles.placeholderText}>No Image</Text>
+                      </View>
                     )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </ScrollView>
-        )}
-      </SafeAreaView>
-    </CustomBgColor>
+
+                    {category !== "cash" && (
+                      <View style={styles.pointsBadge}>
+                        <Image
+                          source={require("../../../assets/home/lettermarkLogo.png")}
+                          style={styles.logoIcon}
+                        />
+                        <Text style={styles.pointsText}>
+                          {offer.points} pts
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.cardTitle,
+                      notEnoughPoints && { color: "#aaa" },
+                    ]}
+                  >
+                    {offer.title || "Untitled Reward"}
+                  </Text>
+
+                  {notEnoughPoints && (
+                    <Text style={styles.insufficientText}>
+                      Not enough points
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </>
+    )}
+  </SafeAreaView>
+</CustomBgColor>
   );
 };
 
@@ -289,4 +293,22 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_500Medium",
     marginBottom: 8,
   },
+totalPointsContainer: {
+  alignItems: "flex-start",
+  marginTop: 12,
+  paddingTop: 0,
+  paddingHorizontal: 15,
+  marginBottom: 10,
+},
+totalPointsLabel: {
+  fontFamily: "Poppins_600SemiBold",
+  color: "#2E7D32",
+  fontSize: 14,
+  marginBottom: 2,
+},
+totalPointsValue: {
+  fontFamily: "Poppins_800ExtraBold",
+  color: "#1B5E20",
+  fontSize: 20,
+},
 });

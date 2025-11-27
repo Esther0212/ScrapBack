@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,25 +8,43 @@ import {
   ScrollView,
   Dimensions,
   Image,
-  Alert,
   Modal,
   ActivityIndicator,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import CustomBgColor from "../../../components/customBgColor";
-import { Menu } from "react-native-paper";
 import axios from "axios";
 import { useUser } from "../../../context/userContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, storage } from "../../../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Animated, Easing } from "react-native";
+import { Animated } from "react-native";
+import MapView, { Marker, Polygon, Polyline } from "react-native-maps";
+import * as Location from "expo-location";
+
+// 🟢 Turf for point-in-polygon
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point } from "@turf/helpers";
+
+// 🟢 NAMRIA CDO barangay polygons (your extracted file)
+import cdoGeoJSON from "../../../utils/cdo_barangays.json";
 
 const { width } = Dimensions.get("window");
+
+// 🗺️ Geoapify API key (for street geocoding)
+const GEOAPIFY_API_KEY = "21e4ce510e324d2c81b5caa1989a69d2";
+
+// 🔧 Helper: normalize barangay names so PSGC & NAMRIA match
+const normalizeBrgyName = (name) =>
+  name
+    ?.toLowerCase()
+    .replace(/\s*\(.*?\)/g, "") // remove parentheses e.g. (Pob.)
+    .replace(/\s+/g, " ")
+    .trim() || "";
 
 const AccountInfo = () => {
   const { userData, setUserData } = useUser();
@@ -42,6 +60,7 @@ const AccountInfo = () => {
   const [dob, setDob] = useState(userData?.dob || "");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [street, setStreet] = useState(userData?.address?.street || "");
+
   const [barangay, setBarangay] = useState(
     userData?.address?.barangay ? { name: userData.address.barangay } : null
   );
@@ -55,22 +74,188 @@ const AccountInfo = () => {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isSaving, setIsSaving] = useState(false);
 
+  const [mapRegion, setMapRegion] = useState(null);
+  const [marker, setMarker] = useState(null);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [isSatellite, setIsSatellite] = useState(false);
+  const [initialCoordsSet, setInitialCoordsSet] = useState(false);
+  const [prevStreet, setPrevStreet] = useState(userData?.address?.street || "");
+  const [prevBarangay, setPrevBarangay] = useState(
+    userData?.address?.barangay || ""
+  );
+
+  // 🟢 NAMRIA barangay feature + polygon + center
+  const [selectedBarangayFeature, setSelectedBarangayFeature] = useState(null);
+  const [barangayPolygonCoords, setBarangayPolygonCoords] = useState([]);
+  const [barangayCenter, setBarangayCenter] = useState(null);
+  const [lastGeocodeKey, setLastGeocodeKey] = useState(null);
+
+  // 🔐 Only validate street-inside-barangay when barangay selection happens
+  const [validationTriggered, setValidationTriggered] = useState(false);
+
+  const [streetDebounceTimer, setStreetDebounceTimer] = useState(null);
+  const [streetReady, setStreetReady] = useState(false);
+  const [streetHeight, setStreetHeight] = useState(55); // default height
+
+  // Debounce street input
   useEffect(() => {
-    const fetchBarangays = async () => {
+    if (!editMode) return;
+
+    // Reset ready flag whenever street changes
+    setStreetReady(false);
+
+    // If there is no barangay yet → do nothing
+    if (!barangay?.name) return;
+
+    // If user clears street → do nothing
+    if (!street.trim()) return;
+
+    // Clear previous timer
+    if (streetDebounceTimer) clearTimeout(streetDebounceTimer);
+
+    // Start debounce timer
+    const t = setTimeout(() => {
+      setStreetReady(true);
+      setValidationTriggered(true); // ⭐ automatically allow revalidation
+    }, 700);
+
+    setStreetDebounceTimer(t);
+
+    return () => clearTimeout(t);
+  }, [street]);
+
+  // 🔔 Helper to show toast
+  const showToast = (message, duration = 2000) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setTimeout(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => setToastVisible(false));
+      }, duration);
+    });
+  };
+
+  // 🟢 Load barangays list from your NAMRIA GeoJSON (no more PSGC HTTP)
+  useEffect(() => {
+    if (cdoGeoJSON?.features?.length) {
+      const uniqueNames = Array.from(
+        new Set(
+          cdoGeoJSON.features.map((f) => f.properties?.barangay).filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b));
+
+      const list = uniqueNames.map((name) => ({ name }));
+      setBarangays(list);
+    }
+  }, []);
+
+  useEffect(() => {
+    const applyBarangaySelection = async () => {
+      if (!barangay?.name || !cdoGeoJSON?.features?.length) {
+        setSelectedBarangayFeature(null);
+        setBarangayPolygonCoords([]);
+        return;
+      }
+
+      const selectedNameNorm = normalizeBrgyName(barangay.name);
+
+      // 1️⃣ Find NAMRIA polygon (same as before)
+      const feature = cdoGeoJSON.features.find((f) => {
+        const n = normalizeBrgyName(f.properties?.barangay || "");
+        return n === selectedNameNorm;
+      });
+
+      setSelectedBarangayFeature(feature || null);
+
+      // Extract polygon normally
+      if (feature?.geometry?.coordinates) {
+        let ring = [];
+
+        if (feature.geometry.type === "Polygon") {
+          ring = feature.geometry.coordinates[0] || [];
+        } else if (feature.geometry.type === "MultiPolygon") {
+          let maxLen = 0;
+          feature.geometry.coordinates.forEach((poly) => {
+            if (poly[0]?.length > maxLen) {
+              maxLen = poly[0].length;
+              ring = poly[0];
+            }
+          });
+        }
+
+        let closedRing = [...ring];
+        if (
+          closedRing.length > 0 &&
+          (closedRing[0][0] !== closedRing[closedRing.length - 1][0] ||
+            closedRing[0][1] !== closedRing[closedRing.length - 1][1])
+        ) {
+          closedRing.push(closedRing[0]);
+        }
+
+        const coords = closedRing.map(([lng, lat]) => ({
+          latitude: lat,
+          longitude: lng,
+        }));
+
+        setBarangayPolygonCoords(coords);
+      } else {
+        setBarangayPolygonCoords([]);
+      }
+
+      // 2️⃣ ALWAYS GEOCODE BARANGAY NAME (map should center here)
       try {
-        const res = await axios.get(
-          "https://psgc.gitlab.io/api/cities-municipalities/104305000/barangays/"
-        );
-        setBarangays(res.data);
+        const brgyAddress = `${barangay.name}, Cagayan de Oro City, Philippines`;
+        const brgyGeo = await Location.geocodeAsync(brgyAddress);
+
+        if (brgyGeo && brgyGeo.length > 0) {
+          const { latitude, longitude } = brgyGeo[0];
+
+          // Center map on this barangay name (no marker)
+          setMapRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.0025,
+            longitudeDelta: 0.0025,
+          });
+
+          // Optionally remember this as barangayCenter for later fallback
+          setBarangayCenter({
+            latitude,
+            longitude,
+          });
+        }
       } catch (err) {
-        console.error("Error fetching barangays:", err);
+        console.log("Barangay geocode error:", err);
       }
     };
-    fetchBarangays();
-  }, []);
+
+    applyBarangaySelection();
+  }, [barangay]);
+
+  // 🧮 Check if a point is inside selected barangay polygon
+  const isInsideSelectedBarangay = (latitude, longitude, featureOverride) => {
+    const feat = featureOverride || selectedBarangayFeature;
+    if (!feat || !feat.geometry) return true; // if no polygon, don't block
+
+    const pt = point([longitude, latitude]);
+    try {
+      return booleanPointInPolygon(pt, feat);
+    } catch (e) {
+      console.warn("booleanPointInPolygon error:", e);
+      return true;
+    }
+  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -107,7 +292,6 @@ const AccountInfo = () => {
     if (!userData?.uid) return;
     const userRef = doc(db, "user", userData.uid);
 
-    // ✅ set profilePic to null instead of ""
     await updateDoc(userRef, { profilePic: null });
 
     setUserData({ ...userData, profilePic: null });
@@ -121,15 +305,200 @@ const AccountInfo = () => {
     return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
   };
 
+  // 🧭 Initial load: if user has saved coords, use them once
+  useEffect(() => {
+    const fetchInitialCoords = async () => {
+      try {
+        if (userData?.location && !initialCoordsSet) {
+          const { lat, lng } = userData.location;
+          setMapRegion({
+            latitude: lat,
+            longitude: lng,
+            latitudeDelta: 0.0025,
+            longitudeDelta: 0.0025,
+          });
+          setMarker({ latitude: lat, longitude: lng });
+          setInitialCoordsSet(true);
+          console.log("📍 Loaded saved coordinates from Firestore");
+          return; // stop here; polygon/streets handled by other effects
+        }
+      } catch (err) {
+        console.error("Error fetching geocode:", err);
+      }
+    };
+
+    fetchInitialCoords();
+  }, [userData?.location, initialCoordsSet]);
+
+  // Ensure map centers / focuses on saved pinpoint when entering edit mode
+  useEffect(() => {
+    if (!editMode) return;
+
+    const centerMapOnLocation = async () => {
+      if (userData?.location) {
+        // Center on saved coordinates if they exist
+        const { lat, lng } = userData.location;
+        setMapRegion({
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: 0.0025,
+          longitudeDelta: 0.0025,
+        });
+        setMarker({ latitude: lat, longitude: lng });
+        setInitialCoordsSet(true);
+        console.log("📍 Centered map on saved user location (enter edit mode)");
+      } else if (street || barangay?.name) {
+        // If no saved coordinates, center on street + barangay (no marker)
+        try {
+          const address = `${street || ""}, ${barangay?.name || ""}, Cagayan de Oro City, Philippines`;
+          const geocode = await Location.geocodeAsync(address);
+
+          if (geocode && geocode.length > 0) {
+            const { latitude, longitude } = geocode[0];
+            setMapRegion({
+              latitude,
+              longitude,
+              latitudeDelta: 0.0025,
+              longitudeDelta: 0.0025,
+            });
+            setMarker(null); // still no marker
+            console.log(
+              "📍 Centered map on street and barangay inputs (no saved coords)"
+            );
+          } else {
+            console.warn("⚠️ Unable to geocode address:", address);
+          }
+        } catch (err) {
+          console.error("Geocoding error:", err);
+        }
+      } else {
+        console.warn("⚠️ No saved location or address to center the map.");
+      }
+    };
+
+    centerMapOnLocation();
+  }, [editMode]); // ⬅️ only depends on editMode now
+
+  // 🗺️ Street geocoding using Location.geocodeAsync ONLY when:
+  //  - editMode is true
+  //  - street has value
+  //  - barangay is selected
+  //  - barangay polygon is loaded
+  //  - validationTriggered === true (street was typed BEFORE barangay was chosen)
+  useEffect(() => {
+    const runStreetGeocode = async () => {
+      if (
+        !editMode ||
+        !selectedBarangayFeature ||
+        !barangay?.name ||
+        !street?.trim() ||
+        !validationTriggered ||
+        !streetReady
+      ) {
+        return;
+      }
+
+      try {
+        let geocode = [];
+        let tried = "";
+
+        // 1️⃣ Try Street + Barangay (most accurate)
+        let address = `${street}, ${barangay.name}, Cagayan de Oro City, Philippines`;
+        geocode = await Location.geocodeAsync(address);
+        tried = "Street + Barangay";
+
+        // 2️⃣ Try Street only if the first failed
+        if (!geocode || geocode.length === 0) {
+          address = `${street}, Cagayan de Oro City, Philippines`;
+          geocode = await Location.geocodeAsync(address);
+          tried = "Street only";
+        }
+
+        // 3️⃣ Try Barangay only (fallback to barangay center)
+        if (!geocode || geocode.length === 0) {
+          if (barangayCenter) {
+            setMapRegion((prev) => ({
+              ...(prev || {}),
+              latitude: barangayCenter.latitude,
+              longitude: barangayCenter.longitude,
+              latitudeDelta: prev?.latitudeDelta || 0.0025,
+              longitudeDelta: prev?.longitudeDelta || 0.0025,
+            }));
+          }
+          return;
+        }
+
+        // We got coordinates
+        const { latitude, longitude } = geocode[0];
+
+        // 4️⃣ Polygon check — make sure street is inside the selected barangay
+        const inside = isInsideSelectedBarangay(latitude, longitude);
+
+        if (!inside) {
+          // ❌ outside ➜ fallback to barangay center
+          if (barangayCenter) {
+            setMapRegion((prev) => ({
+              ...(prev || {}),
+              latitude: barangayCenter.latitude,
+              longitude: barangayCenter.longitude,
+              latitudeDelta: prev?.latitudeDelta || 0.0025,
+              longitudeDelta: prev?.longitudeDelta || 0.0025,
+            }));
+          }
+          return;
+        }
+
+        // 5️⃣ Valid street inside barangay polygon ➜ center to street coords (no marker)
+        setMapRegion((prev) => ({
+          ...(prev || {}),
+          latitude,
+          longitude,
+          latitudeDelta: prev?.latitudeDelta ?? 0.0025,
+          longitudeDelta: prev?.longitudeDelta ?? 0.0025,
+        }));
+
+        console.log("📍 Geocode success via:", tried);
+      } catch (err) {
+        console.error("Geocode error:", err);
+
+        // On error → fall back to barangay
+        if (barangayCenter) {
+          setMapRegion((prev) => ({
+            ...(prev || {}),
+            latitude: barangayCenter.latitude,
+            longitude: barangayCenter.longitude,
+            latitudeDelta: prev?.latitudeDelta || 0.0025,
+            longitudeDelta: prev?.longitudeDelta || 0.0025,
+          }));
+        }
+      }
+    };
+
+    runStreetGeocode();
+  }, [
+    editMode,
+    street,
+    barangay,
+    selectedBarangayFeature,
+    barangayCenter,
+    validationTriggered,
+    streetReady,
+  ]);
+
   const handleSave = async () => {
     try {
       if (!userData?.uid) return;
 
-      setIsSaving(true); // ✅ start loading spinner
+      // 🚫 Require pinpointed location before saving
+      if (!marker) {
+        showToast("Please tap the map to pinpoint your exact location.", 2500);
+        return;
+      }
+
+      setIsSaving(true);
 
       let finalProfilePic = profilePic;
 
-      // if new local image, upload to Firebase Storage
       if (profilePic && profilePic.startsWith("file://")) {
         const uploadedUrl = await uploadImageToStorage(
           profilePic,
@@ -148,6 +517,8 @@ const AccountInfo = () => {
       };
 
       const userRef = doc(db, "user", userData.uid);
+      const userLocation = { lat: marker.latitude, lng: marker.longitude };
+
       await updateDoc(userRef, {
         profilePic: finalProfilePic || null,
         firstName,
@@ -157,6 +528,7 @@ const AccountInfo = () => {
         gender,
         dob,
         address: updatedAddress,
+        location: userLocation,
       });
 
       setUserData({
@@ -169,33 +541,22 @@ const AccountInfo = () => {
         gender,
         dob,
         address: updatedAddress,
+        location: userLocation,
       });
 
-      // ✅ Success toast animation
-      setToastMessage("Profile updated successfully!");
-      setToastVisible(true);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        setTimeout(() => {
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => setToastVisible(false));
-        }, 2000);
-      });
+      setPrevStreet(street);
+      setPrevBarangay(barangay?.name || "");
+      setInitialCoordsSet(true);
 
+      setValidationTriggered(false);
+
+      showToast("Profile updated successfully!", 2000);
       setEditMode(false);
     } catch (err) {
       console.error(err);
-      setToastMessage("Failed to update profile.");
-      setToastVisible(true);
-      setTimeout(() => setToastVisible(false), 2500);
+      showToast("Failed to update profile.", 2500);
     } finally {
-      setIsSaving(false); // ✅ stop spinner
+      setIsSaving(false);
     }
   };
 
@@ -211,6 +572,23 @@ const AccountInfo = () => {
     setBarangay(
       userData?.address?.barangay ? { name: userData.address.barangay } : null
     );
+
+    // Reset validation + marker + region back to saved
+    setValidationTriggered(false);
+    if (userData?.location) {
+      const { lat, lng } = userData.location;
+      setMarker({ latitude: lat, longitude: lng });
+      setMapRegion({
+        latitude: lat,
+        longitude: lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+    } else {
+      setMarker(null);
+      setMapRegion(null);
+    }
+
     setEditMode(false);
   };
 
@@ -312,9 +690,9 @@ const AccountInfo = () => {
                       ]}
                       onPress={async () => {
                         if (isSaving) return;
-                        setIsSaving(true); // show spinner right away
+                        setIsSaving(true);
                         await handleSave();
-                        setConfirmModalVisible(false); // close AFTER save
+                        setConfirmModalVisible(false);
                       }}
                       disabled={isSaving}
                     >
@@ -364,7 +742,20 @@ const AccountInfo = () => {
             <InputField
               label="Contact Number"
               value={contact}
-              setValue={setContact}
+              setValue={(text) => {
+                let cleaned = text.replace(/[^0-9+]/g, "");
+
+                if (cleaned.includes("+") && !cleaned.startsWith("+")) {
+                  cleaned = cleaned.replace("+", "");
+                }
+
+                if (cleaned.startsWith("+")) {
+                  if (cleaned.length <= 13) setContact(cleaned);
+                } else {
+                  if (cleaned.length <= 11) setContact(cleaned);
+                }
+              }}
+              keyboardType="phone-pad"
               editable={editMode}
             />
 
@@ -410,50 +801,206 @@ const AccountInfo = () => {
               )}
             </View>
 
-              {/* Address */}
-              <Text style={styles.label}>Address</Text>
-              <InputField
-                label="Street Name, Building, House No., etc."
-                value={street}
-                setValue={setStreet}
-                editable={editMode}
-                subLabel
-              />
-              <InputField
-                label="Region"
-                value={userData?.address?.region || "Northern Mindanao"}
-                editable={false}
-                subLabel
-              />
-              <InputField
-                label="Province"
-                value={userData?.address?.province || "Misamis Oriental"}
-                editable={false}
-                subLabel
-              />
-              <InputField
-                label="City"
-                value={userData?.address?.city || "City of Cagayan De Oro"}
-                editable={false}
-                subLabel
-              />
-              <DropdownField
-                label="Barangay"
-                visible={barangayMenuVisible}
-                setVisible={setBarangayMenuVisible}
-                selected={barangay ? barangay.name : ""}
-                setSelected={setBarangay}
-                options={barangays}
-                optionKey="name"
-                editable={editMode}
-                subLabel
-              />
-              <InputField
-                label="Postal Code"
-                value={userData?.address?.postalCode || "9000"}
-                editable={false}
-                subLabel
-              />
+            {/* Address */}
+            <Text style={styles.label}>Address</Text>
+            <InputField
+              label="Describe Your Exact Location"
+              placeholder="(street, house no., building, landmarks, directions, etc.)"
+              value={street}
+              setValue={(value) => {
+                // First input: STREET
+                setStreet(value);
+                // Changing street invalidates previous validation
+                setLastGeocodeKey(null);
+                setValidationTriggered(false);
+
+                // 🔥 User changed address → hide marker until they tap map again
+                setMarker(null);
+              }}
+              editable={editMode}
+              subLabel
+              multiline={true}
+              dynamicHeight={streetHeight}
+              onHeightChange={setStreetHeight}
+            />
+            <DropdownField
+              label="Barangay"
+              visible={barangayMenuVisible}
+              setVisible={setBarangayMenuVisible}
+              selected={barangay ? barangay.name : ""}
+              setSelected={(item) => {
+                setBarangay(item);
+                setLastGeocodeKey(null);
+
+                // 🔥 User changed barangay → hide marker until they tap map again
+                setMarker(null);
+
+                if (street.trim()) {
+                  // Street already exists → auto validate on barangay change
+                  setValidationTriggered(true);
+                  setStreetReady(true);
+                } else {
+                  setValidationTriggered(false);
+                  setStreetReady(false);
+                }
+              }}
+              options={barangays}
+              optionKey="name"
+              editable={editMode}
+              subLabel
+            />
+            <InputField
+              label="City"
+              value={userData?.address?.city || "City of Cagayan De Oro"}
+              editable={false}
+              subLabel
+            />
+            <InputField
+              label="Region"
+              value={userData?.address?.region || "Northern Mindanao"}
+              editable={false}
+              subLabel
+            />
+            <InputField
+              label="Province"
+              value={userData?.address?.province || "Misamis Oriental"}
+              editable={false}
+              subLabel
+            />
+            <InputField
+              label="Postal Code"
+              value={userData?.address?.postalCode || "9000"}
+              editable={false}
+              subLabel
+            />
+
+            {/* Map Input Field */}
+            {editMode && (
+              <>
+                <Text style={styles.subLabel}>Pinpoint Specific Location</Text>
+
+                <View style={styles.mapContainer}>
+                  {mapRegion && (
+                    <>
+                      <MapView
+                        style={isMapExpanded ? styles.fullMap : styles.map}
+                        region={mapRegion}
+                        mapType={isSatellite ? "hybrid" : "standard"}
+                        onPress={(e) => {
+                          const { latitude, longitude } =
+                            e.nativeEvent.coordinate;
+
+                          if (
+                            selectedBarangayFeature &&
+                            !isInsideSelectedBarangay(latitude, longitude)
+                          ) {
+                            showToast(
+                              "Location must be inside selected barangay.",
+                              2200
+                            );
+                            if (barangayCenter) {
+                              setMarker(null);
+                              setMapRegion((prev) => ({
+                                ...(prev || {}),
+                                latitude: barangayCenter.latitude,
+                                longitude: barangayCenter.longitude,
+                                latitudeDelta: prev?.latitudeDelta ?? 0.03,
+                                longitudeDelta: prev?.longitudeDelta ?? 0.03,
+                              }));
+                            }
+                            return;
+                          }
+
+                          setMarker({ latitude, longitude });
+                          setMapRegion((prev) => ({
+                            ...(prev || {}),
+                            latitude,
+                            longitude,
+                            latitudeDelta: prev?.latitudeDelta ?? 0.03,
+                            longitudeDelta: prev?.longitudeDelta ?? 0.03,
+                          }));
+                        }}
+                      >
+                        {/* Barangay polygon from NAMRIA */}
+                        {/* Hidden polygon used only for geometry */}
+                        {barangayPolygonCoords.length > 0 && (
+                          <Polygon
+                            coordinates={barangayPolygonCoords}
+                            strokeColor="transparent"
+                            fillColor="transparent"
+                            strokeWidth={0}
+                          />
+                        )}
+
+                        {/* Visible dotted outline like Google Maps */}
+                        {barangayPolygonCoords.length > 0 && (
+                          <Polyline
+                            coordinates={barangayPolygonCoords}
+                            strokeColor="#E85C4F" // boundary color
+                            strokeWidth={2}
+                            lineDashPattern={[1, 1]} // dotted/dashed effect
+                          />
+                        )}
+
+                        {marker && (
+                          <Marker
+                            coordinate={marker}
+                            draggable
+                            onDragEnd={(e) => {
+                              const { latitude, longitude } =
+                                e.nativeEvent.coordinate;
+
+                              if (
+                                selectedBarangayFeature &&
+                                !isInsideSelectedBarangay(latitude, longitude)
+                              ) {
+                                showToast(
+                                  "Pin must stay inside the selected barangay.",
+                                  2400
+                                );
+                                if (barangayCenter) {
+                                  setMarker(barangayCenter);
+                                  setMapRegion((prev) => ({
+                                    ...(prev || {}),
+                                    latitude: barangayCenter.latitude,
+                                    longitude: barangayCenter.longitude,
+                                    latitudeDelta: prev?.latitudeDelta ?? 0.03,
+                                    longitudeDelta:
+                                      prev?.longitudeDelta ?? 0.03,
+                                  }));
+                                }
+                                return;
+                              }
+
+                              setMarker({ latitude, longitude });
+                              setMapRegion((prev) => ({
+                                ...(prev || {}),
+                                latitude,
+                                longitude,
+                                latitudeDelta: prev?.latitudeDelta ?? 0.03,
+                                longitudeDelta: prev?.longitudeDelta ?? 0.03,
+                              }));
+                            }}
+                          />
+                        )}
+                      </MapView>
+
+                      {/* 🛰 Map Type Toggle Button */}
+                      <TouchableOpacity
+                        style={styles.mapToggleButton}
+                        onPress={() => setIsSatellite(!isSatellite)}
+                      >
+                        <FontAwesome
+                          name={isSatellite ? "map" : "map-o"}
+                          size={24}
+                          color="black"
+                        />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </>
+            )}
 
             {/* Buttons */}
             {editMode ? (
@@ -504,6 +1051,11 @@ const InputField = ({
   editable = false,
   containerStyle,
   subLabel,
+  keyboardType,
+  multiline = false,
+  dynamicHeight,
+  onHeightChange,
+  placeholder,
 }) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
@@ -511,7 +1063,25 @@ const InputField = ({
       value={value}
       editable={editable}
       onChangeText={setValue}
-      style={[styles.input, { color: editable ? "#3A2E2E" : "#777" }]}
+      placeholder={placeholder} // ← ADD THIS
+      placeholderTextColor="#9F9F9F"
+      multiline={multiline}
+      onContentSizeChange={(e) => {
+        if (multiline && onHeightChange) {
+          const newHeight = e.nativeEvent.contentSize.height;
+
+          // Prevent shrinking below normal height
+          onHeightChange(Math.max(55, Math.min(newHeight, 160)));
+        }
+      }}
+      style={[
+        styles.input,
+        {
+          color: editable ? "#3A2E2E" : "#777",
+          height: multiline ? dynamicHeight : 55,
+          textAlignVertical: multiline ? "top" : "center",
+        },
+      ]}
     />
   </View>
 );
@@ -519,56 +1089,107 @@ const InputField = ({
 // DropdownField
 const DropdownField = ({
   label,
-  visible,
-  setVisible,
   selected,
   setSelected,
   options,
   optionKey,
   editable = false,
   subLabel,
-}) => (
-  <View style={styles.inputContainer}>
-    <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
-    <Menu
-      visible={visible && editable}
-      onDismiss={() => setVisible(false)}
-      anchor={
-        <TouchableOpacity
-          style={[styles.input, { alignItems: "flex-start" }]}
-          onPress={editable ? () => setVisible(true) : null}
-          disabled={!editable}
-        >
-          <Text
-            style={[
-              styles.dropdownText,
-              { color: editable ? (selected ? "#3A2E2E" : "#777") : "#777" },
-            ]}
-          >
-            {selected || `Select ${label}`}
-          </Text>
-        </TouchableOpacity>
-      }
-      contentStyle={styles.menuContent}
-    >
-      {options.map((o) => (
-        <Menu.Item
-          key={optionKey ? o.code : o}
-          onPress={() => {
-            setSelected(o);
-            setVisible(false);
-          }}
-          title={optionKey ? o[optionKey] : o}
-          titleStyle={{
+  visible,
+  setVisible,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const actualOpen = visible ?? isOpen;
+  const setActualOpen = setVisible || setIsOpen;
+
+  const filteredOptions =
+    label === "Barangay" && searchQuery
+      ? options.filter((item) =>
+          (optionKey ? item[optionKey] : item.name || item)
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
+        )
+      : options;
+
+  return (
+    <View style={[styles.inputContainer, { zIndex: 1000 }]}>
+      <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
+
+      {/* Dropdown Button */}
+      <TouchableOpacity
+        style={[
+          styles.input,
+          { flexDirection: "row", justifyContent: "space-between" },
+        ]}
+        onPress={() => editable && setActualOpen(!actualOpen)}
+        disabled={!editable}
+        activeOpacity={0.8}
+      >
+        <Text
+          style={{
+            color: editable ? (selected ? "#3A2E2E" : "#777") : "#777",
             fontSize: 15,
             fontFamily: "Poppins_400Regular",
-            color: "#3A2E2E",
           }}
-        />
-      ))}
-    </Menu>
-  </View>
-);
+        >
+          {selected || `Select ${label}`}
+        </Text>
+        {editable && (
+          <Text style={{ color: "#3A2E2E", fontSize: 16 }}>
+            {actualOpen ? "▲" : "▼"}
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      {/* Dropdown List */}
+      {actualOpen && editable && (
+        <View style={styles.dropdownContainer}>
+          {label === "Barangay" && (
+            <TextInput
+              placeholder="Search barangay..."
+              placeholderTextColor="#3A2E2E"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+            />
+          )}
+
+          <ScrollView
+            style={styles.dropdownList}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.dropdownItem,
+                    index !== filteredOptions.length - 1 &&
+                      styles.dropdownItemBorder,
+                  ]}
+                  onPress={() => {
+                    setSelected(optionKey ? item : item.name || item);
+                    setActualOpen(false);
+                    setSearchQuery("");
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>
+                    {optionKey ? item[optionKey] : item.name || item}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noResultText}>No results found</Text>
+            )}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
@@ -608,9 +1229,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     paddingVertical: 10,
-    paddingHorizontal: 10, // ✅ Add horizontal padding instead of fixed width
+    paddingHorizontal: 10,
     elevation: 5,
-    alignSelf: "center", // ✅ Center horizontally without stretching
+    alignSelf: "center",
   },
   modalButton: { paddingVertical: 12, paddingHorizontal: 20 },
   modalButtonText: {
@@ -633,7 +1254,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    backgroundColor: "#F1E3D3",
+    backgroundColor: "#fff",
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 18,
@@ -644,7 +1265,99 @@ const styles = StyleSheet.create({
     borderColor: "#E0D4C3",
     width: "100%",
   },
-  menuContent: { backgroundColor: "#fff", borderRadius: 12 },
+  dropdownContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+    zIndex: 1000,
+  },
+  dropdownList: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    maxHeight: 230,
+    zIndex: 1000,
+  },
+  dropdownItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5D6C7",
+  },
+  searchInput: {
+    backgroundColor: "#F6F6E9",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+    margin: 8,
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+  },
+  noResultText: {
+    textAlign: "center",
+    color: "#777",
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    paddingVertical: 10,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+  },
+  mapContainer: {
+    borderRadius: 10,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+    height: 300,
+    position: "relative",
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  fullMap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2000,
+  },
+  mapToggleButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "white",
+    padding: 8,
+    borderRadius: 8,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    zIndex: 5,
+  },
+  expandButton: {
+    position: "absolute",
+    top: 10,
+    right: 50,
+    backgroundColor: "white",
+    padding: 8,
+    borderRadius: 8,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    zIndex: 5,
+  },
   editButton: {
     flexDirection: "row",
     justifyContent: "center",
@@ -693,7 +1406,9 @@ const styles = StyleSheet.create({
   confirmModal: {
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 20,
+    paddingLeft: 20,
+    paddingTop: 20,
+    paddingRight: 20,
     width: "90%",
     alignItems: "center",
   },
@@ -717,7 +1432,7 @@ const styles = StyleSheet.create({
   },
   toast: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 60 : 40, // ✅ appear near top of screen
+    top: Platform.OS === "ios" ? 60 : 40,
     left: "6%",
     right: "6%",
     backgroundColor: "rgba(14,146,71,0.95)",
@@ -733,7 +1448,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 6,
   },
-
   toastText: {
     color: "#fff",
     fontFamily: "Poppins_700Bold",

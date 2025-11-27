@@ -1,134 +1,396 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
   TextInput,
-  Alert,
   ScrollView,
   Dimensions,
   ActivityIndicator,
-  ToastAndroid, // ✅ added for toast
-  Modal, // ✅ added for modal
-  Pressable, // ✅ added for close button
+  ToastAndroid,
+  Modal,
+  Pressable,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, FontAwesome } from "@expo/vector-icons";
+
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
-} from "firebase/auth"; // ✅ added sendEmailVerification
+} from "firebase/auth";
+
 import { setDoc, doc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
+
 import CustomBgColor from "../components/customBgColor";
-import { Menu, Provider as PaperProvider } from "react-native-paper";
-import Checkbox from "react-native-paper/lib/commonjs/components/Checkbox/Checkbox"; // ✅ correct import path
+import { Provider as PaperProvider } from "react-native-paper";
+import Checkbox from "react-native-paper/lib/commonjs/components/Checkbox/Checkbox";
+
 import DateTimePickerModal from "react-native-modal-datetime-picker";
-import axios from "axios";
 
+import MapView, { Marker, Polygon, Polyline } from "react-native-maps";
+import * as Location from "expo-location";
+
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point } from "@turf/helpers";
+
+// NAMRIA polygons
+import cdoGeoJSON from "../utils/cdo_barangays.json";
+
+// Screen width
+const { width } = Dimensions.get("window");
+
+/* ------------------------------------------------
+   NORMALIZE BARANGAY NAME (remove (Pob.), spacing)
+-------------------------------------------------- */
+const normalizeBrgyName = (name) =>
+  name
+    ?.toLowerCase()
+    .replace(/\s*\(.*?\)/g, "")
+    .replace(/\s+/g, " ")
+    .trim() || "";
+
+/* ------------------------------------------------
+   SIGNUP SCREEN
+-------------------------------------------------- */
 const Signup = () => {
-  const { width } = Dimensions.get("window");
-
-  // Basic info
+  /* ----------------------------
+     BASIC SIGNUP STATES
+  ----------------------------- */
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
 
-  // Gender dropdown
   const [gender, setGender] = useState("");
   const [genderMenuVisible, setGenderMenuVisible] = useState(false);
 
-  // Date picker
   const [dob, setDob] = useState(null);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
 
-  // Address
-  const [street, setStreet] = useState("");
-  const [region, setRegion] = useState(null);
-  const [province, setProvince] = useState(null);
-  const [city, setCity] = useState(null);
-  const [barangay, setBarangay] = useState(null);
-  const [postalCode, setPostalCode] = useState("9000"); // auto-set
-
-  // Address dropdown data
-  const [regions, setRegions] = useState([]);
-  const [provinces, setProvinces] = useState([]);
-  const [cities, setCities] = useState([]);
-  const [barangays, setBarangays] = useState([]);
-  const [barangayMenu, setBarangayMenu] = useState(false);
-
-  // ✅ Added loading state
   const [loading, setLoading] = useState(false);
 
-  // ✅ Privacy consent states
   const [privacyChecked, setPrivacyChecked] = useState(false);
   const [privacyError, setPrivacyError] = useState(false);
 
-  // ✅ Privacy Policy modal visibility
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Preload API data to reduce lag (done at component mount)
+  /* ----------------------------
+     ADDRESS SYSTEM STATES
+  ----------------------------- */
+
+  const [street, setStreet] = useState("");
+  const [streetHeight, setStreetHeight] = useState(55);
+  const [streetDebounceTimer, setStreetDebounceTimer] = useState(null);
+  const [streetReady, setStreetReady] = useState(false);
+
+  const [barangays, setBarangays] = useState([]);
+  const [barangayMenuVisible, setBarangayMenuVisible] = useState(false);
+  const [barangay, setBarangay] = useState(null);
+
+  const [selectedBarangayFeature, setSelectedBarangayFeature] =
+    useState(null);
+  const [barangayPolygonCoords, setBarangayPolygonCoords] = useState([]);
+  const [barangayCenter, setBarangayCenter] = useState(null);
+
+  const [mapRegion, setMapRegion] = useState(null);
+  const [marker, setMarker] = useState(null);
+  const [isSatellite, setIsSatellite] = useState(false);
+  const [validationTriggered, setValidationTriggered] = useState(false);
+
+  /* ----------------------------
+     LOCAL STATES FOR PASSWORD VISIBILITY
+  ----------------------------- */
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+
+  // Default map center (Cagayan de Oro) when no barangay/street yet
   useEffect(() => {
-    const preloadAddressData = async () => {
-      try {
-        const regionRes = await axios.get(
-          "https://psgc.gitlab.io/api/regions/"
-        );
-        setRegions(regionRes.data);
-
-        // Default selections
-        const northernMindanao = regionRes.data.find(
-          (r) => r.name === "Northern Mindanao"
-        );
-        setRegion(northernMindanao);
-
-        if (northernMindanao) {
-          const provinceRes = await axios.get(
-            `https://psgc.gitlab.io/api/regions/${northernMindanao.code}/provinces/`
-          );
-          setProvinces(provinceRes.data);
-
-          const misamis = provinceRes.data.find(
-            (p) => p.name === "Misamis Oriental"
-          );
-          setProvince(misamis);
-
-          if (misamis) {
-            const cityRes = await axios.get(
-              `https://psgc.gitlab.io/api/provinces/${misamis.code}/cities-municipalities/`
-            );
-            setCities(cityRes.data);
-
-            const cagayanCity = cityRes.data.find(
-              (c) => c.name === "City of Cagayan De Oro"
-            );
-            setCity(cagayanCity);
-
-            if (cagayanCity) {
-              const barangayRes = await axios.get(
-                `https://psgc.gitlab.io/api/cities-municipalities/${cagayanCity.code}/barangays/`
-              );
-              setBarangays(barangayRes.data);
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Error preloading address data:", err);
-      }
-    };
-    preloadAddressData();
+    if (!mapRegion) {
+      setMapRegion({
+        latitude: 8.4542, // CDO center
+        longitude: 124.6319,
+        latitudeDelta: 0.0025,
+        longitudeDelta: 0.0025,
+      });
+    }
   }, []);
 
+  /* ----------------------------
+     LOCATION PERMISSION HELPER
+  ----------------------------- */
+  const ensureLocationPermission = async () => {
+    try {
+      let { status } = await Location.getForegroundPermissionsAsync();
+
+      if (status !== "granted") {
+        const res = await Location.requestForegroundPermissionsAsync();
+        status = res.status;
+      }
+
+      if (status !== "granted") {
+        if (Platform.OS === "android") {
+          ToastAndroid.show(
+            "Please enable location permission to validate your address.",
+            ToastAndroid.LONG
+          );
+        } else {
+          // On iOS you might want an Alert instead
+          console.log(
+            "Location permission not granted. Please enable it in Settings."
+          );
+        }
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.log("Permission check error:", err);
+      return false;
+    }
+  };
+
+  /* ----------------------------
+     LOAD NAMRIA BARANGAYS
+  ----------------------------- */
+  useEffect(() => {
+    if (cdoGeoJSON?.features?.length) {
+      const uniqueNames = Array.from(
+        new Set(
+          cdoGeoJSON.features
+            .map((f) => f.properties?.barangay)
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b));
+
+      const list = uniqueNames.map((name) => ({ name }));
+      setBarangays(list);
+    }
+  }, []);
+
+  /* ----------------------------
+     HANDLE BARANGAY SELECTION
+  ----------------------------- */
+  useEffect(() => {
+    const applySelection = async () => {
+      if (!barangay?.name) {
+        setSelectedBarangayFeature(null);
+        setBarangayPolygonCoords([]);
+        return;
+      }
+
+      const selectedNameNorm = normalizeBrgyName(barangay.name);
+
+      // find feature
+      const feature = cdoGeoJSON.features.find((f) => {
+        const n = normalizeBrgyName(f.properties?.barangay || "");
+        return n === selectedNameNorm;
+      });
+
+      setSelectedBarangayFeature(feature || null);
+
+      /* Extract polygon */
+      if (feature?.geometry?.coordinates) {
+        let ring = [];
+
+        if (feature.geometry.type === "Polygon") {
+          ring = feature.geometry.coordinates[0] || [];
+        } else if (feature.geometry.type === "MultiPolygon") {
+          let maxLen = 0;
+          feature.geometry.coordinates.forEach((poly) => {
+            if (poly[0]?.length > maxLen) {
+              maxLen = poly[0].length;
+              ring = poly[0];
+            }
+          });
+        }
+
+        let closedRing = [...ring];
+        if (
+          closedRing.length > 0 &&
+          (closedRing[0][0] !== closedRing[closedRing.length - 1][0] ||
+            closedRing[0][1] !== closedRing[closedRing.length - 1][1])
+        ) {
+          closedRing.push(closedRing[0]);
+        }
+
+        const coords = closedRing.map(([lng, lat]) => ({
+          latitude: lat,
+          longitude: lng,
+        }));
+
+        setBarangayPolygonCoords(coords);
+      } else {
+        setBarangayPolygonCoords([]);
+      }
+
+      /* Geocode barangay center */
+      try {
+        const hasPerm = await ensureLocationPermission();
+        if (!hasPerm) return;
+
+        const geo = await Location.geocodeAsync(
+          `${barangay.name}, Cagayan de Oro City, Philippines`
+        );
+        if (geo && geo.length > 0) {
+          const { latitude, longitude } = geo[0];
+          setBarangayCenter({ latitude, longitude });
+          setMapRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.0025,
+            longitudeDelta: 0.0025,
+          });
+        }
+      } catch (err) {
+        console.log("Barangay geocode error:", err);
+      }
+    };
+
+    applySelection();
+  }, [barangay]);
+
+  /* ----------------------------
+     STREET DEBOUNCE
+  ----------------------------- */
+  useEffect(() => {
+    setStreetReady(false);
+
+    if (!barangay?.name || !street.trim()) return;
+
+    if (streetDebounceTimer) clearTimeout(streetDebounceTimer);
+
+    const t = setTimeout(() => {
+      setStreetReady(true);
+      setValidationTriggered(true);
+    }, 700);
+
+    setStreetDebounceTimer(t);
+
+    return () => clearTimeout(t);
+  }, [street]);
+
+  /* ----------------------------
+     CHECK IF POINT IS INSIDE POLYGON
+  ----------------------------- */
+  const isInsideSelectedBarangay = (lat, lng, overrideFeat) => {
+    const feat = overrideFeat || selectedBarangayFeature;
+    if (!feat || !feat.geometry) return true;
+
+    const pt = point([lng, lat]);
+    try {
+      return booleanPointInPolygon(pt, feat);
+    } catch {
+      return true;
+    }
+  };
+
+  /* ----------------------------
+     STREET GEOCODING + VALIDATION
+  ----------------------------- */
+  useEffect(() => {
+    const runGeocode = async () => {
+      if (
+        !barangay?.name ||
+        !selectedBarangayFeature ||
+        !street.trim() ||
+        !streetReady
+      )
+        return;
+
+      try {
+        const hasPerm = await ensureLocationPermission();
+        if (!hasPerm) return;
+
+        // Try street + barangay
+        let addr = `${street}, ${barangay.name}, Cagayan de Oro City, Philippines`;
+        let geo = await Location.geocodeAsync(addr);
+
+        // Try street only
+        if (!geo || geo.length === 0) {
+          addr = `${street}, Cagayan de Oro City, Philippines`;
+          geo = await Location.geocodeAsync(addr);
+        }
+
+        // Fallback to barangay
+        if (!geo || geo.length === 0) {
+          if (barangayCenter) {
+            setMapRegion({
+              latitude: barangayCenter.latitude,
+              longitude: barangayCenter.longitude,
+              latitudeDelta: 0.0025,
+              longitudeDelta: 0.0025,
+            });
+          }
+          return;
+        }
+
+        const { latitude, longitude } = geo[0];
+
+        const inside = isInsideSelectedBarangay(
+          latitude,
+          longitude,
+          selectedBarangayFeature
+        );
+
+        // Street outside polygon → revert to barangay center
+        if (!inside) {
+          if (barangayCenter) {
+            setMapRegion({
+              latitude: barangayCenter.latitude,
+              longitude: barangayCenter.longitude,
+              latitudeDelta: 0.0025,
+              longitudeDelta: 0.0025,
+            });
+          }
+          return;
+        }
+
+        // Valid street → center map (no marker yet)
+        setMapRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0.0025,
+          longitudeDelta: 0.0025,
+        });
+      } catch (err) {
+        console.log("Street geocode error:", err);
+      }
+    };
+
+    runGeocode();
+  }, [streetReady, barangay, selectedBarangayFeature]);
+
+  /* ----------------------------
+     PASSWORD VALIDATION
+  ----------------------------- */
+  const [passwordError, setPasswordError] = useState("");
+
+  const validatePassword = (pass) => {
+    const strongPass = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (pass.length === 0) {
+      setPasswordError("");
+    } else if (!strongPass.test(pass)) {
+      setPasswordError(
+        "Password must be at least 8 characters, include uppercase, lowercase, and number."
+      );
+    } else {
+      setPasswordError("");
+    }
+  };
+
+  /* ----------------------------
+     SIGNUP HANDLER
+  ----------------------------- */
   const handleSignup = async () => {
+    // Privacy required
     if (!privacyChecked) {
       setPrivacyError(true);
       ToastAndroid.show(
@@ -138,6 +400,36 @@ const Signup = () => {
       return;
     }
 
+    // DOB required
+    if (!dob) {
+      ToastAndroid.show(
+        "Please select your date of birth.",
+        ToastAndroid.SHORT
+      );
+      return;
+    }
+
+    // Age check (18+)
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+
+    if (age < 18) {
+      ToastAndroid.show(
+        `You must be 18 or older to sign up. Your age is ${age}.`,
+        ToastAndroid.LONG
+      );
+      return;
+    }
+
+    // Required fields
     if (
       !firstName ||
       !lastName ||
@@ -148,9 +440,6 @@ const Signup = () => {
       !gender ||
       !dob ||
       !street ||
-      !region ||
-      !province ||
-      !city ||
       !barangay
     ) {
       ToastAndroid.show(
@@ -160,15 +449,45 @@ const Signup = () => {
       return;
     }
 
+    // Password match
     if (password !== confirmPassword) {
       ToastAndroid.show("Passwords do not match.", ToastAndroid.SHORT);
+      return;
+    }
+
+    // Strong password
+    const strongPass = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!strongPass.test(password)) {
+      ToastAndroid.show(
+        "Password must be at least 8 characters, include uppercase, lowercase, and number.",
+        ToastAndroid.LONG
+      );
+      return;
+    }
+
+    // Phone number format
+    const phoneRegex = /^(09|\+639)\d{9}$/;
+    if (!phoneRegex.test(contact)) {
+      ToastAndroid.show(
+        "Please enter a valid phone number.",
+        ToastAndroid.LONG
+      );
+      return;
+    }
+
+    // Require map pinpoint
+    if (!marker) {
+      ToastAndroid.show(
+        "Please tap the map to pinpoint your exact location.",
+        ToastAndroid.LONG
+      );
       return;
     }
 
     try {
       setLoading(true);
 
-      // ✅ Create the user account
+      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -176,10 +495,16 @@ const Signup = () => {
       );
       const user = userCredential.user;
 
-      // ✅ Send email verification
+      // Send email verification
       await sendEmailVerification(user);
 
-      // ✅ Store user info in Firestore
+      // Fixed location metadata
+      const region = "Northern Mindanao";
+      const province = "Misamis Oriental";
+      const city = "City of Cagayan De Oro";
+      const postalCode = "9000";
+
+      // Save user document to Firestore
       await setDoc(doc(db, "user", user.uid), {
         firstName,
         lastName,
@@ -190,23 +515,25 @@ const Signup = () => {
         userType: "user",
         address: {
           street,
-          region: region.name,
-          province: province.name,
-          city: city.name,
-          barangay: barangay.name,
+          region,
+          province,
+          city,
+          barangay: barangay?.name || "",
           postalCode,
+        },
+        location: {
+          lat: marker.latitude,
+          lng: marker.longitude,
         },
         createdAt: new Date(),
         points: 0,
         online: false,
       });
 
-      // ✅ Show success modal only (no toast)
       setShowSuccessModal(true);
     } catch (error) {
       console.error("Signup Error:", error);
 
-      // 🎯 Friendlier error messages
       let message = "Signup failed. Please try again.";
       if (error.code === "auth/email-already-in-use") {
         message = "This email is already registered. Please log in instead.";
@@ -226,18 +553,25 @@ const Signup = () => {
     }
   };
 
+  /* ----------------------------
+     UI RENDER
+  ----------------------------- */
   return (
     <PaperProvider>
       <CustomBgColor>
         <SafeAreaView style={styles.safeArea}>
-          <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="on-drag"
+          >
             <View style={styles.container}>
               <Text style={styles.title}>Sign up to earn points!</Text>
               <Text style={styles.subtitle}>
                 Create your ScrapBack account now
               </Text>
 
-              {/* First Name & Last Name side by side */}
+              {/* FIRST & LAST NAME */}
               <View style={styles.row}>
                 <InputField
                   label="First Name"
@@ -253,6 +587,7 @@ const Signup = () => {
                 />
               </View>
 
+              {/* EMAIL */}
               <InputField
                 label="Email"
                 value={email}
@@ -260,20 +595,41 @@ const Signup = () => {
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
+
+              {/* CONTACT */}
               <InputField
                 label="Contact Number"
                 value={contact}
-                setValue={setContact}
+                setValue={(text) => {
+                  let cleaned = text.replace(/[^0-9+]/g, "");
+                  if (cleaned.includes("+") && !cleaned.startsWith("+")) {
+                    cleaned = cleaned.replace("+", "");
+                  }
+                  if (cleaned.startsWith("+")) {
+                    if (cleaned.length <= 13) setContact(cleaned);
+                  } else {
+                    if (cleaned.length <= 11) setContact(cleaned);
+                  }
+                }}
                 keyboardType="phone-pad"
               />
 
+              {/* PASSWORD */}
               <PasswordField
                 label="Password"
                 value={password}
-                setValue={setPassword}
+                setValue={(text) => {
+                  setPassword(text);
+                  validatePassword(text);
+                }}
                 visible={passwordVisible}
                 setVisible={setPasswordVisible}
               />
+              {passwordError ? (
+                <Text style={styles.errorText}>{passwordError}</Text>
+              ) : null}
+
+              {/* CONFIRM PASSWORD */}
               <PasswordField
                 label="Confirm Password"
                 value={confirmPassword}
@@ -282,7 +638,7 @@ const Signup = () => {
                 setVisible={setConfirmPasswordVisible}
               />
 
-              {/* Gender Dropdown */}
+              {/* GENDER DROPDOWN */}
               <DropdownField
                 label="Gender"
                 visible={genderMenuVisible}
@@ -292,7 +648,7 @@ const Signup = () => {
                 options={["Male", "Female", "Other"]}
               />
 
-              {/* Date of Birth */}
+              {/* DATE OF BIRTH */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Date of Birth</Text>
                 <TouchableOpacity
@@ -309,9 +665,15 @@ const Signup = () => {
                     {dob ? new Date(dob).toLocaleDateString() : "Select Date"}
                   </Text>
                 </TouchableOpacity>
+
                 <DateTimePickerModal
                   isVisible={datePickerVisible}
                   mode="date"
+                  maximumDate={
+                    new Date(
+                      new Date().setFullYear(new Date().getFullYear() - 18)
+                    )
+                  }
                   onConfirm={(date) => {
                     setDob(date.toISOString());
                     setDatePickerVisible(false);
@@ -320,71 +682,214 @@ const Signup = () => {
                 />
               </View>
 
-              {/* Address */}
+              {/* ADDRESS SECTION */}
               <Text style={styles.label}>Address</Text>
 
+              {/* STREET */}
               <InputField
-                label="Street, Building, House No., etc."
+                label="Describe Your Exact Location"
                 value={street}
-                setValue={setStreet}
+                setValue={(value) => {
+                  setStreet(value);
+                  setMarker(null); // changing street resets marker
+                  setValidationTriggered(false);
+                  setStreetReady(false);
+                }}
                 subLabel
+                multiline
+                dynamicHeight={streetHeight}
+                onHeightChange={setStreetHeight}
+                placeholder="(street, house no., building, landmarks, directions, etc.)"
               />
 
+              {/* BARANGAY DROPDOWN (NAMRIA) */}
               <DropdownField
                 label="Barangay"
-                visible={barangayMenu}
-                setVisible={setBarangayMenu}
+                visible={barangayMenuVisible}
+                setVisible={setBarangayMenuVisible}
                 selected={barangay ? barangay.name : ""}
-                setSelected={setBarangay}
+                setSelected={(item) => {
+                  setBarangay(item);
+                  setMarker(null);
+                  if (street.trim()) {
+                    setValidationTriggered(true);
+                    setStreetReady(true);
+                  } else {
+                    setValidationTriggered(false);
+                    setStreetReady(false);
+                  }
+                }}
                 options={barangays}
                 optionKey="name"
                 subLabel
               />
 
-              <DropdownField
+              {/* CITY */}
+              <InputField
                 label="City"
-                visible={false}
-                setVisible={() => {}}
-                selected={city ? city.name : ""}
-                setSelected={() => {}}
-                options={cities}
-                optionKey="name"
-                readOnly
+                value="City of Cagayan De Oro"
+                setValue={() => {}}
+                editable={false}
                 subLabel
               />
 
-              <DropdownField
+              {/* REGION */}
+              <InputField
                 label="Region"
-                visible={false}
-                setVisible={() => {}}
-                selected={region ? region.name : ""}
-                setSelected={() => {}}
-                options={regions}
-                optionKey="name"
-                readOnly
-                subLabel
-              />
-              <DropdownField
-                label="Province"
-                visible={false}
-                setVisible={() => {}}
-                selected={province ? province.name : ""}
-                setSelected={() => {}}
-                options={provinces}
-                optionKey="name"
-                readOnly
+                value="Northern Mindanao"
+                setValue={() => {}}
+                editable={false}
                 subLabel
               />
 
-              <View style={styles.inputContainer}>
-                <Text style={styles.subLabel}>Postal Code</Text>
-                <TextInput
-                  value={postalCode}
-                  editable={false}
-                  style={styles.input}
-                />
+              {/* PROVINCE */}
+              <InputField
+                label="Province"
+                value="Misamis Oriental"
+                setValue={() => {}}
+                editable={false}
+                subLabel
+              />
+
+              {/* POSTAL CODE */}
+              <InputField
+                label="Postal Code"
+                value="9000"
+                setValue={() => {}}
+                editable={false}
+                subLabel
+              />
+
+              {/* MAP SECTION */}
+              <Text style={styles.subLabel}>Pinpoint Specific Location</Text>
+              <View style={styles.mapContainer}>
+                {mapRegion && (
+                  <>
+                    <MapView
+                      style={styles.map}
+                      region={mapRegion}
+                      mapType={isSatellite ? "hybrid" : "standard"}
+                      onPress={async (e) => {
+                        const { latitude, longitude } =
+                          e.nativeEvent.coordinate;
+
+                        if (
+                          selectedBarangayFeature &&
+                          !isInsideSelectedBarangay(
+                            latitude,
+                            longitude,
+                            selectedBarangayFeature
+                          )
+                        ) {
+                          ToastAndroid.show(
+                            "Location must be inside selected barangay.",
+                            ToastAndroid.LONG
+                          );
+                          if (barangayCenter) {
+                            setMarker(null);
+                            setMapRegion({
+                              latitude: barangayCenter.latitude,
+                              longitude: barangayCenter.longitude,
+                              latitudeDelta: 0.0025,
+                              longitudeDelta: 0.0025,
+                            });
+                          }
+                          return;
+                        }
+
+                        setMarker({ latitude, longitude });
+                        setMapRegion((prev) => ({
+                          ...(prev || {}),
+                          latitude,
+                          longitude,
+                          latitudeDelta: prev?.latitudeDelta,
+                          longitudeDelta: prev?.longitudeDelta,
+                        }));
+                      }}
+                    >
+                      {/* Hidden polygon for geometry */}
+                      {barangayPolygonCoords.length > 0 && (
+                        <Polygon
+                          coordinates={barangayPolygonCoords}
+                          strokeColor="transparent"
+                          fillColor="transparent"
+                          strokeWidth={0}
+                        />
+                      )}
+
+                      {/* Visible dotted outline */}
+                      {barangayPolygonCoords.length > 0 && (
+                        <Polyline
+                          coordinates={barangayPolygonCoords}
+                          strokeColor="#E85C4F"
+                          strokeWidth={2}
+                          lineDashPattern={[1, 1]}
+                        />
+                      )}
+
+                      {/* Marker */}
+                      {marker && (
+                        <Marker
+                          coordinate={marker}
+                          draggable
+                          onDragEnd={(e) => {
+                            const { latitude, longitude } =
+                              e.nativeEvent.coordinate;
+
+                            if (
+                              selectedBarangayFeature &&
+                              !isInsideSelectedBarangay(
+                                latitude,
+                                longitude,
+                                selectedBarangayFeature
+                              )
+                            ) {
+                              ToastAndroid.show(
+                                "Pin must stay inside the selected barangay.",
+                                ToastAndroid.LONG
+                              );
+                              if (barangayCenter) {
+                                setMarker(barangayCenter);
+                                setMapRegion((prev) => ({
+                                  ...(prev || {}),
+                                  latitude: barangayCenter.latitude,
+                                  longitude: barangayCenter.longitude,
+                                  latitudeDelta: prev?.latitudeDelta,
+                                  longitudeDelta: prev?.longitudeDelta,
+                                }));
+                              }
+                              return;
+                            }
+
+                            setMarker({ latitude, longitude });
+                            setMapRegion((prev) => ({
+                              ...(prev || {}),
+                              latitude,
+                              longitude,
+                              latitudeDelta: prev?.latitudeDelta,
+                              longitudeDelta: prev?.longitudeDelta,
+                            }));
+                          }}
+                        />
+                      )}
+                    </MapView>
+
+                    {/* MAP TYPE TOGGLE */}
+                    <TouchableOpacity
+                      style={styles.mapToggleButton}
+                      onPress={() => setIsSatellite(!isSatellite)}
+                    >
+                      <FontAwesome
+                        name={isSatellite ? "map" : "map-o"}
+                        size={24}
+                        color="black"
+                      />
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
-              {/* ✅ Privacy Agreement Checkbox */}
+
+              {/* PRIVACY CHECKBOX */}
               <View style={styles.checkboxContainer}>
                 <TouchableOpacity
                   onPress={() => {
@@ -393,7 +898,8 @@ const Signup = () => {
                   }}
                   style={[
                     styles.checkboxRow,
-                    privacyError && !privacyChecked && { borderColor: "red" },
+                    privacyError &&
+                      !privacyChecked && { borderColor: "red" },
                   ]}
                   activeOpacity={0.8}
                 >
@@ -412,7 +918,7 @@ const Signup = () => {
                         color: "#008243",
                         textDecorationLine: "underline",
                       }}
-                      onPress={() => setShowPrivacyModal(true)} // ✅ open modal on click
+                      onPress={() => setShowPrivacyModal(true)}
                     >
                       Privacy Policy
                     </Text>
@@ -424,11 +930,13 @@ const Signup = () => {
                   </Text>
                 )}
               </View>
-              {/* ✅ Sign Up Button with loader */}
+
+              {/* SIGN UP BUTTON */}
               <TouchableOpacity
-                style={styles.signupButton}
+                style={[styles.signupButton, { opacity: loading ? 0.6 : 1 }]}
                 activeOpacity={0.85}
                 onPress={handleSignup}
+                disabled={loading}
               >
                 {loading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -436,6 +944,8 @@ const Signup = () => {
                   <Text style={styles.signupButtonText}>Sign Up</Text>
                 )}
               </TouchableOpacity>
+
+              {/* LOGIN LINK */}
               <TouchableOpacity
                 style={styles.loginLink}
                 onPress={() => router.push("/login")}
@@ -446,7 +956,8 @@ const Signup = () => {
                 </Text>
               </TouchableOpacity>
             </View>
-            {/* ✅ Privacy Policy Modal */}
+
+            {/* PRIVACY POLICY MODAL */}
             <Modal
               visible={showPrivacyModal}
               transparent
@@ -477,7 +988,7 @@ const Signup = () => {
               </View>
             </Modal>
 
-            {/* ✅ Success Modal */}
+            {/* SUCCESS MODAL */}
             <Modal
               visible={showSuccessModal}
               transparent
@@ -486,7 +997,9 @@ const Signup = () => {
             >
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContainer}>
-                  <Text style={styles.modalTitle}>Verification Email Sent</Text>
+                  <Text style={styles.modalTitle}>
+                    Verification Email Sent
+                  </Text>
                   <ScrollView style={styles.modalContent}>
                     <Text style={styles.modalText}>
                       A verification link has been sent to your email address.
@@ -515,7 +1028,9 @@ const Signup = () => {
   );
 };
 
-// ✅ Input, Password, Dropdown components remain unchanged
+/* ---------------------------------------------
+   CUSTOM INPUT FIELD (AccountInfo Style but beige)
+---------------------------------------------- */
 const InputField = ({
   label,
   value,
@@ -523,25 +1038,151 @@ const InputField = ({
   keyboardType,
   containerStyle,
   subLabel,
-  ...props
+  multiline = false,
+  dynamicHeight,
+  onHeightChange,
+  placeholder,
+  editable = true,
 }) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
     <TextInput
-      placeholder={label}
       value={value}
+      editable={editable}
       onChangeText={setValue}
-      style={styles.input}
+      placeholder={placeholder || label}
       placeholderTextColor="#777"
+      multiline={multiline}
+      onContentSizeChange={(e) => {
+        if (multiline && onHeightChange) {
+          const newHeight = e.nativeEvent.contentSize.height;
+          onHeightChange(Math.max(55, Math.min(newHeight, 160)));
+        }
+      }}
+      style={[
+        styles.input,
+        {
+          height: multiline ? dynamicHeight : 55,
+          textAlignVertical: multiline ? "top" : "center",
+        },
+      ]}
       keyboardType={keyboardType || "default"}
-      {...props}
     />
   </View>
 );
 
+/* ---------------------------------------------
+   CUSTOM DROPDOWN (AccountInfo Style)
+---------------------------------------------- */
+const DropdownField = ({
+  label,
+  visible,
+  setVisible,
+  selected,
+  setSelected,
+  options,
+  optionKey,
+  subLabel,
+  editable = true,
+}) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredOptions =
+    label === "Barangay" && searchQuery
+      ? options.filter((item) =>
+          (optionKey ? item[optionKey] : item.name || item)
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()
+          )
+        )
+      : options;
+
+  return (
+    <View style={[styles.inputContainer, { zIndex: 1000 }]}>
+      <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
+
+      {/* Button */}
+      <TouchableOpacity
+        style={[
+          styles.input,
+          { flexDirection: "row", justifyContent: "space-between" },
+        ]}
+        onPress={() => editable && setVisible(!visible)}
+        disabled={!editable}
+        activeOpacity={0.8}
+      >
+        <Text
+          style={{
+            color: editable ? (selected ? "#3A2E2E" : "#777") : "#777",
+            fontSize: 15,
+            fontFamily: "Poppins_400Regular",
+          }}
+        >
+          {selected || `Select ${label}`}
+        </Text>
+        {editable && (
+          <Text style={{ color: "#3A2E2E", fontSize: 16 }}>
+            {visible ? "▲" : "▼"}
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      {/* Dropdown menu */}
+      {visible && editable && (
+        <View style={styles.dropdownContainer}>
+          {/* Search */}
+          {label === "Barangay" && (
+            <TextInput
+              placeholder="Search barangay..."
+              placeholderTextColor="#3A2E2E"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+            />
+          )}
+
+          <ScrollView
+            style={styles.dropdownList}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.dropdownItem,
+                    index !== filteredOptions.length - 1 &&
+                      styles.dropdownItemBorder,
+                  ]}
+                  onPress={() => {
+                    setSelected(optionKey ? item : item.name || item);
+                    setVisible(false);
+                    setSearchQuery("");
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>
+                    {optionKey ? item[optionKey] : item.name || item}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noResultText}>No results found</Text>
+            )}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+};
+
+/* ----------------------------
+     PASSWORD FIELD COMPONENT
+  ----------------------------- */
 const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
   <View style={styles.inputContainer}>
     <Text style={styles.label}>{label}</Text>
+
     <View style={styles.passwordWrapper}>
       <TextInput
         placeholder={label}
@@ -550,7 +1191,11 @@ const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
         style={styles.input}
         placeholderTextColor="#777"
         secureTextEntry={!visible}
+        autoCorrect={false}
+        autoCapitalize="none"
+        importantForAutofill="no"
       />
+
       <TouchableOpacity
         style={styles.eyeIcon}
         onPress={() => setVisible(!visible)}
@@ -561,58 +1206,9 @@ const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
   </View>
 );
 
-const DropdownField = ({
-  label,
-  visible,
-  setVisible,
-  selected,
-  setSelected,
-  options,
-  optionKey,
-  readOnly = false,
-  subLabel,
-}) => (
-  <View style={styles.inputContainer}>
-    <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
-    <Menu
-      visible={visible && !readOnly}
-      onDismiss={() => setVisible(false)}
-      anchor={
-        <TouchableOpacity
-          style={[styles.input, { alignItems: "flex-start" }]}
-          onPress={() => !readOnly && setVisible(true)}
-        >
-          <Text
-            style={[
-              styles.dropdownText,
-              { color: selected ? "#3A2E2E" : "#777" },
-            ]}
-          >
-            {selected || `Select ${label}`}
-          </Text>
-        </TouchableOpacity>
-      }
-      contentStyle={styles.menuContent}
-    >
-      {options.map((o) => (
-        <Menu.Item
-          key={optionKey ? o.code : o}
-          onPress={() => {
-            setSelected(o);
-            setVisible(false);
-          }}
-          title={optionKey ? o[optionKey] : o}
-          titleStyle={{
-            fontSize: 15,
-            fontFamily: "Poppins_400Regular",
-            color: "#3A2E2E",
-          }}
-        />
-      ))}
-    </Menu>
-  </View>
-);
-
+/* -----------------------------------------------------------
+   STYLES
+----------------------------------------------------------- */
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollContainer: { flexGrow: 1, justifyContent: "center" },
@@ -660,7 +1256,6 @@ const styles = StyleSheet.create({
   },
   passwordWrapper: { position: "relative" },
   eyeIcon: { position: "absolute", right: 16, top: 14, padding: 4 },
-  menuContent: { backgroundColor: "#fff", borderRadius: 12 },
   signupButton: {
     backgroundColor: "#008243",
     paddingVertical: 18,
@@ -689,6 +1284,52 @@ const styles = StyleSheet.create({
   loginTextBold: {
     fontFamily: "Poppins_700Bold",
     textDecorationLine: "underline",
+  },
+  dropdownContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+    marginTop: 4,
+    zIndex: 1000,
+  },
+  dropdownList: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    maxHeight: 230,
+    zIndex: 1000,
+  },
+  dropdownItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5D6C7",
+  },
+  searchInput: {
+    backgroundColor: "#F6F6E9",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
+    margin: 8,
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+  },
+  noResultText: {
+    textAlign: "center",
+    color: "#777",
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    paddingVertical: 10,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#3A2E2E",
   },
   dropdownText: {
     fontSize: 15,
@@ -720,7 +1361,35 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontFamily: "Poppins_400Regular",
   },
-  // ✅ Privacy Policy Modal Styles
+  // Map styles
+  mapContainer: {
+    borderRadius: 10,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E0D4C3",
+    height: 300,
+    position: "relative",
+    marginBottom: 16,
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  mapToggleButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "white",
+    padding: 8,
+    borderRadius: 8,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    zIndex: 5,
+  },
+  // Modals
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

@@ -130,23 +130,11 @@ const Settings = () => {
             label="Password"
             onPress={() => router.push("/Main/profile/changePassword")}
           />
-          <SettingsItem
-            icon={
-              <Ionicons name="notifications-outline" size={22} color="#333" />
-            }
-            label="Notifications"
-          />
         </View>
 
         {/* Support & About Section */}
-        <Text style={styles.sectionTitle}>Support & About</Text>
+        <Text style={styles.sectionTitle}>About</Text>
         <View style={styles.card}>
-          <SettingsItem
-            icon={
-              <Ionicons name="help-circle-outline" size={22} color="#333" />
-            }
-            label="Contact Support"
-          />
           <SettingsItem
             icon={
               <Ionicons
@@ -162,24 +150,6 @@ const Settings = () => {
         {/* Login Section */}
         <Text style={styles.sectionTitle}>Login</Text>
         <View style={styles.card}>
-          {/* Switch Account */}
-          <TouchableOpacity
-            style={styles.item}
-            onPress={() => setModalVisible(true)}
-          >
-            <View style={styles.itemLeft}>
-              <Ionicons name="swap-horizontal-outline" size={22} color="#333" />
-              <Text style={styles.itemText}>Switch account</Text>
-            </View>
-            <View style={styles.itemRight}>
-              <Image
-                source={getProfileImageSource(userData?.profilePic)}
-                style={styles.profileImage}
-              />
-              <Ionicons name="chevron-forward-outline" size={20} color="#555" />
-            </View>
-          </TouchableOpacity>
-
           {/* Logout */}
           <SettingsItem
             icon={<Ionicons name="log-out-outline" size={22} color="#333" />}
@@ -191,100 +161,6 @@ const Settings = () => {
         <Text style={styles.footer}>v.1 (2025)</Text>
       </ScrollView>
 
-      {/* Bottom Modal for Switch Account */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.bottomModalOverlay}>
-          <View style={styles.bottomModalContent}>
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Switch account</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Feather name="x" size={24} color="black" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.modalList}>
-              {/* Current User */}
-              {userData && (
-                <TouchableOpacity
-                  style={styles.modalItem}
-                  onPress={() => handleSwitch(userData)}
-                >
-                  <View style={styles.modalItemLeft}>
-                    <Image
-                      source={getProfileImageSource(userData.profilePic)}
-                      style={styles.modalProfileImage}
-                    />
-                    <Text style={styles.modalItemText}>
-                      {userData.firstName} {userData.lastName}
-                    </Text>
-                  </View>
-                  <Feather name="check" size={22} color="green" />
-                </TouchableOpacity>
-              )}
-
-              {/* Other Saved Users */}
-              {savedUsers
-                .filter((u) => u.uid !== userData?.uid)
-                .map((user, i) => (
-                  <View key={i} style={styles.modalItem}>
-                    <TouchableOpacity
-                      style={styles.modalItemLeft}
-                      onPress={() => handleSwitch(user)}
-                    >
-                      <Image
-                        source={getProfileImageSource(user.profilePic)}
-                        style={styles.modalProfileImage}
-                      />
-                      <Text style={styles.modalItemText}>
-                        {user.firstName} {user.lastName}
-                      </Text>
-                    </TouchableOpacity>
-
-                    {/* 🗑 Remove Button */}
-                    <TouchableOpacity
-                      onPress={() =>
-                        Alert.alert(
-                          "Remove Account",
-                          `Remove ${user.firstName} ${user.lastName} from list?`,
-                          [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                              text: "Remove",
-                              style: "destructive",
-                              onPress: () => handleRemoveAccount(user.uid),
-                            },
-                          ]
-                        )
-                      }
-                    >
-                      <Feather name="trash-2" size={20} color="#b00020" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-
-              {/* Add Account */}
-              <TouchableOpacity
-                style={styles.addAccount}
-                onPress={() => {
-                  setModalVisible(false);
-                  router.push("/Main/profile/switchAccount");
-                }}
-              >
-                <View style={styles.addCircle}>
-                  <Feather name="plus" size={24} color="white" />
-                </View>
-                <Text style={styles.addAccountText}>Add account</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
       {/* Logout Confirmation Modal */}
       <Modal
         visible={logoutModalVisible}
