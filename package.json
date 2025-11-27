@@ -18,6 +18,9 @@
     "@react-native-firebase/auth": "^23.5.0",
     "@react-native-firebase/messaging": "^23.5.0",
     "@react-native-picker/picker": "2.11.1",
+    "@turf/boolean-point-in-polygon": "^7.2.0",
+    "@turf/helpers": "^7.2.0",
+    "@turf/turf": "^7.2.0",
     "axios": "^1.12.2",
     "expo": "~53.0.23",
     "expo-camera": "~16.1.11",
@@ -48,6 +51,7 @@
     "react-native-toast-message": "^2.3.3",
     "react-native-vector-icons": "^10.3.0",
     "select-philippines-address": "^1.0.6",
+    "shapefile": "^0.6.6",
     "zustand": "^5.0.6"
   },
   "devDependencies": {
