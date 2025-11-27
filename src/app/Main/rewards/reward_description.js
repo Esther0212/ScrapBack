@@ -49,6 +49,9 @@ const RewardDescription = () => {
   // 🪙 Cash modal (user sets amount)
   const [cashModalVisible, setCashModalVisible] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState("");
+  // ✅ ADD NEW STATE (near other modals)
+  const [confirmOnlineModalVisible, setConfirmOnlineModalVisible] = useState(false);
+
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -234,9 +237,8 @@ const RewardDescription = () => {
       // ✅ Create redemption request
       await addDoc(collection(db, "redemptionRequest"), {
         userId: user.uid,
-        name: `${userProfile.firstName || ""} ${
-          userProfile.lastName || ""
-        }`.trim(),
+        name: `${userProfile.firstName || ""} ${userProfile.lastName || ""
+          }`.trim(),
         contact: userProfile.contact || "N/A",
         email: userProfile.email || "",
         rewardId: reward.id,
@@ -277,6 +279,7 @@ const RewardDescription = () => {
     } finally {
       setIsSubmitting(false);
       setChoiceModalVisible(false);
+      setConfirmOnlineModalVisible(false);
     }
   };
 
@@ -365,21 +368,34 @@ const RewardDescription = () => {
 
   // ✅ Handle redeem button click
   const handleRedeemClick = () => {
-    const mode = reward.modeAvailable?.toLowerCase() || "online";
-    const category = reward.category?.toLowerCase();
+    const mode = reward?.modeAvailable?.toLowerCase() || "online";
+    const category = reward?.category?.toLowerCase();
 
-    // ✅ CASH: open modal to set amount
-    if (category === "cash") {
+    // ✅ GCash / Cash but ONLINE = open cash modal
+    if (category === "cash" && (mode === "online" || mode === "both")) {
       setCashModalVisible(true);
       return;
     }
 
-    // Normal modes
-    if (mode === "online") handleRedeemOnline();
-    else if (mode === "onsite") setConfirmMapModalVisible(true);
-    else if (mode === "both" || mode.includes("online"))
+    // ✅ CASH but ONSITE ONLY = go to map like other onsite items
+    if (category === "cash" && mode === "onsite") {
+      setConfirmMapModalVisible(true);
+      return;
+    }
+
+    // ✅ NORMAL FLOW
+    // ✅ REPLACE this inside handleRedeemClick()
+    if (mode === "online") {
+      setConfirmOnlineModalVisible(true);
+      return;
+    }
+
+    else if (mode === "onsite") {
+      setConfirmMapModalVisible(true);
+    }
+    else if (mode === "both") {
       setChoiceModalVisible(true);
-    else handleRedeemOnline();
+    }
   };
 
   // ✅ Loading
@@ -476,12 +492,19 @@ const RewardDescription = () => {
 
   const modeStyle = getModeColor(reward.modeAvailable);
 
-  const isUnavailable = reward.status?.toLowerCase() === "unavailable";
+  const isUnavailable = reward?.status?.toLowerCase() === "unavailable";
+  const isCash = reward?.category?.toLowerCase() === "cash";
+
+  // ✅ FIX: Cash items should only check if user has points
   const canRedeem =
     reward &&
-    reward.category?.toLowerCase() !== "cash" &&
-    userPoints >= Number(reward.points || 0) &&
-    !hasPendingRedemption;
+    !hasPendingRedemption &&
+    !isUnavailable &&
+    (isCash
+      ? userPoints > 0
+      : userPoints >= Number(reward.points || 0));
+
+
 
   // ✅ Header title logic
   const getHeaderTitle = (category) => {
@@ -549,6 +572,7 @@ const RewardDescription = () => {
               redeeming.
             </Text>
 
+
             {/* Redeem Button */}
             <TouchableOpacity
               activeOpacity={
@@ -561,7 +585,7 @@ const RewardDescription = () => {
               style={[
                 styles.ctaButtonSolid,
                 (!canRedeem || isUnavailable || isSubmitting) &&
-                  styles.disabledButton,
+                styles.disabledButton,
               ]}
               disabled={!canRedeem || isUnavailable || isSubmitting}
             >
@@ -579,18 +603,19 @@ const RewardDescription = () => {
                     (!canRedeem || isUnavailable) && styles.disabledText,
                   ]}
                 >
-                  {hasPendingRedemption
-                    ? "Already Redeemed (Pending Approval)"
-                    : !canRedeem
-                      ? `Redeem for ${reward.points} Points`
-                      : isUnavailable
-                        ? "Not Available"
-                        : reward.category?.toLowerCase() === "cash"
+                  {isUnavailable
+                    ? "Reward Not Available"
+                    : hasPendingRedemption
+                      ? "Already Redeemed (Pending Approval)"
+                      : reward?.modeAvailable?.toLowerCase() === "onsite"
+                        ? "Onsite Only — Check Map for Collection Points"
+                        : reward?.category?.toLowerCase() === "cash"
                           ? "Redeem Cash Amount"
                           : `Redeem for ${reward.points} Points`}
                 </Text>
               )}
             </TouchableOpacity>
+
             {/* ✅ Subtle points info below the redeem button */}
             {/* ✅ Points status below the redeem button */}
             <View style={{ alignItems: "center", marginTop: 10 }}>
@@ -616,18 +641,34 @@ const RewardDescription = () => {
 
         {/* ✅ Choice Modal for BOTH */}
         <Modal visible={choiceModalVisible} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+          {/* tap OUTSIDE to close */}
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setChoiceModalVisible(false)}
+          >
+            {/* tap INSIDE to stay open */}
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.modalContent}
+              onPress={() => { }}
+            >
               <Text style={styles.modalText}>
                 How would you like to redeem this reward?
               </Text>
+
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <TouchableOpacity
                   style={styles.choiceButton}
-                  onPress={handleRedeemOnline}
+                  onPress={() => {
+                    setChoiceModalVisible(false);
+                    setConfirmOnlineModalVisible(true);
+                  }}
                 >
                   <Text style={styles.okButtonText}>Request Online</Text>
                 </TouchableOpacity>
+
+
                 <TouchableOpacity
                   style={[styles.choiceButton, { backgroundColor: "#5F934A" }]}
                   onPress={() => {
@@ -638,9 +679,10 @@ const RewardDescription = () => {
                   <Text style={styles.okButtonText}>Go to Map</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </Modal>
+
 
         {/* ⚠️ Confirm Map Modal */}
         <Modal
@@ -655,6 +697,13 @@ const RewardDescription = () => {
               </Text>
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <TouchableOpacity
+                  style={[styles.choiceButton, { backgroundColor: "#B00020" }]}
+                  onPress={() => setConfirmMapModalVisible(false)}
+                >
+                  <Text style={styles.okButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   style={[styles.choiceButton, { backgroundColor: "#5F934A" }]}
                   onPress={() => {
                     setConfirmMapModalVisible(false);
@@ -662,12 +711,6 @@ const RewardDescription = () => {
                   }}
                 >
                   <Text style={styles.okButtonText}>Yes, Go</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.choiceButton, { backgroundColor: "#B00020" }]}
-                  onPress={() => setConfirmMapModalVisible(false)}
-                >
-                  <Text style={styles.okButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -705,14 +748,14 @@ const RewardDescription = () => {
                     style={[
                       styles.amountButton,
                       selectedAmount === amount.toString() &&
-                        styles.amountButtonSelected,
+                      styles.amountButtonSelected,
                     ]}
                   >
                     <Text
                       style={[
                         styles.amountButtonText,
                         selectedAmount === amount.toString() &&
-                          styles.amountButtonTextSelected,
+                        styles.amountButtonTextSelected,
                       ]}
                     >
                       ₱{amount}
@@ -764,6 +807,46 @@ const RewardDescription = () => {
             </View>
           </View>
         </Modal>
+
+        {/* ✅ CONFIRM ONLINE MODAL */}
+        <Modal
+          visible={confirmOnlineModalVisible}
+          transparent
+          animationType="fade"
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalText}>
+                Are you sure you want to send a redemption request online?
+              </Text>
+
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.choiceButton, { backgroundColor: "#B00020" }]}
+                  onPress={() => setConfirmOnlineModalVisible(false)}
+                >
+                  <Text style={styles.okButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.choiceButton}
+                  disabled={isSubmitting}
+                  onPress={() => {
+                    setConfirmOnlineModalVisible(false);
+                    handleRedeemOnline();
+                  }}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.okButtonText}>Confirm</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
 
         {/* ❌ Failed Modal */}
         <Modal visible={failedModalVisible} transparent animationType="fade">
@@ -874,9 +957,12 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     color: "white",
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Poppins_700Bold",
+    textAlign: "center",
+    flexWrap: "wrap",
   },
+
   disabledText: { color: "#666" },
   modalOverlay: {
     flex: 1,
