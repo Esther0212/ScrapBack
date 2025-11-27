@@ -76,9 +76,10 @@ const Home = () => {
   const [conversionRates, setConversionRates] = useState([]);
   const [collapsedCategories, setCollapsedCategories] = useState({});
   const [userPoints, setUserPoints] = useState(0);
+  const [lockedPoints, setLockedPoints] = useState(0);
   const router = useRouter();
 
-  // ✅ Fetch and listen to user's current points dynamically
+  // ✅ Fetch and listen to user's current points + locked points
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
@@ -87,13 +88,23 @@ const Home = () => {
     const unsub = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
+
         const points =
           typeof data.points === "number" && !isNaN(data.points)
             ? parseFloat(data.points.toFixed(2))
             : 0;
+
+        const locked =
+          typeof data.locked_points === "number" &&
+            !isNaN(data.locked_points)
+            ? parseFloat(data.locked_points.toFixed(2))
+            : 0;
+
         setUserPoints(points);
+        setLockedPoints(locked);
       } else {
         setUserPoints(0);
+        setLockedPoints(0);
       }
     });
 
@@ -122,7 +133,12 @@ const Home = () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const notifRef = collection(db, "notifications", user.uid, "userNotifications");
+    const notifRef = collection(
+      db,
+      "notifications",
+      user.uid,
+      "userNotifications"
+    );
     const q = query(notifRef, where("read", "==", false));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -210,18 +226,30 @@ const Home = () => {
           </Text>
 
           {/* ✅ Points Section (Dynamic Firestore Data) */}
+
+
           <View style={styles.pointsContainer}>
-            <View style={styles.leftContainer}>
+            <View style={styles.pointsColumn}>
               <Text style={styles.pointsLabel}>Your Total Points</Text>
-              <View style={styles.rowContainer}>
+
+              <View style={styles.pointsRow}>
                 <Image
                   source={require("../../assets/home/lettermarkLogo.png")}
                   style={styles.lettermarkLogo}
                   resizeMode="cover"
                 />
-                <Text style={styles.pointsValueText}>
-                  {userPoints?.toFixed(2) || "0.00"}
-                </Text>
+
+                <View style={styles.pointsTextColumn}>
+                  <Text style={styles.pointsValueText}>
+                    {userPoints?.toFixed(2) || "0.00"}
+                  </Text>
+
+                  {lockedPoints > 0 && (
+                    <Text style={styles.lockedPointsText}>
+                      {lockedPoints.toFixed(2)} pts locked
+                    </Text>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -240,6 +268,7 @@ const Home = () => {
               </TouchableOpacity>
             </View>
           </View>
+
 
           {/* Recycling Guide */}
           <Text style={styles.sectionTitle}>Recycling Guide</Text>
@@ -281,8 +310,14 @@ const Home = () => {
                 >
                   <View style={styles.card}>
                     <View style={styles.headerBar}>
-                      <Text style={styles.category}>{category} Conversion</Text>
-                      <Ionicons name="chevron-forward" size={20} color="#fff" />
+                      <Text style={styles.category}>
+                        {category} Conversion
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color="#fff"
+                      />
                     </View>
 
                     <View style={styles.table}>
@@ -294,7 +329,10 @@ const Home = () => {
                       </View>
                       {firstRow && (
                         <View
-                          style={[styles.row, { backgroundColor: "#FFFFFF" }]}
+                          style={[
+                            styles.row,
+                            { backgroundColor: "#FFFFFF" },
+                          ]}
                         >
                           <Text style={[styles.cell, { flex: 2 }]}>
                             {firstRow.type}
@@ -357,7 +395,13 @@ const styles = StyleSheet.create({
     color: "#2E7D32",
     fontFamily: "Poppins_800ExtraBold",
     lineHeight: 32,
-    maxWidth: 150, // 🔹 prevents overflow
+    maxWidth: 150,
+  },
+  lockedPointsText: {
+    marginTop: 4,
+    fontSize: 13,
+    color: "#555",
+    fontFamily: "Poppins_500Medium",
   },
   rightContainer: { width: "50%" },
   redeemButton: {
@@ -444,6 +488,30 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     color: "#333",
   },
+  /* ✅ ADD these styles */
+
+pointsColumn: {
+  width: "50%",
+  justifyContent: "center",
+},
+
+pointsRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+},
+
+pointsTextColumn: {
+  justifyContent: "center",
+},
+
+lockedPointsText: {
+  marginTop: 2,
+  fontSize: 13,
+  color: "#555",
+  fontFamily: "Poppins_500Medium",
+},
+
   cell: {
     flex: 1,
     paddingVertical: 12,
