@@ -1,5 +1,4 @@
-// src/app/Main/requestPickup/PickupRequestForm.jsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -47,6 +46,7 @@ export default function PickupRequestForm() {
 
   // only one estimated weight (total)
   const [weights, setWeights] = useState({});
+  // put this near your state declarations
   const totalWeight = selectedTypes.reduce(
     (sum, t) => sum + (parseFloat(weights[t]) || 0),
     0
@@ -89,25 +89,6 @@ export default function PickupRequestForm() {
   const [toastMessage, setToastMessage] = useState("");
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
-  const [isSatellite, setIsSatellite] = useState(false);
-  const [searchHeight, setSearchHeight] = useState(50); // default height
-
-  const [originalAddress, setOriginalAddress] = useState("");
-  const [originalCoords, setOriginalCoords] = useState(null);
-  const [originalSearchHeight, setOriginalSearchHeight] = useState(50);
-
-  const [editAddressModalVisible, setEditAddressModalVisible] = useState(false);
-  const glowAnim = useRef(new Animated.Value(0)).current;
-
-  const [isLocked, setIsLocked] = useState(false);
-
-  const [region, setRegion] = useState({
-    latitude: 8.4542,
-    longitude: 124.6319,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  });
-
   // 📡 Fetch wasteConversionRates
   useEffect(() => {
     const unsub = onSnapshot(
@@ -139,8 +120,10 @@ export default function PickupRequestForm() {
   const toggleType = (type) => {
     setSelectedTypes((prev) => {
       if (prev.includes(type)) {
+        // Deselect → remove from selectedTypes
         const newTypes = prev.filter((t) => t !== type);
 
+        // Also remove from weights
         setWeights((w) => {
           const updated = { ...w };
           delete updated[type];
@@ -149,9 +132,10 @@ export default function PickupRequestForm() {
 
         return newTypes;
       } else {
+        // Select → add type and initialize weight to "0"
         setWeights((w) => ({
           ...w,
-          [type]: w[type] || "1",
+          [type]: w[type] || "1", // ensure there's always a value
         }));
         return [...prev, type];
       }
@@ -182,6 +166,7 @@ export default function PickupRequestForm() {
         const response = await fetch(localUri);
         const blob = await response.blob();
 
+        // Unique file path for this user + timestamp
         const storageRef = ref(
           storage,
           `pickupRequests/${user.uid}_${Date.now()}.jpg`
@@ -190,7 +175,7 @@ export default function PickupRequestForm() {
         await uploadBytes(storageRef, blob);
 
         const downloadUrl = await getDownloadURL(storageRef);
-        setPhoto(downloadUrl);
+        setPhoto(downloadUrl); // ✅ save the cloud URL, not file://
       } catch (err) {
         console.error("Image upload failed:", err);
         showAnimatedToast("Failed to upload photo.");
@@ -224,7 +209,6 @@ export default function PickupRequestForm() {
 
         const detailed = parts.join(", ");
         setAddressName(detailed || props.formatted || "Unknown location");
-        setSearchHeight(50);
       } else {
         setAddressName("Unknown location");
       }
@@ -236,24 +220,19 @@ export default function PickupRequestForm() {
 
   // 👇 fetch existing request if editing
   useEffect(() => {
-    let mounted = true;
     const loadRequest = async () => {
-      if (!requestId) {
-        // Not editing — nothing to load here
-        return;
-      }
+      if (!requestId) return; // new request
 
       try {
         const docRef = doc(db, "pickupRequests", requestId);
         const docSnap = await getDoc(docRef);
-
-        if (!mounted) return;
 
         if (docSnap.exists()) {
           const data = docSnap.data();
           const types = data.types || [];
           const w = data.weights || {};
 
+          // ✅ keep only weights for selected types
           const cleaned = Object.fromEntries(
             Object.entries(w).filter(([k]) => types.includes(k))
           );
@@ -262,63 +241,20 @@ export default function PickupRequestForm() {
           setWeights(cleaned);
           setPickupDateTime(data.pickupDateTime || "");
           setPickupAddress(data.pickupAddress || "");
-
-          // 🔹 Lock if status is "scheduled"
-          if (data.status === "scheduled") {
-            setIsLocked(true);
-          }
-
-          // 🔹 coords from request (stored as { latitude, longitude })
-          if (
-            data.coords &&
-            typeof data.coords.latitude === "number" &&
-            typeof data.coords.longitude === "number"
-          ) {
-            const coords = {
-              latitude: data.coords.latitude,
-              longitude: data.coords.longitude,
-            };
-
-            setMarkerCoords(coords);
-            setInitialRegion({
-              ...coords,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            });
-
-            // set human readable name if available
-            fetchAddressName(coords);
-          }
-
+          setMarkerCoords(data.coords || null);
           setPhoto(data.photoUrl || null);
         }
       } catch (err) {
         console.error("Failed to load request:", err);
-      } finally {
-        // ensure loadingLocation is false after loading edit data
-        if (mounted) setLoadingLocation(false);
       }
     };
 
     loadRequest();
-
-    return () => {
-      mounted = false;
-    };
   }, [requestId]);
 
-  // 🔹 Load user default address & location (lat/lng) – same as AccountInfo
-  // IMPORTANT: Do NOT override edit-data when requestId exists.
+  // 🔹 Load user default address or fallback to GPS
   useEffect(() => {
-    let mounted = true;
     (async () => {
-      // If editing, we should not override the region/marker set from Firestore.
-      if (requestId) {
-        // Make sure we stop the loading spinner if edit-loading already handled it.
-        if (mounted) setLoadingLocation(false);
-        return;
-      }
-
       setLoadingLocation(true);
       try {
         const auth = getAuth();
@@ -326,11 +262,8 @@ export default function PickupRequestForm() {
 
         if (user) {
           const userDoc = await getDoc(doc(db, "user", user.uid));
-          if (!mounted) return;
           if (userDoc.exists()) {
             const userData = userDoc.data();
-
-            // 🏠 Build human-readable address from user.profile (AccountInfo)
             if (userData.address) {
               const { street, barangay, city, province, region, postalCode } =
                 userData.address;
@@ -346,50 +279,32 @@ export default function PickupRequestForm() {
                 .filter(Boolean)
                 .join(", ");
 
-              if (formattedAddress) {
-                setPickupAddress(formattedAddress);
-                setAddressName(formattedAddress);
-              }
-            }
+              setPickupAddress(formattedAddress);
+              setAddressName(formattedAddress);
 
-            // 📍 Use the same saved coords from AccountInfo: location: { lat, lng }
-            if (userData.location) {
-              const { lat, lng } = userData.location;
-              if (typeof lat === "number" && typeof lng === "number") {
-                const coords = {
-                  latitude: lat,
-                  longitude: lng,
-                };
-
-                setMarkerCoords(coords);
+              if (userData.addressCoords) {
+                setMarkerCoords(userData.addressCoords);
                 setInitialRegion({
-                  ...coords,
+                  ...userData.addressCoords,
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 });
-
-                // If no formatted address from profile, reverse-geocode this point
-                if (!userData.address) {
-                  fetchAddressName(coords);
-                }
-
-                if (mounted) setLoadingLocation(false);
+                setLoadingLocation(false);
                 return;
               }
             }
           }
         }
 
-        // fallback to GPS if no saved location and not editing
+        // fallback to GPS if no saved address
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           showAnimatedToast("Location permission is required.");
-          if (mounted) setLoadingLocation(false);
+          setLoadingLocation(false);
           return;
         }
 
         const location = await Location.getCurrentPositionAsync({});
-        if (!mounted) return;
         const coords = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
@@ -405,14 +320,10 @@ export default function PickupRequestForm() {
       } catch (err) {
         console.error("Error fetching user address:", err);
       } finally {
-        if (mounted) setLoadingLocation(false);
+        setLoadingLocation(false);
       }
     })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [requestId]);
+  }, []);
 
   const confirmLocation = () => {
     setPickupAddress(addressName || "Unknown address");
@@ -420,8 +331,6 @@ export default function PickupRequestForm() {
   };
 
   const onChangeDate = (event, selectedDate) => {
-    if (isLocked) return;
-
     if (event.type === "dismissed") {
       setShowDateOnlyPicker(false);
       setShowTimeOnlyPicker(false);
@@ -498,7 +407,7 @@ export default function PickupRequestForm() {
       !pickupAddress
     ) {
       showAnimatedToast("Please fill in all fields.");
-      return false;
+      return false; // ❗ return false so caller knows it failed
     }
 
     try {
@@ -507,7 +416,8 @@ export default function PickupRequestForm() {
       const user = auth.currentUser;
       if (!user) return false;
 
-      let displayName = user.email;
+      // 🔹 Fetch user profile to get full name
+      let displayName = user.email; // fallback if no name
       try {
         const userDoc = await getDoc(doc(db, "user", user.uid));
         if (userDoc.exists()) {
@@ -519,6 +429,7 @@ export default function PickupRequestForm() {
       }
 
       if (requestId) {
+        // 🔹 Update existing request
         await updateDoc(doc(db, "pickupRequests", requestId), {
           types: selectedTypes,
           weights: weights,
@@ -527,12 +438,13 @@ export default function PickupRequestForm() {
           pickupAddress,
           pickupDate: date,
           estimatedPoints: totalPoints,
-          coords: markerCoords, // { latitude, longitude } – same as map
+          coords: markerCoords,
           photoUrl: photo || null,
-          seenByAdmin: false,
+          seenByAdmin: false, // 👈 reset so admin sees "UPDATED"
           updatedAt: serverTimestamp(),
         });
 
+        // ✅ Save notification for admins
         await addDoc(collection(db, "adminNotifications"), {
           title: "Pickup Request Updated",
           body: `User <b>${displayName}</b> updated a request at ${pickupAddress}. Click for more details.`,
@@ -543,9 +455,11 @@ export default function PickupRequestForm() {
           requestId: requestId,
         });
 
+        // ✅ Consistent alert with routing
         showAnimatedToast("Pickup request updated!");
         setTimeout(() => router.push("/Main/requestPickup"), 2000);
       } else {
+        // 🔹 Create new request
         const newDoc = await addDoc(collection(db, "pickupRequests"), {
           userId: user.uid,
           types: selectedTypes,
@@ -555,13 +469,14 @@ export default function PickupRequestForm() {
           pickupDate: date,
           estimatedPoints: totalPoints,
           pickupAddress,
-          coords: markerCoords, // { latitude, longitude }
+          coords: markerCoords,
           photoUrl: photo || null,
           status: "pending",
           seenByAdmin: false,
           createdAt: serverTimestamp(),
         });
 
+        // ✅ Save notification for admins
         await addDoc(collection(db, "adminNotifications"), {
           title: "New Pickup Request",
           body: `User <b>${displayName}</b> created a new request for ${pickupAddress}. Click for more details.`,
@@ -576,12 +491,13 @@ export default function PickupRequestForm() {
         setTimeout(() => router.push("/Main/requestPickup"), 2000);
       }
 
-      return true;
+      return true; // ✅ success
     } catch (err) {
       console.error("Error saving request:", err);
       showAnimatedToast("Failed to save request.");
-      return false;
+      return false; // ❌ failed
     } finally {
+      setSubmitting(false);
       setSubmitting(false);
     }
   };
@@ -602,7 +518,7 @@ export default function PickupRequestForm() {
                 key={cat.category}
                 style={[
                   styles.categoryCard,
-                  selectedInCat.length > 0 && styles.categoryCardSelected,
+                  selectedInCat.length > 0 && styles.categoryCardSelected, // ✅ highlight selected category
                 ]}
                 onPress={() => {
                   setSelectedCategory(cat);
@@ -613,14 +529,14 @@ export default function PickupRequestForm() {
                   <FontAwesome
                     name="recycle"
                     size={28}
-                    color={selectedInCat.length > 0 ? "#008243" : "#999"}
+                    color={selectedInCat.length > 0 ? "#0E9247" : "#999"} // ✅ icon turns green if selected
                   />
                 </View>
                 <View style={styles.infoTextContainer}>
                   <Text
                     style={[
                       styles.categoryTitle,
-                      selectedInCat.length > 0 && { color: "#008243" },
+                      selectedInCat.length > 0 && { color: "#0E9247" }, // ✅ category text green if selected
                     ]}
                   >
                     {cat.category}
@@ -684,15 +600,14 @@ export default function PickupRequestForm() {
 
           {/* Date */}
           <TouchableOpacity
-            style={[styles.infoBox, isLocked && { backgroundColor: "#eee" }]}
-            disabled={isLocked}
+            style={styles.infoBox}
             onPress={() => setShowDateOnlyPicker(true)}
           >
             <View style={styles.iconWrapper}>
               <MaterialIcons name="date-range" size={30} color="green" />
             </View>
             <View style={styles.infoTextContainer}>
-              <Text style={styles.infoTitle}>Preferred Pickup Date & Time</Text>
+              <Text style={styles.infoTitle}>Pickup Date & Time</Text>
               <Text style={styles.infoSub}>
                 {pickupDateTime || "Select Date & Time"}
               </Text>
@@ -701,20 +616,14 @@ export default function PickupRequestForm() {
 
           {/* Address */}
           <TouchableOpacity
-            style={[styles.infoBox, isLocked && { backgroundColor: "#eee" }]}
-            disabled={isLocked}
-            onPress={() => {
-              setOriginalAddress(addressName);
-              setOriginalCoords(markerCoords);
-              setOriginalSearchHeight(searchHeight);
-              setModalVisible(true);
-            }}
+            style={styles.infoBox}
+            onPress={() => setModalVisible(true)}
           >
             <View style={styles.iconWrapper}>
               <FontAwesome name="map-marker" size={32} color="red" />
             </View>
             <View style={styles.infoTextContainer}>
-              <Text style={styles.infoTitle}>Preferred Pickup Address</Text>
+              <Text style={styles.infoTitle}>Pickup Address</Text>
               <Text style={styles.infoSub}>
                 {pickupAddress || "Select Location on Map"}
               </Text>
@@ -731,6 +640,7 @@ export default function PickupRequestForm() {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
+                <FontAwesome name="truck" size={30} color="#fff" />
                 <Text style={styles.requestButtonText}>
                   {requestId ? "Update Request" : "Request Pickup"}
                 </Text>
@@ -739,7 +649,7 @@ export default function PickupRequestForm() {
           </TouchableOpacity>
 
           {/* Date Pickers */}
-          {showDateOnlyPicker && !isLocked && (
+          {showDateOnlyPicker && (
             <DateTimePicker
               value={date}
               mode="date"
@@ -747,7 +657,7 @@ export default function PickupRequestForm() {
               onChange={onChangeDate}
             />
           )}
-          {showTimeOnlyPicker && !isLocked && (
+          {showTimeOnlyPicker && (
             <DateTimePicker
               value={date}
               mode="time"
@@ -761,64 +671,24 @@ export default function PickupRequestForm() {
           <Modal visible={modalVisible} animationType="slide">
             <View style={{ flex: 1 }}>
               <View style={styles.topOverlay}>
-                <Text style={styles.toggleLabel}>Edit Address</Text>
                 <View style={styles.searchBox}>
-                  <Animated.View
-                    style={{
-                      borderRadius: 10,
-                      padding: 2,
-                      borderWidth: 2, // thickness of glow
-                      paddingHorizontal: 10,
-                      borderColor: glowAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ["transparent", "rgba(0,130,67,0.6)"],
-                      }),
-                    }}
-                  >
-                    <TextInput
-                      style={[
-                        styles.searchOverlay,
-                        {
-                          height: searchHeight,
-                        },
-                      ]}
-                      placeholder="Edit or Pinpoint Location"
-                      value={addressName}
-                      onChangeText={setAddressName}
-                      multiline={true}
-                      scrollEnabled={true} // 🔥 allows scrolling when max height reached
-                      onContentSizeChange={(e) => {
-                        const h = e.nativeEvent.contentSize.height;
-
-                        // Approx line height (React Native default ~20)
-                        const lineHeight = 20;
-
-                        // Maximum height for 4 lines
-                        const maxHeight = lineHeight * 4;
-
-                        const adjusted = Math.max(50, Math.min(h, maxHeight));
-
-                        if (adjusted !== searchHeight) {
-                          setSearchHeight(adjusted);
-                        }
-                      }}
-                    />
-                  </Animated.View>
+                  <TextInput
+                    style={styles.searchOverlay}
+                    placeholder="Search"
+                    value={addressName}
+                    onChangeText={setAddressName}
+                  />
                 </View>
-                <Text style={styles.toggleLabel}>Pinpoint Location</Text>
               </View>
 
               {loadingLocation ? (
                 <ActivityIndicator style={{ marginTop: 20 }} size="large" />
               ) : (
                 <MapView
-                  provider={PROVIDER_GOOGLE}
+                provider={PROVIDER_GOOGLE}
                   style={{ flex: 1 }}
-                  // Use the initialRegion chosen earlier (edit coords or user/default). If initialRegion is null fallback to region state.
-                  initialRegion={initialRegion || region}
-                  mapType={isSatellite ? "hybrid" : "standard"}
+                  initialRegion={initialRegion}
                   onPress={(e) => {
-                    if (isLocked) return;
                     const coords = e.nativeEvent.coordinate;
                     setMarkerCoords(coords);
                     fetchAddressName(coords);
@@ -827,53 +697,37 @@ export default function PickupRequestForm() {
                   {markerCoords && (
                     <Marker
                       coordinate={markerCoords}
-                      draggable={!isLocked}
-                      title="Pinpointed Pickup Location"
-                      description="This is your requested pickup location. Wait for confirmation from the admin."
+                      draggable
                       onDragEnd={(e) => {
-                        if (isLocked) return;
                         const coords = e.nativeEvent.coordinate;
                         setMarkerCoords(coords);
                         fetchAddressName(coords);
                       }}
-                    />
+                    >
+                      <FontAwesome name="map-marker" size={38} color="red" />
+                      <Callout>
+                        <View style={{ width: 200 }}>
+                          <Text style={{ fontWeight: "bold", marginBottom: 4 }}>
+                            Selected Location
+                          </Text>
+                          <Text>{addressName || "Fetching address..."}</Text>
+                        </View>
+                      </Callout>
+                    </Marker>
                   )}
                 </MapView>
               )}
-              <TouchableOpacity
-                style={[
-                  styles.accountInfoToggle,
-                  { top: searchHeight + 80 }, // 👈 dynamic offset based on search height
-                ]}
-                onPress={() => setIsSatellite(!isSatellite)}
-                activeOpacity={0.8}
-              >
-                <FontAwesome
-                  name={isSatellite ? "map" : "map-o"}
-                  size={24}
-                  color="black"
-                />
-              </TouchableOpacity>
 
               <View style={styles.footerOverlay}>
                 <TouchableOpacity
                   style={styles.cancelBtnOverlay}
-                  onPress={() => {
-                    setAddressName(originalAddress);
-                    setMarkerCoords(originalCoords);
-                    setSearchHeight(originalSearchHeight);
-                    setModalVisible(false);
-                  }}
+                  onPress={() => setModalVisible(false)}
                 >
                   <Text style={styles.footerText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[
-                    styles.confirmBtnOverlay,
-                    isLocked && { backgroundColor: "#999" },
-                  ]}
-                  disabled={isLocked}
-                  onPress={() => setEditAddressModalVisible(true)}
+                  style={styles.confirmBtnOverlay}
+                  onPress={confirmLocation}
                 >
                   <Text style={styles.footerText}>Confirm</Text>
                 </TouchableOpacity>
@@ -883,7 +737,7 @@ export default function PickupRequestForm() {
 
           {/* Waste Category Modal */}
           <Modal visible={categoryModalVisible} animationType="slide">
-            <SafeAreaView style={{ flex: 1, backgroundColor: "#F0F1C5" }}>
+            <SafeAreaView style={{ flex: 1 }}>
               <Text style={styles.modalHeader}>
                 {selectedCategory?.category}
               </Text>
@@ -916,8 +770,8 @@ export default function PickupRequestForm() {
                             style={[
                               styles.wastePoints,
                               isSelected && {
-                                color: "#008243",
-                                fontFamily: "Poppins_400Regular",
+                                color: "#0E9247",
+                                fontWeight: "700",
                               },
                             ]}
                           >
@@ -929,31 +783,15 @@ export default function PickupRequestForm() {
                           <View style={styles.controls}>
                             <TouchableOpacity
                               style={styles.stepperBtn}
-                              onPress={() => {
-                                setWeights((prev) => {
-                                  const newValue =
-                                    (parseFloat(prev[item.type]) || 0) - 1;
-
-                                  // 👉 If weight goes to 0 → unselect the type
-                                  if (newValue <= 0) {
-                                    const updated = { ...prev };
-                                    delete updated[item.type];
-
-                                    // remove from selectedTypes
-                                    setSelectedTypes((types) =>
-                                      types.filter((t) => t !== item.type)
-                                    );
-
-                                    return updated;
-                                  }
-
-                                  // normal decrease
-                                  return {
-                                    ...prev,
-                                    [item.type]: newValue.toString(),
-                                  };
-                                });
-                              }}
+                              onPress={() =>
+                                setWeights((prev) => ({
+                                  ...prev,
+                                  [item.type]: Math.max(
+                                    (parseFloat(prev[item.type]) || 0) - 1,
+                                    0
+                                  ).toString(),
+                                }))
+                              }
                             >
                               <Text style={styles.stepperText}>-</Text>
                             </TouchableOpacity>
@@ -962,31 +800,14 @@ export default function PickupRequestForm() {
                               style={styles.weightInput}
                               placeholder="kg"
                               keyboardType="numeric"
-                              value={weights[item.type] ?? ""}
+                              value={weights[item.type] ?? "0"}
                               onChangeText={(val) => {
-                                // sanitize numbers
+                                // ✅ only allow one decimal point and max 2 digits after
                                 const sanitized = val
-                                  .replace(/[^0-9.]/g, "")
-                                  .replace(/^([^.]*\.)|\./g, "$1")
-                                  .replace(/^(\d+\.?\d{0,2}).*$/, "$1");
+                                  .replace(/[^0-9.]/g, "") // allow digits and dot
+                                  .replace(/^([^.]*\.)|\./g, "$1") // allow only one dot
+                                  .replace(/^(\d+\.?\d{0,2}).*$/, "$1"); // limit to 2 decimals
 
-                                // ✅ Always keep type selected if user is typing
-                                setSelectedTypes((types) =>
-                                  types.includes(item.type)
-                                    ? types
-                                    : [...types, item.type]
-                                );
-
-                                // ✅ If user clears input, DO NOT unselect — just store empty
-                                if (sanitized === "") {
-                                  setWeights((prev) => ({
-                                    ...prev,
-                                    [item.type]: "",
-                                  }));
-                                  return;
-                                }
-
-                                // normal update
                                 setWeights((prev) => ({
                                   ...prev,
                                   [item.type]: sanitized,
@@ -996,20 +817,14 @@ export default function PickupRequestForm() {
 
                             <TouchableOpacity
                               style={styles.stepperBtn}
-                              onPress={() => {
-                                setSelectedTypes((types) =>
-                                  types.includes(item.type)
-                                    ? types
-                                    : [...types, item.type]
-                                );
-
+                              onPress={() =>
                                 setWeights((prev) => ({
                                   ...prev,
                                   [item.type]: (
                                     (parseFloat(prev[item.type]) || 0) + 1
                                   ).toString(),
-                                }));
-                              }}
+                                }))
+                              }
                             >
                               <Text style={styles.stepperText}>+</Text>
                             </TouchableOpacity>
@@ -1023,27 +838,7 @@ export default function PickupRequestForm() {
               <View style={styles.modalFooter}>
                 <TouchableOpacity
                   style={styles.modalCloseBtn}
-                  onPress={() => {
-                    // ✅ Remove items with empty or zero weight on close
-                    setWeights((prev) => {
-                      const updated = { ...prev };
-
-                      Object.entries(updated).forEach(([key, value]) => {
-                        if (!value || parseFloat(value) <= 0) {
-                          delete updated[key];
-                        }
-                      });
-
-                      // also clean selectedTypes
-                      setSelectedTypes((prevTypes) =>
-                        prevTypes.filter((type) => updated[type] !== undefined)
-                      );
-
-                      return updated;
-                    });
-
-                    setCategoryModalVisible(false);
-                  }}
+                  onPress={() => setCategoryModalVisible(false)}
                 >
                   <Text style={styles.modalCloseText}>Close</Text>
                 </TouchableOpacity>
@@ -1060,7 +855,7 @@ export default function PickupRequestForm() {
         >
           <View style={styles.overlayCenter}>
             <View style={styles.confirmModal}>
-              <Ionicons name="help-circle-outline" size={40} color="#008243" />
+              <Ionicons name="help-circle-outline" size={40} color="#0E9247" />
               <Text style={styles.confirmTitle}>Confirm Request</Text>
               <Text style={styles.confirmText}>
                 Are you sure all details are correct for your pickup request?
@@ -1109,73 +904,6 @@ export default function PickupRequestForm() {
             </View>
           </View>
         </Modal>
-        <Modal
-          visible={editAddressModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setEditAddressModalVisible(false)}
-        >
-          <View style={styles.overlayCenter}>
-            <View style={styles.addressModal}>
-              <Ionicons name="location-outline" size={40} color="#008243" />
-
-              <Text style={styles.addressModalTitle}>
-                Refine Pickup Address?
-              </Text>
-
-              <Text style={styles.addressModalText}>
-                You can add more details like house number or landmarks to help
-                staff locate your exact pickup point. Would you like to edit it
-                first?
-              </Text>
-
-              <View style={styles.addressModalButtons}>
-                <TouchableOpacity
-                  style={styles.modalUseButton}
-                  onPress={() => {
-                    setEditAddressModalVisible(false);
-                    confirmLocation();
-                  }}
-                >
-                  <Text style={styles.modalUseText}>Use as is</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalEditButton}
-                  onPress={() => {
-                    setEditAddressModalVisible(false);
-
-                    // trigger search field glow
-                    Animated.sequence([
-                      Animated.timing(glowAnim, {
-                        toValue: 1,
-                        duration: 300,
-                        useNativeDriver: false,
-                      }),
-                      Animated.timing(glowAnim, {
-                        toValue: 0,
-                        duration: 300,
-                        useNativeDriver: false,
-                      }),
-                      Animated.timing(glowAnim, {
-                        toValue: 1,
-                        duration: 300,
-                        useNativeDriver: false,
-                      }),
-                      Animated.timing(glowAnim, {
-                        toValue: 0,
-                        duration: 300,
-                        useNativeDriver: false,
-                      }),
-                    ]).start();
-                  }}
-                >
-                  <Text style={styles.modalEditText}>Edit Address</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
         {toastVisible && (
           <Animated.View
             style={[
@@ -1186,7 +914,7 @@ export default function PickupRequestForm() {
                   {
                     translateY: fadeAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [-50, 0],
+                      outputRange: [-50, 0], // ✅ slide down from top
                     }),
                   },
                 ],
@@ -1224,10 +952,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  categoryCardSelected: {
-    borderColor: "#008243",
-    backgroundColor: "#E6F4EA",
-  },
   categoryTitle: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
   categorySub: {
     fontSize: 15,
@@ -1257,12 +981,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EFEFEF",
   },
-  lockedText: {
-    marginTop: 10,
-    textAlign: "center",
-    color: "#00D26A",
-    fontWeight: "bold",
-  },
   iconWrapper: { width: 36, alignItems: "center" },
   infoTextContainer: { marginLeft: 12, flex: 1 },
   infoTitle: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
@@ -1274,7 +992,7 @@ const styles = StyleSheet.create({
   },
   requestButton: {
     flexDirection: "row",
-    backgroundColor: "#008243",
+    backgroundColor: "#0E9247",
     paddingVertical: 16,
     borderRadius: 12,
     justifyContent: "center",
@@ -1299,21 +1017,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    marginBottom: 10,
   },
   searchOverlay: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
-  toggleLabel: {
-    fontSize: 15,
-    fontFamily: "Poppins_700Bold",
-    color: "#333",
-    marginBottom: 5,
-  },
-  toggleLabel1: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
   footerOverlay: {
     position: "absolute",
     bottom: 40,
@@ -1328,7 +1040,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     paddingVertical: 14,
     borderRadius: 10,
-    backgroundColor: "#888",
+    backgroundColor: "rgba(0,0,0,0.6)",
     alignItems: "center",
   },
   confirmBtnOverlay: {
@@ -1336,27 +1048,18 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     paddingVertical: 14,
     borderRadius: 10,
-    backgroundColor: "#008243",
+    backgroundColor: "#7EBF62",
     alignItems: "center",
-  },
-  lockedText: {
-    marginTop: 10,
-    textAlign: "center",
-    color: "#c0392b",
-    fontWeight: "bold",
   },
   footerText: { color: "#fff", fontSize: 16, fontFamily: "Poppins_700Bold" },
   modalHeader: {
-    fontFamily: "Poppins_700Bold",
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: "700",
     padding: 16,
     textAlign: "center",
-    backgroundColor: "#F0F1C5",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 5,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
   modalList: { padding: 16 },
   wasteOption: {
@@ -1368,54 +1071,48 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
   },
   wasteOptionSelected: {
-    borderColor: "#008243",
-    backgroundColor: "#E6F4EA",
+    borderColor: "#0E9247",
+    backgroundColor: "#E6F4EA", // lighter green background when selected
   },
-  wasteText: { fontSize: 15, color: "#333", fontFamily: "Poppins_700Bold" },
-  wasteTextSelected: { color: "#008243", fontFamily: "Poppins_700Bold" },
-  wastePoints: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 4,
-    fontFamily: "Poppins_400Regular",
-  },
+  wasteText: { fontSize: 15, color: "#333", fontWeight: "500" },
+  wasteTextSelected: { color: "#0E9247", fontWeight: "700" },
+  wastePoints: { fontSize: 13, color: "#666", marginTop: 4 },
   modalFooter: {
     padding: 16,
-    backgroundColor: "#F0F1C5",
+    backgroundColor: "#f9f9f9",
     alignItems: "center",
   },
   modalCloseBtn: {
-    width: "100%", // ⭐ makes it full horizontal width
-    backgroundColor: "#008243",
+    backgroundColor: "#0E9247",
     paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
-    alignItems: "center",
   },
   modalCloseText: {
-    color: "white",
-    fontFamily: "Poppins_700Bold",
-    fontSize: 16,
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 15,
   },
   weightInput: {
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 6,
+    borderRadius: 8,
     paddingHorizontal: 10,
     width: 70,
-    textAlign: "center",
+    textAlign: "right",
     fontSize: 14,
+    marginLeft: 10,
     backgroundColor: "#fff",
-    marginHorizontal: 8,
-    fontFamily: "Poppins_400Regular",
   },
   stepperBtn: {
-    width: 40,
-    height: 40,
+    width: 30,
+    height: 30,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "#ddd",
     justifyContent: "center",
     alignItems: "center",
+    marginHorizontal: 5,
     backgroundColor: "#f5f5f5",
   },
   stepperText: {
@@ -1429,13 +1126,13 @@ const styles = StyleSheet.create({
   },
   wasteInfo: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 0, // allows text to shrink/truncate
     paddingRight: 8,
   },
   controls: {
     flexDirection: "row",
     alignItems: "center",
-    flexShrink: 0,
+    flexShrink: 0, // keep controls visible
   },
   overlayCenter: {
     flex: 1,
@@ -1478,7 +1175,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   confirmButton: {
-    backgroundColor: "#008243",
+    backgroundColor: "#0E9247",
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
@@ -1495,7 +1192,7 @@ const styles = StyleSheet.create({
   },
   toast: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 60 : 40,
+    top: Platform.OS === "ios" ? 60 : 40, // ✅ appear near top of screen
     left: "6%",
     right: "6%",
     backgroundColor: "rgba(14,146,71,0.95)",
@@ -1511,73 +1208,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 6,
   },
+
   toastText: {
     color: "#fff",
     fontFamily: "Poppins_700Bold",
     fontSize: 15,
     textAlign: "center",
-  },
-  accountInfoToggle: {
-    position: "absolute",
-    top: 20,
-    right: 20,
-    backgroundColor: "white",
-    padding: 10,
-    borderRadius: 10,
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 3,
-    zIndex: 9999, // 🔥 prevents leaking through map
-  },
-  addressModal: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
-    width: "90%",
-    alignItems: "center",
-  },
-  addressModalTitle: {
-    fontSize: 18,
-    fontFamily: "Poppins_700Bold",
-    color: "#333",
-    marginVertical: 10,
-  },
-  addressModalText: {
-    fontSize: 14,
-    fontFamily: "Poppins_400Regular",
-    color: "#555",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  addressModalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  modalEditButton: {
-    flex: 0.48,
-    backgroundColor: "#008243",
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  modalEditText: {
-    color: "#fff",
-    fontFamily: "Poppins_700Bold",
-    fontSize: 14,
-  },
-  modalUseButton: {
-    flex: 0.48,
-    backgroundColor: "#888",
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  modalUseText: {
-    color: "#fff",
-    fontFamily: "Poppins_700Bold",
-    fontSize: 14,
   },
 });

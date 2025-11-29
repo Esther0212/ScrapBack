@@ -68,6 +68,17 @@ export default function EarnPointsQR() {
     fetchUserData();
   }, [user]);
 
+  // ⏳ countdown logic
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+
+    const interval = setInterval(() => {
+      setTimeLeft((t) => (t > 0 ? t - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timeLeft]);
+
   if (!user) {
     return <Text style={styles.errorText}>Please log in</Text>;
   }

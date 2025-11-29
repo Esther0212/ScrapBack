@@ -21,7 +21,6 @@ import {
   doc,
   updateDoc,
   orderBy,
-  getDoc,
 } from "firebase/firestore";
 import CustomBgColor from "../../components/customBgColor";
 import { useRouter } from "expo-router";
@@ -96,8 +95,8 @@ export default function NotificationsScreen() {
           d?.createdAt?.toDate
             ? d.createdAt.toDate().getTime()
             : typeof d?.createdAt === "number"
-            ? d.createdAt
-            : 0;
+              ? d.createdAt
+              : 0;
         return getTime(b) - getTime(a);
       });
 
@@ -156,11 +155,8 @@ export default function NotificationsScreen() {
     setModalVisible(true);
   };
 
-  // 🔹 Handle modal action (Go / Close)
-  // ✅ FINAL LOGIC:
-  // - scheduled → /Main/map (center on scheduledCoords)
-  // - pending, in progress, not approved, completed, cancelled → /Main/requestPickup
-  const handleModalAction = async (confirm) => {
+  // 🔹 Handle modal action
+  const handleModalAction = (confirm) => {
     if (!confirm || !selectedNotif) {
       setModalVisible(false);
       setSelectedNotif(null);
@@ -169,86 +165,14 @@ export default function NotificationsScreen() {
 
     const type = selectedNotif.type;
 
-    // 🔵 Collection point
     if (selectedNotif.title?.includes("Collection Point")) {
       router.push("/Main/map");
-    }
-
-    // ✅ PICKUP STATUS
-    else if (type === "pickupStatus") {
-      try {
-        const requestId =
-          selectedNotif.requestId || selectedNotif.pickupRequestId;
-
-        if (!requestId) {
-          router.push("/Main/requestPickup");
-          setModalVisible(false);
-          setSelectedNotif(null);
-          return;
-        }
-
-        const reqRef = doc(db, "pickupRequests", requestId);
-        const reqSnap = await getDoc(reqRef);
-
-        if (!reqSnap.exists()) {
-          router.push("/Main/requestPickup");
-          setModalVisible(false);
-          setSelectedNotif(null);
-          return;
-        }
-
-        const reqData = reqSnap.data();
-        const status = (reqData.status || "").toLowerCase();
-
-        // ✅ SCHEDULED → MAP TAB, CENTER ON scheduledCoords, NO PURPLE PIN
-        if (
-          status === "scheduled" &&
-          reqData.scheduledCoords?.latitude != null &&
-          reqData.scheduledCoords?.longitude != null
-        ) {
-          const navKey = `${requestId}_${Date.now()}`;
-
-          router.push({
-            pathname: "/Main/map",
-            params: {
-              from: "pickupScheduled",
-              pickupRequestId: requestId,
-              lat: String(reqData.scheduledCoords.latitude),
-              lng: String(reqData.scheduledCoords.longitude),
-              address: reqData.scheduledAddress || "",
-              date: reqData.scheduledDate || "",
-              time: reqData.scheduledTime || "",
-              navKey,
-            },
-          });
-        } else {
-          // 🟡 ALL OTHER STATUSES (pending, in progress, not approved, completed, cancelled)
-          // → REQUEST PICKUP PAGE
-          router.push({
-            pathname: "/Main/requestPickup",
-            params: {
-              pickupRequestId: requestId,
-              lat:
-                reqData.coords?.latitude != null
-                  ? String(reqData.coords.latitude)
-                  : "",
-              lng:
-                reqData.coords?.longitude != null
-                  ? String(reqData.coords.longitude)
-                  : "",
-              address: reqData.pickupAddress || "",
-              date: reqData.pickupDateTime || "",
-            },
-          });
-        }
-      } catch (err) {
-        console.error("Error handling pickupStatus:", err);
-        router.push("/Main/requestPickup");
-      }
-    }
-
-    // ✅ OTHER TYPES
-    else if (type === "redemptionStatus" || type === "pointsEarned") {
+    } else if (type === "pickupStatus") {
+      router.push("/Main/requestPickup");
+    } else if (
+      type === "redemptionStatus" ||
+      type === "pointsEarned" // 🟩 added earned points
+    ) {
       router.push("/Main/profile");
     } else if (type === "staff_redemption" || type === "staff_contribution") {
       router.push("/pages/Transactions");
@@ -374,7 +298,7 @@ export default function NotificationsScreen() {
                 {(selectedNotif?.title?.includes("Collection Point") ||
                   selectedNotif?.type === "pickupStatus" ||
                   selectedNotif?.type === "redemptionStatus" ||
-                  selectedNotif?.type === "pointsEarned" ||
+                  selectedNotif?.type === "pointsEarned" || // 🟩 added this line
                   selectedNotif?.type === "staff_redemption" ||
                   selectedNotif?.type === "staff_contribution") && (
                   <TouchableOpacity
