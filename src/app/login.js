@@ -33,17 +33,14 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
-
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-  const showToast = (message) => {
-    if (Platform.OS === "android") {
-      ToastAndroid.show(message, ToastAndroid.SHORT);
-    } else {
-      console.log("Toast:", message);
-    }
+  const showToast = (msg, duration = 2000) => {
+    if (Platform.OS === "android") ToastAndroid.show(msg, ToastAndroid.SHORT);
+    else console.log(msg);
   };
 
+  const validateEmail = (e) => {
+    return /^\S+@\S+\.\S+$/.test(e);
+  };
   const handleLogin = async () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
@@ -71,9 +68,19 @@ const Login = () => {
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
 
-      // ✅ Check if email is verified
-      if (!user.emailVerified) {
-        await signOut(auth); // log them out again
+      // 🔎 Check Firestore profile
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      const isExistingUser = userDocSnap.exists();
+
+      /* ======================================================
+        🔒 NEW RULE:
+        - New users (no Firestore record) → must verify
+        - Existing users (with Firestore record) → skip verification
+      ====================================================== */
+      if (!isExistingUser && !user.emailVerified) {
+        await signOut(auth); // logout again
 
         showToast("Please verify your email before logging in.");
         setLoading(false);
@@ -90,24 +97,20 @@ const Login = () => {
         );
       }
 
-      // 🔎 Fetch user profile
-      const userDocRef = doc(db, "user", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (userDocSnap.exists()) {
+      // 📌 Load user profile
+      if (isExistingUser) {
         const profile = userDocSnap.data();
-
         setUserData({
           uid: user.uid,
           email: user.email,
           ...profile,
         });
       } else {
-        console.warn("⚠️ No profile found for user:", user.uid);
+        // first-time login (verified)
         setUserData({ uid: user.uid, email: user.email });
       }
 
-      // 💾 Remember credentials
+      // 💾 Remember Me
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", email);
         await AsyncStorage.setItem("savedPassword", password);
@@ -116,22 +119,19 @@ const Login = () => {
         await AsyncStorage.removeItem("savedPassword");
       }
 
-      showToast("Login successful! Welcome back!");
+      showToast(isExistingUser ? "Welcome back!" : "Account verified!");
 
       setTimeout(() => {
         router.replace("/Main");
-      }, 1000);
+      }, 800);
 
     } catch (error) {
       console.error("FULL LOGIN ERROR:", error);
 
       let message = "Login failed. Please try again.";
-      if (error.code === "auth/invalid-email")
-        message = "Invalid email address.";
-      else if (error.code === "auth/user-not-found")
-        message = "User not found.";
-      else if (error.code === "auth/wrong-password")
-        message = "Incorrect password.";
+      if (error.code === "auth/invalid-email") message = "Invalid email address.";
+      else if (error.code === "auth/user-not-found") message = "User not found.";
+      else if (error.code === "auth/wrong-password") message = "Incorrect password.";
 
       showToast("❌ " + message);
 
@@ -139,6 +139,7 @@ const Login = () => {
       setLoading(false);
     }
   };
+
 
   // Auto-load saved creds
   useEffect(() => {
