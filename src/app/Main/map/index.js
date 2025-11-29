@@ -458,39 +458,7 @@ export default function MapSelector() {
     <CustomBgColor>
       <SafeAreaView style={{ flex: 1, paddingTop: 25 }}>
         <View style={styles.container}>
-          {/* 🔍 Search Suggestions Modal */}
-          {showSearchModal && searchResults.length > 0 && (
-            <View style={styles.searchModal}>
-              <FlatList
-                data={searchResults}
-                keyExtractor={(item) => item.place_id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.searchResultItem}
-                    onPress={() => {
-                      const { lat, lon, formatted } = item;
-                      const newRegion = {
-                        latitude: lat,
-                        longitude: lon,
-                        latitudeDelta: 0.05,
-                        longitudeDelta: 0.05,
-                      };
-                      setRegion(newRegion);
-                      setSearchMarker({ latitude: lat, longitude: lon });
-                      setPickupFocusMarker(null);
-                      mapRef.current?.animateToRegion(newRegion, 1000);
-                      setShowSearchModal(false);
-                      setSearchText(formatted);
-                      Keyboard.dismiss();
-                    }}
-                  >
-                    <Text style={styles.resultTitle}>{item.address_line1}</Text>
-                    <Text style={styles.resultSubtitle}>{item.formatted}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
-          )}
+          
 
           {/* 🔍 Search + Tabs */}
           <View
@@ -500,43 +468,11 @@ export default function MapSelector() {
             ]}
           >
             {/* Search */}
-            <View style={styles.searchBox}>
               <View
                 style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
               >
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search location..."
-                  value={searchText}
-                  onChangeText={(text) => {
-                    setSearchText(text);
-                    setShowSearchModal(true);
-
-                    if (searchTimeout.current) {
-                      clearTimeout(searchTimeout.current);
-                    }
-                    searchTimeout.current = setTimeout(() => {
-                      fetchGeoapifySuggestions(text);
-                    }, 80);
-                  }}
-                  onSubmitEditing={handleSearch}
-                />
-                {searchText.length > 0 && (
-                  <TouchableOpacity
-                    onPress={async () => {
-                      setSearchText("");
-                      setSearchResults([]);
-                      setShowSearchModal(false);
-                      setSearchMarker(null);
-                      await resetToUserLocation();
-                    }}
-                    style={{ marginLeft: 8 }}
-                  >
-                    <Feather name="x" size={22} color="#333" />
-                  </TouchableOpacity>
-                )}
+                
               </View>
-            </View>
 
             {/* Toggle Map/List */}
             <View style={styles.toggleContainer}>
@@ -644,7 +580,7 @@ export default function MapSelector() {
               keyExtractor={(item) => item.id}
               renderItem={renderScheduleCard}
               contentContainerStyle={{
-                paddingTop: 200,
+                paddingTop: 130,
                 paddingHorizontal: 16,
                 paddingBottom: 20,
               }}
@@ -712,7 +648,7 @@ const styles = StyleSheet.create({
     color: "#666",
     fontFamily: "Poppins_400Regular",
   },
-  toggleContainer: { marginHorizontal: 20, marginTop: 10 },
+  toggleContainer: { marginHorizontal: 20, marginTop: 20 },
   toggleButtons: {
     flexDirection: "row",
     backgroundColor: "#ccc",
@@ -724,7 +660,7 @@ const styles = StyleSheet.create({
   toggleLabel: { fontSize: 15, fontFamily: "Poppins_700Bold", color: "#333" },
   toggleOption: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 15,
     alignItems: "center",
     backgroundColor: "#ccc",
   },
