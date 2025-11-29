@@ -12,21 +12,24 @@ import {
 } from "@expo-google-fonts/poppins";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect } from "react";
+
 import { UserProvider } from "../context/userContext";
 import { EducationalProvider } from "../context/educationalContext";
+
 import { auth, db } from "../../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+
 import { Provider as PaperProvider } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 
-// ✅ FCM FUNCTIONS
+// FCM utilities
 import {
   registerForPushNotificationsAsync,
   listenForTokenRefresh,
   listenForForegroundMessages,
+  forceRefreshToken,
 } from "../utils/notifications";
 
-// Keep splash visible until fonts load
 SplashScreen.preventAutoHideAsync();
 
 export default function Layout() {
@@ -48,9 +51,10 @@ export default function Layout() {
     onLayoutRootView();
   }, [fontsLoaded]);
 
-  // ------------------------------------------------------------
-  // ✅ USER STATUS + FCM (ONLY RUNS IF LOGGED IN)
-  // ------------------------------------------------------------
+  /* ==================================================================
+     🔥 USER STATUS + FCM TOKEN HANDLING
+     This runs ONLY when a user logs in
+     ================================================================== */
   useEffect(() => {
     let appState = AppState.currentState;
     let stateSub = null;
@@ -59,21 +63,31 @@ export default function Layout() {
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
-        console.log("⚠️ No user logged in — skipping FCM + status");
+        console.log("⚠️ No user logged in — skipping FCM");
         return;
       }
 
-      console.log("✅ User detected:", user.email);
+      console.log("👤 Logged in:", user.email);
 
-      // ✅ Register FCM token
-      await registerForPushNotificationsAsync();
+      // ⭐ WAIT for Firebase Auth to be fully ready
+      setTimeout(async () => {
+        console.log("🟢 Initializing Push Notifications…");
 
-      // ✅ Listen for token refresh
+        // DELETE OLD TOKEN FIRST
+        await forceRefreshToken();
+
+        // REQUEST + SAVE NEW TOKEN
+        const newToken = await registerForPushNotificationsAsync();
+        console.log("🔥 FINAL TOKEN (saved):", newToken);
+      }, 500);
+
+      // Token refreshed listener
       tokenSub = listenForTokenRefresh();
 
-      // ✅ Listen for foreground messages
+      // Foreground message listener
       foregroundSub = listenForForegroundMessages();
 
+      // ONLINE / OFFLINE USER PRESENCE
       const userRef = doc(db, "user", user.uid);
 
       const setStatus = async (isOnline) => {
@@ -82,16 +96,12 @@ export default function Layout() {
             online: isOnline,
             lastActive: serverTimestamp(),
           });
-
-          console.log(
-            `✅ ${user.email} set to ${isOnline ? "ONLINE" : "OFFLINE"}`
-          );
+          console.log(`🟢 STATUS: ${isOnline ? "ONLINE" : "OFFLINE"}`);
         } catch (err) {
           console.log("❌ Error updating status:", err);
         }
       };
 
-      // Listen to app background / active state
       stateSub = AppState.addEventListener("change", (next) => {
         if (appState !== next) {
           appState = next;
@@ -99,7 +109,6 @@ export default function Layout() {
         }
       });
 
-      // Initial status
       setStatus(true);
 
       return () => {
@@ -119,7 +128,7 @@ export default function Layout() {
     <SafeAreaProvider>
       <StatusBar style="dark" backgroundColor="#ffffff" />
 
-      <PaperProvider theme={{ dark: false }}>
+      <PaperProvider>
         <UserProvider>
           <EducationalProvider>
             <View

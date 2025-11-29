@@ -50,8 +50,8 @@ const RewardDescription = () => {
   const [cashModalVisible, setCashModalVisible] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState("");
   // ✅ ADD NEW STATE (near other modals)
-  const [confirmOnlineModalVisible, setConfirmOnlineModalVisible] = useState(false);
-
+  const [confirmOnlineModalVisible, setConfirmOnlineModalVisible] =
+    useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -153,7 +153,7 @@ const RewardDescription = () => {
       });
     });
 
-  // ✅ Send notification to all admins (shared adminNotifications collection)
+  
   // ✅ Send notification to all admins (shared adminNotifications collection)
   const notifyAdmins = async (title, body, userId, type = "redemption") => {
     try {
@@ -237,8 +237,9 @@ const RewardDescription = () => {
       // ✅ Create redemption request
       await addDoc(collection(db, "redemptionRequest"), {
         userId: user.uid,
-        name: `${userProfile.firstName || ""} ${userProfile.lastName || ""
-          }`.trim(),
+        name: `${userProfile.firstName || ""} ${
+          userProfile.lastName || ""
+        }`.trim(),
         contact: userProfile.contact || "N/A",
         email: userProfile.email || "",
         rewardId: reward.id,
@@ -261,7 +262,7 @@ const RewardDescription = () => {
       // 🔔 Notify admins
       await notifyAdmins(
         "New Redemption Request",
-        `User <b>${userProfile.firstName} ${userProfile.lastName}</b> requested to redeem <b>${reward.title}</b>.`,
+        `User <b>${userProfile.firstName} ${userProfile.lastName}</b> requested to redeem <b>${reward.title}</b>. It will automatically expire after <b>24 hours</b> if not approved.`,
         user.uid
       );
 
@@ -269,7 +270,7 @@ const RewardDescription = () => {
       await notifyUser(
         user.uid,
         "Redemption Request Submitted",
-        `Your redemption request for <b>${reward.title}</b> has been successfully sent.`
+        `Your redemption request for <b>${reward.title}</b> has been successfully sent. It will automatically expire after <b>24 hours</b> if not approved by PACAFACO.`
       );
 
       setSuccessModalVisible(true);
@@ -354,7 +355,7 @@ const RewardDescription = () => {
       await notifyUser(
         user.uid,
         "Redemption Request Submitted",
-        `Your cash redemption request of ₱${selectedAmount} has been successfully sent.`
+        `Your cash redemption request of ₱${selectedAmount} has been successfully sent. It will automatically expire after <b>24 hours</b> if not approved by PACAFACO.`
       );
       setCashModalVisible(false);
       setSuccessModalVisible(true);
@@ -388,12 +389,9 @@ const RewardDescription = () => {
     if (mode === "online") {
       setConfirmOnlineModalVisible(true);
       return;
-    }
-
-    else if (mode === "onsite") {
+    } else if (mode === "onsite") {
       setConfirmMapModalVisible(true);
-    }
-    else if (mode === "both") {
+    } else if (mode === "both") {
       setChoiceModalVisible(true);
     }
   };
@@ -500,11 +498,7 @@ const RewardDescription = () => {
     reward &&
     !hasPendingRedemption &&
     !isUnavailable &&
-    (isCash
-      ? userPoints > 0
-      : userPoints >= Number(reward.points || 0));
-
-
+    (isCash ? userPoints > 0 : userPoints >= Number(reward.points || 0));
 
   // ✅ Header title logic
   const getHeaderTitle = (category) => {
@@ -572,7 +566,6 @@ const RewardDescription = () => {
               redeeming.
             </Text>
 
-
             {/* Redeem Button */}
             <TouchableOpacity
               activeOpacity={
@@ -585,7 +578,7 @@ const RewardDescription = () => {
               style={[
                 styles.ctaButtonSolid,
                 (!canRedeem || isUnavailable || isSubmitting) &&
-                styles.disabledButton,
+                  styles.disabledButton,
               ]}
               disabled={!canRedeem || isUnavailable || isSubmitting}
             >
@@ -651,13 +644,23 @@ const RewardDescription = () => {
             <TouchableOpacity
               activeOpacity={1}
               style={styles.modalContent}
-              onPress={() => { }}
+              onPress={() => {}}
             >
               <Text style={styles.modalText}>
                 How would you like to redeem this reward?
               </Text>
 
               <View style={{ flexDirection: "row", gap: 10 }}>
+
+                 <TouchableOpacity
+                  style={[styles.choiceButton, { backgroundColor: "#5F934A" }]}
+                  onPress={() => {
+                    setChoiceModalVisible(false);
+                    setConfirmMapModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.okButtonText}>Go to Map</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.choiceButton}
                   onPress={() => {
@@ -668,21 +671,11 @@ const RewardDescription = () => {
                   <Text style={styles.okButtonText}>Request Online</Text>
                 </TouchableOpacity>
 
-
-                <TouchableOpacity
-                  style={[styles.choiceButton, { backgroundColor: "#5F934A" }]}
-                  onPress={() => {
-                    setChoiceModalVisible(false);
-                    setConfirmMapModalVisible(true);
-                  }}
-                >
-                  <Text style={styles.okButtonText}>Go to Map</Text>
-                </TouchableOpacity>
+               
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
-
 
         {/* ⚠️ Confirm Map Modal */}
         <Modal
@@ -748,14 +741,14 @@ const RewardDescription = () => {
                     style={[
                       styles.amountButton,
                       selectedAmount === amount.toString() &&
-                      styles.amountButtonSelected,
+                        styles.amountButtonSelected,
                     ]}
                   >
                     <Text
                       style={[
                         styles.amountButtonText,
                         selectedAmount === amount.toString() &&
-                        styles.amountButtonTextSelected,
+                          styles.amountButtonTextSelected,
                       ]}
                     >
                       ₱{amount}
@@ -792,9 +785,13 @@ const RewardDescription = () => {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalText}>
-                Your redemption request has been sent successfully!{"\n"}Waiting
-                for PACAFACO approval.
+                Your redemption request has been sent successfully!{"\n"}
+                Waiting for PACAFACO approval.{"\n\n"}
+                This request will expire after{" "}
+                <Text style={{ fontWeight: "bold" }}>24 hours</Text> if not
+                approved.
               </Text>
+
               <TouchableOpacity
                 style={styles.okButton}
                 onPress={() => {
@@ -846,7 +843,6 @@ const RewardDescription = () => {
             </View>
           </View>
         </Modal>
-
 
         {/* ❌ Failed Modal */}
         <Modal visible={failedModalVisible} transparent animationType="fade">
