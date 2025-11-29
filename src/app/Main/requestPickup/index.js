@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// src/app/Main/requestPickup/index.jsx
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -16,7 +17,7 @@ import {
 } from "react-native";
 import * as Animatable from "react-native-animatable";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
 
 // 🔥 Firebase
@@ -31,9 +32,49 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
+/* ============================
+   ✅ DATETIME FORMAT UTILS
+============================ */
+
+// format: November 25, 2025 at 3:49 PM
+const formatDateTime = (dateInput) => {
+  if (!dateInput) return "N/A";
+
+  const date = new Date(dateInput);
+
+  if (isNaN(date.getTime())) return dateInput;
+
+  const options = {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  };
+
+  const formatted = new Intl.DateTimeFormat("en-US", options).format(date);
+
+  // Replace comma before time to match: "November 25, 2025 at 3:49 PM"
+  return formatted.replace(",", " at");
+};
+
+// combine scheduledDate + scheduledTime
+const formatScheduledDateTime = (date, time) => {
+  if (!date || !time) return "N/A";
+  return formatDateTime(`${date} ${time}`);
+};
+
 const RequestPickup = () => {
   const router = useRouter();
+  const listRef = useRef(null);
+
+  // 🔹 Params from notifications (pickupRequestId mainly)
+  const params = useLocalSearchParams();
+  const { pickupRequestId } = params;
+
   const [requests, setRequests] = useState([]);
+  const [contributions, setContributions] = useState({});
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState({});
   const [menuOpen, setMenuOpen] = useState(null);
@@ -44,11 +85,45 @@ const RequestPickup = () => {
   const [cancelTargetId, setCancelTargetId] = useState(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [cancelItemId, setCancelItemId] = useState(null);
   const [archiveModalVisible, setArchiveModalVisible] = useState(false);
   const [archiveItemId, setArchiveItemId] = useState(null);
   const [confirmCancelModalVisible, setConfirmCancelModalVisible] =
     useState(false);
+
+  /* ============================
+     Listen to contribution_logs
+     (ONLY the current user's docs)
+  ============================= */
+  useEffect(() => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const contribRef = collection(db, "contribution_logs");
+    const contribQuery = query(contribRef, where("userId", "==", user.uid));
+
+    const unsub = onSnapshot(
+      contribQuery,
+      (snapshot) => {
+        const map = {};
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data.pickupRequestId) {
+            map[data.pickupRequestId] = {
+              id: docSnap.id,
+              ...data,
+            };
+          }
+        });
+        setContributions(map);
+      },
+      (error) => {
+        console.error("contribution_logs listener error:", error);
+      }
+    );
+
+    return () => unsub();
+  }, []);
 
   // Load current user's pickup requests
   useEffect(() => {
@@ -56,31 +131,56 @@ const RequestPickup = () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const q = query(
+    const qRef = query(
       collection(db, "pickupRequests"),
       where("userId", "==", user.uid)
     );
 
-    const unsub = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
+    const unsub = onSnapshot(
+      qRef,
+      (snapshot) => {
+        const data = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
 
-      // ✅ keep ALL requests (only filter archived)
-      const active = data
-        .filter((d) => !d.archived)
-        .sort(
-          (a, b) =>
-            (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
-        );
+        const active = data
+          .filter((d) => !d.archived)
+          .sort(
+            (a, b) =>
+              (b.createdAt?.toMillis?.() || 0) -
+              (a.createdAt?.toMillis?.() || 0)
+          );
 
-      setRequests(active);
-      setLoading(false);
-    });
+        setRequests(active);
+        setLoading(false);
+
+        // ✅ If opened from notification, scroll to that request
+        if (pickupRequestId && listRef.current) {
+          const index = active.findIndex((r) => r.id === pickupRequestId);
+          if (index !== -1) {
+            setTimeout(() => {
+              try {
+                listRef.current.scrollToIndex({
+                  index,
+                  animated: true,
+                  viewPosition: 0.5,
+                });
+              } catch (e) {
+                console.log("scrollToIndex error:", e);
+              }
+            }, 400);
+          }
+        }
+      },
+      (error) => {
+        console.error("pickupRequests listener error:", error);
+        setLoading(false);
+      }
+    );
 
     return () => unsub();
-  }, []);
+  }, [pickupRequestId]);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -136,7 +236,7 @@ const RequestPickup = () => {
 
   const handleCancel = (id) => {
     setCancelTargetId(id);
-    setConfirmCancelModalVisible(true); // 👈 open the first "Are you sure?" modal
+    setConfirmCancelModalVisible(true); // open the first "Are you sure?" modal
   };
 
   const handleEdit = (item) => {
@@ -158,9 +258,44 @@ const RequestPickup = () => {
     const isCollapsed = collapsed[item.id];
     const isMenuOpen = menuOpen === item.id;
 
-    // ✅ disable buttons for completed/cancelled/not approved
+    const status = item.status?.toLowerCase();
+    const isScheduled = status === "scheduled";
+    const isCompleted = status === "completed";
+
+    const contribution = contributions[item.id];
+
+    let displayTypes = item.types?.join(", ") || "N/A";
+    let displayWeight = item.estimatedWeight
+      ? `${item.estimatedWeight} kg`
+      : "N/A";
+    let displayPoints = item.estimatedPoints
+      ? `${item.estimatedPoints} pts`
+      : "N/A";
+    let displayDate = formatDateTime(item.pickupDateTime);
+    let displayAddress = item.pickupAddress || "N/A";
+
+    if (isScheduled) {
+      displayDate = formatScheduledDateTime(
+        item.scheduledDate,
+        item.scheduledTime
+      );
+      displayAddress = item.scheduledAddress || "N/A";
+    }
+
+    if (isCompleted && contribution) {
+      displayTypes = contribution.selectedTypes?.join(", ") || "N/A";
+      displayWeight = contribution.totalActualWeight
+        ? `${contribution.totalActualWeight} kg`
+        : "N/A";
+      displayPoints = contribution.totalPoints
+        ? `${contribution.totalPoints} pts`
+        : "N/A";
+      displayDate = formatDateTime(contribution.pickupDateTime);
+      displayAddress = contribution.collectionAddress || "N/A";
+    }
+
     const disableActions = ["completed", "cancelled", "not approved"].includes(
-      item.status?.toLowerCase()
+      status
     );
 
     return (
@@ -231,28 +366,52 @@ const RequestPickup = () => {
         {!isCollapsed && (
           <>
             <View style={styles.cardContent}>
+              {/* Recyclables */}
               <Text style={styles.cardText}>
-                <Text style={styles.bold}>Recyclables:</Text>{" "}
-                {item.types?.join(", ") || "N/A"}
-              </Text>
-              <Text style={styles.cardText}>
-                <Text style={styles.bold}>Estimated Weight:</Text>{" "}
-                {item.estimatedWeight ? `${item.estimatedWeight} kg` : "N/A"}
-              </Text>
-              <Text style={styles.cardText}>
-                <Text style={styles.bold}>Estimated Points:</Text>{" "}
-                {item.estimatedPoints ? `${item.estimatedPoints} pts` : "N/A"}
+                <Text style={styles.bold}>Recyclables:</Text> {displayTypes}
               </Text>
 
+              {/* Weight */}
               <Text style={styles.cardText}>
-                <Text style={styles.bold}>Datetime:</Text>{" "}
-                {item.pickupDateTime || "N/A"}
+                <Text style={styles.bold}>
+                  {isCompleted ? "Total Actual Weight:" : "Estimated Weight:"}
+                </Text>{" "}
+                {displayWeight}
               </Text>
+
+              {/* Points */}
               <Text style={styles.cardText}>
-                <Text style={styles.bold}>Address:</Text>{" "}
-                {item.pickupAddress || "N/A"}
+                <Text style={styles.bold}>
+                  {isCompleted ? "Total Points Awarded:" : "Estimated Points:"}
+                </Text>{" "}
+                {displayPoints}
               </Text>
-              {/* ✅ Show reason only if provided */}
+
+              {/* Datetime */}
+              <Text style={styles.cardText}>
+                <Text style={styles.bold}>
+                  {isCompleted
+                    ? "Final Datetime:"
+                    : isScheduled
+                      ? "Scheduled Datetime:"
+                      : "Preferred Datetime:"}
+                </Text>{" "}
+                {displayDate}
+              </Text>
+
+              {/* Address */}
+              <Text style={styles.cardText}>
+                <Text style={styles.bold}>
+                  {isCompleted
+                    ? "Final Address:"
+                    : isScheduled
+                      ? "Scheduled Address:"
+                      : "Preferred Address:"}
+                </Text>{" "}
+                {displayAddress}
+              </Text>
+
+              {/* Reason */}
               {(item.reason || item.cancelReason) && (
                 <Text style={styles.cardText}>
                   <Text style={styles.bold}>Reason:</Text>{" "}
@@ -295,6 +454,7 @@ const RequestPickup = () => {
           <ActivityIndicator size="large" style={{ marginTop: 40 }} />
         ) : (
           <FlatList
+            ref={listRef}
             data={requests}
             renderItem={({ item }) => renderCard(item)}
             keyExtractor={(item) => item.id}
@@ -355,8 +515,8 @@ const RequestPickup = () => {
         >
           <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>
-        
-        {/* ✅ Edit Confirmation Modal */}
+
+        {/* Edit Confirmation Modal */}
         {editModalVisible && (
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
@@ -389,76 +549,79 @@ const RequestPickup = () => {
             </View>
           </View>
         )}
+
+        {/* STEP 1: Confirm Cancel Modal */}
+        {confirmCancelModalVisible && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Ionicons name="alert-circle-outline" size={40} color="#d9534f" />
+              <Text style={styles.modalTitle}>Cancel Pickup</Text>
+              <Text style={styles.modalText}>
+                Are you sure you want to cancel this request?
+              </Text>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalCancelBtn]}
+                  onPress={() => setConfirmCancelModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelText}>No</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalConfirmBtn]}
+                  onPress={() => {
+                    setConfirmCancelModalVisible(false);
+                    setCancelModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.modalConfirmText}>Yes</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Archive Modal */}
+        {archiveModalVisible && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Ionicons name="archive-outline" size={40} color="#9370db" />
+              <Text style={styles.modalTitle}>Archive Pickup</Text>
+              <Text style={styles.modalText}>
+                Do you want to move this request to archive?
+              </Text>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalCancelBtn]}
+                  onPress={() => setArchiveModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelText}>No</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalConfirmBtn]}
+                  onPress={async () => {
+                    try {
+                      await updateDoc(
+                        doc(db, "pickupRequests", archiveItemId),
+                        { archived: true }
+                      );
+                      showToast("Pickup request archived.");
+                    } catch (err) {
+                      console.error("Error archiving request:", err);
+                      showToast("Failed to archive request.");
+                    } finally {
+                      setArchiveModalVisible(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.modalConfirmText}>Yes</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
-      {/* STEP 1: Confirm Cancel Modal */}
-      {confirmCancelModalVisible && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Ionicons name="alert-circle-outline" size={40} color="#d9534f" />
-            <Text style={styles.modalTitle}>Cancel Pickup</Text>
-            <Text style={styles.modalText}>
-              Are you sure you want to cancel this request?
-            </Text>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalCancelBtn]}
-                onPress={() => setConfirmCancelModalVisible(false)}
-              >
-                <Text style={styles.modalCancelText}>No</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalConfirmBtn]}
-                onPress={() => {
-                  setConfirmCancelModalVisible(false);
-                  setCancelModalVisible(true); // 👈 open the reason modal next
-                }}
-              >
-                <Text style={styles.modalConfirmText}>Yes</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {archiveModalVisible && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Ionicons name="archive-outline" size={40} color="#9370db" />
-            <Text style={styles.modalTitle}>Archive Pickup</Text>
-            <Text style={styles.modalText}>
-              Do you want to move this request to archive?
-            </Text>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalCancelBtn]}
-                onPress={() => setArchiveModalVisible(false)}
-              >
-                <Text style={styles.modalCancelText}>No</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalConfirmBtn]}
-                onPress={async () => {
-                  try {
-                    await updateDoc(doc(db, "pickupRequests", archiveItemId), {
-                      archived: true,
-                    });
-                    showToast("Pickup request archived.");
-                  } catch (err) {
-                    console.error("Error archiving request:", err);
-                    showToast("Failed to archive request.");
-                  } finally {
-                    setArchiveModalVisible(false);
-                  }
-                }}
-              >
-                <Text style={styles.modalConfirmText}>Yes</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
     </CustomBgColor>
   );
 };
@@ -530,13 +693,18 @@ const styles = StyleSheet.create({
   },
   cardContent: { marginBottom: 10, marginTop: 10 },
   cardText: { fontSize: 13, fontFamily: "Poppins_400Regular", color: "#333" },
-  bold: { flex: 1, fontSize: 13, fontFamily: "Poppins_700Bold", color: "#333" },
+  bold: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
+  },
   buttonRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 12,
-    gap: 10, // perfect spacing between buttons
+    gap: 10,
   },
   cancelBtn: {
     flex: 1,
@@ -558,7 +726,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 24,
     right: 24,
-    backgroundColor: "#2fa64f",
+    backgroundColor: "#008243",
     width: 64,
     height: 64,
     borderRadius: 32,
@@ -570,13 +738,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
   },
-  // Modal styles
+  // Modal styles (reason modal)
   modalOverlay: {
-    flex: 1,
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    zIndex: 999,
   },
   modalContent: {
     width: "100%",
@@ -623,18 +795,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Poppins_700Bold",
   },
-  // 🧭 Modal Styles
-  modalOverlay: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 999,
-  },
+  // Shared modal box (edit / confirm cancel / archive)
   modalBox: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -642,12 +803,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "85%",
     elevation: 8,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontFamily: "Poppins_700Bold",
-    color: "#222",
-    marginTop: 10,
   },
   modalText: {
     fontSize: 15,

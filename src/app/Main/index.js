@@ -37,29 +37,42 @@ const Home = () => {
   const [conversionRates, setConversionRates] = useState([]);
   const [collapsedCategories, setCollapsedCategories] = useState({});
   const [userPoints, setUserPoints] = useState(0);
+  const [lockedPoints, setLockedPoints] = useState(0);
   const router = useRouter();
 
-  // ✅ Fetch and listen to user's current points dynamically
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
 
-    const userRef = doc(db, "user", user.uid);
-    const unsub = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        const points =
-          typeof data.points === "number" && !isNaN(data.points)
-            ? parseFloat(data.points.toFixed(2))
-            : 0;
-        setUserPoints(points);
-      } else {
-        setUserPoints(0);
-      }
-    });
+// ✅ Fetch and listen to user's current points + locked points
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
 
-    return unsub;
-  }, []);
+  const userRef = doc(db, "user", user.uid);
+  const unsub = onSnapshot(userRef, (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+
+      const points =
+        typeof data.points === "number" && !isNaN(data.points)
+          ? parseFloat(data.points.toFixed(2))
+          : 0;
+
+      const locked =
+        typeof data.locked_points === "number" &&
+        !isNaN(data.locked_points)
+          ? parseFloat(data.locked_points.toFixed(2))
+          : 0;
+
+      setUserPoints(points);
+      setLockedPoints(locked);
+    } else {
+      setUserPoints(0);
+      setLockedPoints(0);
+    }
+  });
+
+  return unsub;
+}, []);
+
 
 
   // ✅ Real-time badge for nested notifications path
@@ -155,18 +168,28 @@ const Home = () => {
           </Text>
 
           {/* ✅ Points Section (Dynamic Firestore Data) */}
-          <View style={styles.pointsContainer}>
-            <View style={styles.leftContainer}>
+         <View style={styles.pointsContainer}>
+            <View style={styles.pointsColumn}>
               <Text style={styles.pointsLabel}>Your Total Points</Text>
-              <View style={styles.rowContainer}>
+
+              <View style={styles.pointsRow}>
                 <Image
                   source={require("../../assets/home/lettermarkLogo.png")}
                   style={styles.lettermarkLogo}
                   resizeMode="cover"
                 />
-                <Text style={styles.pointsValueText}>
-                  {userPoints?.toFixed(2) || "0.00"}
-                </Text>
+
+                <View style={styles.pointsTextColumn}>
+                  <Text style={styles.pointsValueText}>
+                    {userPoints?.toFixed(2) || "0.00"}
+                  </Text>
+
+                  {lockedPoints > 0 && (
+                    <Text style={styles.lockedPointsText}>
+                      {lockedPoints.toFixed(2)} pts locked
+                    </Text>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -185,6 +208,7 @@ const Home = () => {
               </TouchableOpacity>
             </View>
           </View>
+
 
           {/* Recycling Guide */}
           <Text style={styles.sectionTitle}>Recycling Guide</Text>
@@ -388,7 +412,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Poppins_700Bold",
     color: "#333",
-  },
+  },  
+pointsColumn: {
+  width: "50%",
+  justifyContent: "center",
+},
+
+pointsRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+},
+
+pointsTextColumn: {
+  justifyContent: "center",
+},
+
+lockedPointsText: {
+  marginTop: 2,
+  fontSize: 13,
+  color: "#555",
+  fontFamily: "Poppins_500Medium",
+},
+
   cell: {
     flex: 1,
     paddingVertical: 12,
