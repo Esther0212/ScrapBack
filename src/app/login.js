@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerForPushNotificationsAsync } from "../utils/notifications";
@@ -33,17 +33,14 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
-
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-  const showToast = (message) => {
-    if (Platform.OS === "android") {
-      ToastAndroid.show(message, ToastAndroid.SHORT);
-    } else {
-      console.log("Toast:", message);
-    }
+  const showToast = (msg, duration = 2000) => {
+    if (Platform.OS === "android") ToastAndroid.show(msg, ToastAndroid.SHORT);
+    else console.log(msg);
   };
 
+  const validateEmail = (e) => {
+    return /^\S+@\S+\.\S+$/.test(e);
+  };
   const handleLogin = async () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
@@ -71,6 +68,25 @@ const Login = () => {
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       console.log("✅ Logged in:", user.uid);
 
+      // 🔎 Check Firestore profile
+      const userDocRef = doc(db, "user", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      const isExistingUser = userDocSnap.exists();
+
+      /* ======================================================
+        🔒 NEW RULE:
+        - New users (no Firestore record) → must verify
+        - Existing users (with Firestore record) → skip verification
+      ====================================================== */
+      if (!isExistingUser && !user.emailVerified) {
+        await signOut(auth); // logout again
+
+        showToast("Please verify your email before logging in.");
+        setLoading(false);
+        return;
+      }
+
       // 🔔 Get push token
       const token = await registerForPushNotificationsAsync();
       if (token) {
@@ -81,25 +97,20 @@ const Login = () => {
         );
       }
 
-      // 🔎 Fetch user profile
-      const userDocRef = doc(db, "user", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (userDocSnap.exists()) {
+      // 📌 Load user profile
+      if (isExistingUser) {
         const profile = userDocSnap.data();
-
-        // ✅ Update context
         setUserData({
           uid: user.uid,
           email: user.email,
           ...profile,
         });
       } else {
-        console.warn("⚠️ No profile found for user:", user.uid);
+        // first-time login (verified)
         setUserData({ uid: user.uid, email: user.email });
       }
 
-      // 💾 Remember credentials
+      // 💾 Remember Me
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", email);
         await AsyncStorage.setItem("savedPassword", password);
@@ -108,29 +119,27 @@ const Login = () => {
         await AsyncStorage.removeItem("savedPassword");
       }
 
-      // ✅ Success toast
-      showToast("Login successful! Welcome back!");
+      showToast(isExistingUser ? "Welcome back!" : "Account verified!");
 
-      // Small delay for a smooth transition
       setTimeout(() => {
         router.replace("/Main");
-      }, 1000);
+      }, 800);
+
     } catch (error) {
       console.error("FULL LOGIN ERROR:", error);
-      let message = "Login failed. Please try again.";
-      if (error.code === "auth/invalid-email")
-        message = "Invalid email address.";
-      else if (error.code === "auth/user-not-found")
-        message = "User not found.";
-      else if (error.code === "auth/wrong-password")
-        message = "Incorrect password.";
 
-      // ⚠️ Error toast
+      let message = "Login failed. Please try again.";
+      if (error.code === "auth/invalid-email") message = "Invalid email address.";
+      else if (error.code === "auth/user-not-found") message = "User not found.";
+      else if (error.code === "auth/wrong-password") message = "Incorrect password.";
+
       showToast("❌ " + message);
+
     } finally {
       setLoading(false);
     }
   };
+
 
   // Auto-load saved creds
   useEffect(() => {
@@ -138,6 +147,7 @@ const Login = () => {
       try {
         const savedEmail = await AsyncStorage.getItem("savedEmail");
         const savedPassword = await AsyncStorage.getItem("savedPassword");
+
         if (savedEmail && savedPassword) {
           setEmail(savedEmail);
           setPassword(savedPassword);
@@ -147,6 +157,7 @@ const Login = () => {
         console.log("Error loading saved creds:", e);
       }
     };
+
     loadSaved();
   }, []);
 
@@ -230,8 +241,8 @@ const Login = () => {
           {/* Login button */}
           <TouchableOpacity
             style={styles.loginButton}
-            activeOpacity={0.8}
             onPress={handleLogin}
+            activeOpacity={0.8}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -317,17 +328,12 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 14,
     alignItems: "center",
-    shadowColor: "rgba(0, 0, 0, 1)",
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 5,
     elevation: 4,
   },
   loginButtonText: {
     color: "#FFFFFF",
     fontSize: 18,
     fontFamily: "Poppins_700Bold",
-    letterSpacing: 0.5,
   },
   signupLink: { marginTop: 24, alignItems: "center" },
   signupText: {
