@@ -45,6 +45,12 @@
       android:resource="@drawable/ic_notification"
       tools:replace="android:resource"/>
 
+    <!-- ✅ FORCE CUSTOM COLOR (FIXES YOUR ERROR) -->
+    <meta-data
+      android:name="com.google.firebase.messaging.default_notification_color"
+      android:resource="@color/notification_color"
+      tools:replace="android:resource"/>
+
     <activity
       android:name=".MainActivity"
       android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
