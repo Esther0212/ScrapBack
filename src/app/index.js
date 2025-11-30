@@ -16,6 +16,8 @@ import upperVector from '../assets/splash/upperVector.png';
 import lowerVector from '../assets/splash/lowerVector.png';
 import scrap from '../assets/splash/scrap.png';
 import back from '../assets/splash/back.png';
+import { auth } from "../../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,6 +25,18 @@ const D = 800;
 const P = 300;
 
 export default function Splash() {
+
+    // 🔥 AUTO-REDIRECT IF USER IS ALREADY LOGGED IN
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.replace("/Main");  // ← CHANGE THIS TO YOUR REAL HOME ROUTE
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
   const hasSkipped = useRef(false);
 
   const bg = useRef(new Animated.Value(0)).current;

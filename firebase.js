@@ -1,6 +1,10 @@
 // ✅ Import Firebase JS SDK (Web SDK compatible with React Native)
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { 
+  initializeAuth,
+  getReactNativePersistence 
+} from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -16,7 +20,12 @@ const firebaseConfig = {
 
 // ✅ Initialize Firebase (only once)
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+
+// 🚨 IMPORTANT: Use initializeAuth() for persistent login on APK
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
+
 const db = getFirestore(app);
 const storage = getStorage(app);
 
