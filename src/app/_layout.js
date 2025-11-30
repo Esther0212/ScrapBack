@@ -21,6 +21,7 @@ import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 import { Provider as PaperProvider } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
+import messaging from "@react-native-firebase/messaging"; // ← ADD THIS
 
 // FCM utilities
 import {
@@ -63,11 +64,31 @@ export default function Layout() {
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
-        console.log("⚠️ No user logged in — skipping FCM");
+        console.log("⚠️ No user logged in — clearing FCM token");
+
+        try {
+          await messaging().deleteToken();
+          console.log("🗑 Cleared FCM token (no user)");
+        } catch (e) {
+          console.log("⚠️ Failed to clear token:", e);
+        }
+
         return;
       }
 
       console.log("👤 Logged in:", user.email);
+
+      // ❤️ HEARTBEAT: update lastActive every 30 seconds
+      const heartbeat = setInterval(async () => {
+        try {
+          await updateDoc(doc(db, "user", user.uid), {
+            lastActive: serverTimestamp(),
+          });
+          console.log("❤️ heartbeat updated");
+        } catch (e) {
+          console.log("heartbeat failed:", e);
+        }
+      }, 30000); // 30 seconds
 
       // ⭐ WAIT for Firebase Auth to be fully ready
       setTimeout(async () => {
@@ -115,6 +136,7 @@ export default function Layout() {
         stateSub?.remove?.();
         tokenSub?.();
         foregroundSub?.();
+        clearInterval(heartbeat); // stop heartbeat
         setStatus(false);
       };
     });

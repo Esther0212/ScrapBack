@@ -19,6 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { db } from "../../../../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import messaging from "@react-native-firebase/messaging"; // ← ADD THIS
 
 const Settings = () => {
   const router = useRouter();
@@ -28,30 +29,37 @@ const Settings = () => {
   const [savedUsers, setSavedUsers] = useState([]);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
- const handleLogout = async () => {
-  try {
-    const user = auth.currentUser;
-    if (user) {
-      // 👇 Mark user offline in Firestore before logging out
-      await updateDoc(doc(db, "user", user.uid), {
-        online: false,
-        lastActive: serverTimestamp(),
-      });
-      console.log("✅ Marked user offline before logout");
+  const handleLogout = async () => {
+    try {
+      const user = auth.currentUser;
+
+      if (user) {
+        // Mark user offline
+        await updateDoc(doc(db, "user", user.uid), {
+          online: false,
+          lastActive: serverTimestamp(),
+          fcmToken: "", // remove token in Firestore
+        });
+
+        console.log("🔻 User offline + token removed in Firestore");
+      }
+
+      // 🔥 Remove FCM token from device + Firestore
+      await messaging().deleteToken();
+      console.log("🗑 Device FCM token deleted");
+
+      // Sign out from Firebase
+      await signOut(auth);
+
+      // Clear local data if needed
+      await AsyncStorage.removeItem("lastUsedUser");
+
+      router.replace("/login");
+    } catch (error) {
+      console.error("Logout Failed:", error);
+      Alert.alert("Logout Failed", error.message);
     }
-
-    // 🔐 Now sign them out from Firebase
-    await signOut(auth);
-
-    // 🧹 Optional: clear any locally stored session
-    await AsyncStorage.removeItem("lastUsedUser");
-
-    router.replace("/login");
-  } catch (error) {
-    console.error("Logout Failed:", error);
-    Alert.alert("Logout Failed", error.message);
-  }
-};
+  };
 
   // Load saved accounts
   useEffect(() => {
@@ -68,41 +76,6 @@ const Settings = () => {
     fetchUsers();
   }, []);
 
-  const handleSwitch = async (user) => {
-    try {
-      const auth = getAuth();
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        user.email,
-        user.password
-      );
-
-      await AsyncStorage.setItem("lastUsedUser", JSON.stringify(user));
-
-      Alert.alert(
-        "Switch Account",
-        `Now logged in as ${user.firstName} ${user.lastName}`
-      );
-
-      setModalVisible(false);
-      router.replace("/Main");
-    } catch (error) {
-      Alert.alert("Switch Failed", error.message);
-    }
-  };
-
-  const handleRemoveAccount = async (uid) => {
-    try {
-      const users = JSON.parse(await AsyncStorage.getItem("savedUsers")) || [];
-      const updatedUsers = users.filter((u) => u.uid !== uid);
-      await AsyncStorage.setItem("savedUsers", JSON.stringify(updatedUsers));
-      setSavedUsers(updatedUsers);
-      Alert.alert("Removed", "Account has been removed from switch list.");
-    } catch (err) {
-      console.error("Error removing user:", err);
-      Alert.alert("Error", "Failed to remove account. Please try again.");
-    }
-  };
 
   // helper: profile image fallback
   const getProfileImageSource = (profilePic) => {

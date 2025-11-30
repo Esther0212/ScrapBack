@@ -126,3 +126,29 @@ export function listenForForegroundMessages() {
 messaging().setBackgroundMessageHandler(async (remoteMessage) => {
   console.log("🌙 BACKGROUND NOTIFICATION RECEIVED:", remoteMessage);
 });
+
+/* =========================================================
+   ❌ DELETE TOKEN FOR CURRENT USER (logout / switch)
+   ========================================================= */
+export async function removeDeviceTokenForCurrentUser() {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    console.log("🗑 Removing FCM token for user:", user.uid);
+
+    // delete device token
+    await messaging().deleteToken();
+
+    // remove from Firestore
+    await setDoc(
+      doc(db, "user", user.uid),
+      { fcmToken: "" },
+      { merge: true }
+    );
+
+  } catch (err) {
+    console.log("❌ Error removing token:", err);
+  }
+}
+
