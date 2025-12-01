@@ -12,6 +12,8 @@ import {
   SafeAreaView,
   StyleSheet,
   TouchableOpacity,
+  FlatList,
+  useColorScheme,
 } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
@@ -93,6 +95,8 @@ export default function MapSelector() {
   const { userData } = useUser();
   const router = useRouter();
   const params = useLocalSearchParams();
+
+  const systemTheme = useColorScheme(); // "light" | "dark"
 
   const mapRef = useRef(null);
   const userRegionRef = useRef(null);
@@ -477,8 +481,14 @@ export default function MapSelector() {
     <CustomBgColor>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.container}>
-          {/* Top Controls (Map/List toggle + helper text) */}
-          <View style={styles.topOverlayContainer}>
+          {/* 🔍 Search + Tabs + Header Actions (copy UX; only LIST tab gets edit controls) */}
+          <View
+            style={[
+              styles.topOverlayContainer,
+              selectedView === "list" && styles.listTabBackground,
+            ]}
+          >
+            {/* Tabs + Header Actions */}
             <View style={styles.toggleContainer}>
               <View style={styles.toggleButtons}>
                 <TouchableOpacity
@@ -497,7 +507,6 @@ export default function MapSelector() {
                     Map
                   </Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
                   style={[
                     styles.toggleOption,
@@ -517,9 +526,22 @@ export default function MapSelector() {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.toggleLabelBox}>
-                <Text style={styles.toggleLabel}>
-                  View Collection Points Around You
+              {/* Header row with label + edit controls */}
+              <View style={styles.headerRow}>
+                {/* ONLY the label text color follows the MapView/OS color scheme.
+                    When on the MAP tab: text color = white if system dark, black if system light.
+                    When on the LIST tab: text color always black (as requested). */}
+                <Text
+                  style={[
+                    styles.toggleLabel,
+                    selectedView === "map" && {
+                      color: systemTheme === "dark" ? "#FFFFFF" : "#000000",
+                      color: systemTheme === "light" ? "#000000" : "#FFFFFF",
+                    },
+                    selectedView === "list" && { color: "#000000" },
+                  ]}
+                >
+                  Manage Nearby Collection Points
                 </Text>
               </View>
             </View>
@@ -588,20 +610,21 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
+    paddingBottom: 0,
   },
+  listTabBackground: { backgroundColor: "#F0F1C5" },
+
   toggleContainer: { marginHorizontal: 20, marginTop: 45 },
   toggleButtons: {
     flexDirection: "row",
     backgroundColor: "#ccc",
     borderRadius: 10,
     overflow: "hidden",
-    marginBottom: 10,
-  },
-  toggleLabelBox: { marginVertical: 10 },
-  toggleLabel: {
-    fontSize: 15,
-    fontFamily: "Poppins_700Bold",
-    color: "#333",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   toggleOption: {
     flex: 1,
@@ -612,12 +635,24 @@ const styles = StyleSheet.create({
   toggleSelected: { backgroundColor: "white" },
   toggleOptionText: {
     fontSize: 15,
-    fontFamily: "Poppins_400Regular",
     color: "#555",
+    fontFamily: "Poppins_400Regular",
   },
   toggleOptionTextSelected: {
     color: "#117D2E",
     fontFamily: "Poppins_700Bold",
+  },
+
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 10,
+    alignItems: "center",
+  },
+  toggleLabel: {
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    paddingTop: 10,
   },
 
   scheduleCard: {
