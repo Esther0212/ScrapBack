@@ -95,6 +95,19 @@ export default function profileLayout() {
           ),
         }}
       />
+      <Stack.Screen
+        name="about"
+        options={{
+          title: "About PACAFACO",
+          headerShown: true,
+          headerBackVisible: false,
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="chevron-back-outline" size={24} color="black" />
+            </TouchableOpacity>
+          ),
+        }}
+      />
     </Stack>
   );
 }

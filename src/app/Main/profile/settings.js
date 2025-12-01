@@ -144,6 +144,7 @@ const Settings = () => {
               />
             }
             label="About PACAFACO"
+            onPress={() => router.push("/Main/profile/about")}
           />
         </View>
 

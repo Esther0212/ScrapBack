@@ -518,16 +518,23 @@ export default function PickupRequestForm() {
         console.error("Could not fetch user profile:", err);
       }
 
+      // ⭐⭐⭐ ROUND ESTIMATED POINTS TO 2 DECIMAL PLACES ⭐⭐⭐
+      const roundedPoints = Number(totalPoints.toFixed(2));
+
       if (requestId) {
+        // ⭐ UPDATE EXISTING REQUEST ⭐
         await updateDoc(doc(db, "pickupRequests", requestId), {
           types: selectedTypes,
           weights: weights,
-          estimatedWeight: totalWeight,
+          estimatedWeight: Number(totalWeight.toFixed(2)), // optional rounding
           pickupDateTime,
           pickupAddress,
           pickupDate: date,
-          estimatedPoints: totalPoints,
-          coords: markerCoords, // { latitude, longitude } – same as map
+
+          // ⭐ Correct rounded value saved here
+          estimatedPoints: roundedPoints,
+
+          coords: markerCoords,
           photoUrl: photo || null,
           seenByAdmin: false,
           updatedAt: serverTimestamp(),
@@ -535,7 +542,7 @@ export default function PickupRequestForm() {
 
         await addDoc(collection(db, "adminNotifications"), {
           title: "Pickup Request Updated",
-          body: `User <b>${displayName}</b> updated a request at ${pickupAddress}. Click for more details.`,
+          body: `User <b>${displayName}</b> updated a request at ${pickupAddress}.`,
           userId: user.uid,
           createdAt: serverTimestamp(),
           read: false,
@@ -544,18 +551,22 @@ export default function PickupRequestForm() {
         });
 
         showAnimatedToast("Pickup request updated!");
-        setTimeout(() => router.push("/Main/requestPickup"), 2000);
+        setTimeout(() => router.push("/Main/requestPickup"), 1000);
       } else {
+        // ⭐ CREATE NEW REQUEST ⭐
         const newDoc = await addDoc(collection(db, "pickupRequests"), {
           userId: user.uid,
           types: selectedTypes,
           weights: weights,
-          estimatedWeight: totalWeight,
+          estimatedWeight: Number(totalWeight.toFixed(2)), // optional rounding
           pickupDateTime,
           pickupDate: date,
-          estimatedPoints: totalPoints,
+
+          // ⭐ Correct rounded value saved here
+          estimatedPoints: roundedPoints,
+
           pickupAddress,
-          coords: markerCoords, // { latitude, longitude }
+          coords: markerCoords,
           photoUrl: photo || null,
           status: "pending",
           seenByAdmin: false,
@@ -564,7 +575,7 @@ export default function PickupRequestForm() {
 
         await addDoc(collection(db, "adminNotifications"), {
           title: "New Pickup Request",
-          body: `User <b>${displayName}</b> created a new request for ${pickupAddress}. Click for more details.`,
+          body: `User <b>${displayName}</b> created a new request for ${pickupAddress}.`,
           userId: user.uid,
           createdAt: serverTimestamp(),
           type: "new",
@@ -573,7 +584,7 @@ export default function PickupRequestForm() {
         });
 
         showAnimatedToast("Pickup request created!");
-        setTimeout(() => router.push("/Main/requestPickup"), 2000);
+        setTimeout(() => router.push("/Main/requestPickup"), 1000);
       }
 
       return true;
@@ -1098,7 +1109,7 @@ export default function PickupRequestForm() {
                           }).start(() => {
                             requestAnimationFrame(() => setToastVisible(false));
                           });
-                        }, 2000);
+                        }, 1000);
                       });
                     });
                   }}

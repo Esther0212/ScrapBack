@@ -144,6 +144,7 @@ const ChangePassword = () => {
                 placeholder="Enter current password"
                 secureTextEntry={!showCurrent}
                 value={currentPassword}
+                autoCapitalize="none"
                 onChangeText={(text) => {
                   setCurrentPassword(text);
                   setPasswordStatus(null);
@@ -182,6 +183,7 @@ const ChangePassword = () => {
                 placeholder="Enter new password"
                 secureTextEntry={!showNew}
                 value={newPassword}
+                autoCapitalize="none"
                 onChangeText={(text) => setNewPassword(text)}
                 placeholderTextColor="#777"
               />
@@ -214,6 +216,7 @@ const ChangePassword = () => {
                 placeholder="Re-enter new password"
                 secureTextEntry={!showConfirm}
                 value={confirmPassword}
+                autoCapitalize="none"
                 onChangeText={setConfirmPassword}
                 placeholderTextColor="#777"
               />
