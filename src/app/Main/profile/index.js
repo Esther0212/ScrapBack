@@ -141,8 +141,6 @@ const Profile = () => {
     };
   }, [userData?.uid]);
   
-
-  // 🔹 Render grouped list
 // 🔹 Render grouped list
 const renderGroupedList = (groupedData, type = "points") => (
   <FlatList
@@ -165,6 +163,8 @@ const renderGroupedList = (groupedData, type = "points") => (
                 key={log.id}
                 style={[
                   styles.logCard,
+                  type === "points" && { borderColor: "#3cd38aff" },
+                  type === "rewards" && { borderColor: "#FF6B6B" },
                   isVoided && {
                     opacity: 0.7,
                     backgroundColor: "#FFF1F1",

@@ -13,8 +13,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  sendEmailVerification,
+} from "firebase/auth";
+
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerForPushNotificationsAsync } from "../utils/notifications";
 
@@ -24,6 +31,37 @@ import { useUser } from "../context/userContext";
 
 const { width } = Dimensions.get("window");
 
+/////////////////////////////////////////////////////////////////
+// 🟩 NEW FUNCTION — compare only DATE part (ignore time)
+/////////////////////////////////////////////////////////////////
+function isDateTodayOrAfter(createdAt) {
+  if (!createdAt) return false;
+
+  try {
+    const created = new Date(createdAt);
+    const today = new Date();
+
+    // Strip time
+    created.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    // If created date is today or later → NEW USER
+    return created.getTime() >= today.getTime();
+  } catch (e) {
+    console.log("Date compare error:", e);
+    return false;
+  }
+}
+
+/////////////////////////////////////////////////////////////////
+// ⚠️ NOTE: createdAt must exist in Firestore user doc!
+// Use this on signup:
+// await setDoc(doc(db, "user", uid), { ..., createdAt: serverTimestamp() })
+/////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////
+// MAIN LOGIN COMPONENT
+/////////////////////////////////////////////////////////////////
 const Login = () => {
   const { setUserData } = useUser();
 
@@ -33,14 +71,23 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
-  const showToast = (msg, duration = 2000) => {
-    if (Platform.OS === "android") ToastAndroid.show(msg, ToastAndroid.SHORT);
-    else console.log(msg);
+
+  /////////////////////////////////////////////////////////////////
+  // Validation helpers
+  /////////////////////////////////////////////////////////////////
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const showToast = (message) => {
+    if (Platform.OS === "android") {
+      ToastAndroid.show(message, ToastAndroid.LONG);
+    } else {
+      console.log("Toast:", message);
+    }
   };
 
-  const validateEmail = (e) => {
-    return /^\S+@\S+\.\S+$/.test(e);
-  };
+  /////////////////////////////////////////////////////////////////
+  // 🟩 UPDATED LOGIN LOGIC — EMAIL VERIFICATION FOR NEW USERS ONLY
+  /////////////////////////////////////////////////////////////////
   const handleLogin = async () => {
     let tempErrors = { email: "", password: "" };
     let isValid = true;
@@ -64,53 +111,79 @@ const Login = () => {
     try {
       setLoading(true);
 
-      // 🔐 Firebase sign-in
+      /////////////////////////////////////////////////////////////////
+      // 🔐 Sign In With Firebase
+      /////////////////////////////////////////////////////////////////
       const { user } = await signInWithEmailAndPassword(auth, email, password);
-      console.log("✅ Logged in:", user.uid);
+      console.log("USER LOGGED IN:", user.uid);
 
-      // 🔎 Check Firestore profile
+      /////////////////////////////////////////////////////////////////
+      // 🔍 FETCH USER DOCUMENT (must contain createdAt)
+      /////////////////////////////////////////////////////////////////
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
-      const isExistingUser = userDocSnap.exists();
+      let createdAt = null;
+      let userDataFirestore = null;
 
-      /* ======================================================
-        🔒 NEW RULE:
-        - New users (no Firestore record) → must verify
-        - Existing users (with Firestore record) → skip verification
-      ====================================================== */
-      if (!isExistingUser && !user.emailVerified) {
-        await signOut(auth); // logout again
+      if (userDocSnap.exists()) {
+        userDataFirestore = userDocSnap.data();
+        createdAt = userDataFirestore.createdAt?.toDate
+          ? userDataFirestore.createdAt.toDate()
+          : userDataFirestore.createdAt;
 
-        showToast("Please verify your email before logging in.");
-        setLoading(false);
-        return;
+        console.log("Firestore createdAt:", createdAt);
       }
 
-      // 🔔 Get push token
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        await setDoc(
-          doc(db, "user", user.uid),
-          { expoPushToken: token },
-          { merge: true }
+      /////////////////////////////////////////////////////////////////
+      // 🟨 CASE 1: User has NO createdAt → Old User → Allow login
+      /////////////////////////////////////////////////////////////////
+      if (!createdAt) {
+        console.log(
+          "NO createdAt → treat as OLD user (no verification needed)"
         );
       }
 
-      // 📌 Load user profile
-      if (isExistingUser) {
-        const profile = userDocSnap.data();
-        setUserData({
-          uid: user.uid,
-          email: user.email,
-          ...profile,
-        });
+      /////////////////////////////////////////////////////////////////
+      // 🟥 CASE 2: User is NEW (created today or after)
+      /////////////////////////////////////////////////////////////////
+      const isNewUser = createdAt && isDateTodayOrAfter(createdAt);
+
+      if (isNewUser) {
+        console.log("User is NEW → Must verify email");
+
+        if (!user.emailVerified) {
+          await signOut(auth);
+          showToast(
+            "Please verify your email before logging in. Check your inbox."
+          );
+          setLoading(false);
+          return;
+        }
       } else {
-        // first-time login (verified)
-        setUserData({ uid: user.uid, email: user.email });
+        console.log("User is OLD → email verification NOT required");
       }
 
-      // 💾 Remember Me
+      /////////////////////////////////////////////////////////////////
+      // 🔔 Register for push notifications
+      /////////////////////////////////////////////////////////////////
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await setDoc(userDocRef, { expoPushToken: token }, { merge: true });
+      }
+
+      /////////////////////////////////////////////////////////////////
+      // Set global context user data
+      /////////////////////////////////////////////////////////////////
+      setUserData({
+        uid: user.uid,
+        email: user.email,
+        ...userDataFirestore,
+      });
+
+      /////////////////////////////////////////////////////////////////
+      // 💾 Handle Remember Me
+      /////////////////////////////////////////////////////////////////
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", email);
         await AsyncStorage.setItem("savedPassword", password);
@@ -119,29 +192,34 @@ const Login = () => {
         await AsyncStorage.removeItem("savedPassword");
       }
 
-      showToast(isExistingUser ? "Welcome back!" : "Account verified!");
+      /////////////////////////////////////////////////////////////////
+      // NAVIGATE
+      /////////////////////////////////////////////////////////////////
+      showToast("Login successful! Welcome back!");
 
       setTimeout(() => {
         router.replace("/Main");
-      }, 800);
-
+      }, 1000);
     } catch (error) {
       console.error("FULL LOGIN ERROR:", error);
 
       let message = "Login failed. Please try again.";
-      if (error.code === "auth/invalid-email") message = "Invalid email address.";
-      else if (error.code === "auth/user-not-found") message = "User not found.";
-      else if (error.code === "auth/wrong-password") message = "Incorrect password.";
+      if (error.code === "auth/invalid-email")
+        message = "Invalid email address.";
+      else if (error.code === "auth/user-not-found")
+        message = "User not found.";
+      else if (error.code === "auth/wrong-password")
+        message = "Incorrect password.";
 
-      showToast("❌ " + message);
-
+      showToast(message);
     } finally {
       setLoading(false);
     }
   };
 
-
-  // Auto-load saved creds
+  /////////////////////////////////////////////////////////////////
+  // Load saved login info
+  /////////////////////////////////////////////////////////////////
   useEffect(() => {
     const loadSaved = async () => {
       try {
@@ -161,6 +239,9 @@ const Login = () => {
     loadSaved();
   }, []);
 
+  /////////////////////////////////////////////////////////////////
+  // RETURN UI
+  /////////////////////////////////////////////////////////////////
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
@@ -168,7 +249,7 @@ const Login = () => {
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Login to your account</Text>
 
-          {/* Email */}
+          {/* EMAIL FIELD */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email address</Text>
             <TextInput
@@ -188,7 +269,7 @@ const Login = () => {
             ) : null}
           </View>
 
-          {/* Password */}
+          {/* PASSWORD FIELD */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordWrapper}>
@@ -197,7 +278,11 @@ const Login = () => {
                 placeholderTextColor="#888"
                 style={styles.input}
                 secureTextEntry={!passwordVisible}
+                autoCapitalize="none"
                 value={password}
+                contextMenuHidden={true} // hides copy/paste menu
+                editable={true}
+                selectTextOnFocus={false} // prevents selecting/pasting
                 onChangeText={(text) => {
                   setPassword(text);
                   setErrors((prev) => ({ ...prev, password: "" }));
@@ -219,7 +304,7 @@ const Login = () => {
             ) : null}
           </View>
 
-          {/* Remember Me + Forgot Password */}
+          {/* REMEMBER ME + FORGOT PASSWORD */}
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.rememberMe}
@@ -238,11 +323,12 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Login button */}
+          {/* LOGIN BUTTON */}
           <TouchableOpacity
             style={styles.loginButton}
             onPress={handleLogin}
             activeOpacity={0.8}
+            disabled={loading}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -251,7 +337,7 @@ const Login = () => {
             )}
           </TouchableOpacity>
 
-          {/* Signup link */}
+          {/* SIGNUP LINK */}
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => router.push("/signup")}
@@ -267,6 +353,9 @@ const Login = () => {
   );
 };
 
+/////////////////////////////////////////////////////////////////
+// STYLESHEET
+/////////////////////////////////////////////////////////////////
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },

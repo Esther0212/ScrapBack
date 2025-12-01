@@ -16,6 +16,7 @@ import {
   FlatList,
   Linking,
   SafeAreaView,
+  useColorScheme,
 } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
@@ -99,6 +100,8 @@ export default function MapSelector() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  const systemTheme = useColorScheme(); // "light" | "dark"
+
   const mapRef = useRef(null);
   const userRegionRef = useRef(null);
 
@@ -112,10 +115,6 @@ export default function MapSelector() {
   const [marker, setMarker] = useState(null); // user location
   const [searchMarker, setSearchMarker] = useState(null); // searched location
   const [pickupFocusMarker, setPickupFocusMarker] = useState(null); // scheduled pickup marker (state kept, but no purple pin rendered)
-
-  const [searchResults, setSearchResults] = useState([]);
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const searchTimeout = useRef(null);
 
   const [points, setPoints] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -340,32 +339,6 @@ export default function MapSelector() {
   }, [flattenedData]);
 
   /* ================================
-     SEARCH HANDLER
-  ================================= */
-  const handleSearch = async () => {
-    if (!searchText) return;
-    try {
-      const results = await Location.geocodeAsync(searchText);
-      if (results.length > 0) {
-        const { latitude, longitude } = results[0];
-        const newRegion = {
-          latitude,
-          longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        };
-        setRegion(newRegion);
-        setSearchMarker({ latitude, longitude });
-        setPickupFocusMarker(null);
-        mapRef.current?.animateToRegion(newRegion, 1000);
-        Keyboard.dismiss();
-      }
-    } catch (error) {
-      console.error("Search failed:", error);
-    }
-  };
-
-  /* ================================
      OPEN GOOGLE MAPS
   ================================= */
   const openGoogleMaps = (lat, lng) => {
@@ -456,7 +429,7 @@ export default function MapSelector() {
   ================================= */
   return (
     <CustomBgColor>
-      <SafeAreaView style={{ flex: 1, paddingTop: 25 }}>
+      <SafeAreaView style={{ flex: 1,}}>
         <View style={styles.container}>
           
 
@@ -467,12 +440,6 @@ export default function MapSelector() {
               selectedView === "list" && styles.listTabBackground,
             ]}
           >
-            {/* Search */}
-              <View
-                style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
-              >
-                
-              </View>
 
             {/* Toggle Map/List */}
             <View style={styles.toggleContainer}>
@@ -513,7 +480,16 @@ export default function MapSelector() {
                 </TouchableOpacity>
               </View>
               <View style={styles.toggleLabelBox}>
-                <Text style={styles.toggleLabel}>
+                <Text
+                  style={[
+                    styles.toggleLabel,
+                    selectedView === "map" && {
+                      color: systemTheme === "dark" ? "#FFFFFF" : "#000000",
+                      color: systemTheme === "light" ? "#000000" : "#FFFFFF",
+                    },
+                    selectedView === "list" && { color: "#000000" },
+                  ]}
+                >
                   View Collection Points Around You
                 </Text>
               </View>
@@ -580,7 +556,7 @@ export default function MapSelector() {
               keyExtractor={(item) => item.id}
               renderItem={renderScheduleCard}
               contentContainerStyle={{
-                paddingTop: 130,
+                paddingTop: 155,
                 paddingHorizontal: 16,
                 paddingBottom: 20,
               }}
@@ -605,50 +581,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   listTabBackground: { backgroundColor: "#F0F1C5" },
-  searchBox: {
-    backgroundColor: "white",
-    borderRadius: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    elevation: 3,
-    marginHorizontal: 20,
-    marginTop: 30,
-  },
-  searchInput: { flex: 1, fontSize: 15, fontFamily: "Poppins_400Regular" },
-  searchModal: {
-    position: "absolute",
-    top: 95,
-    left: 20,
-    right: 20,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    maxHeight: 250,
-    zIndex: 999,
-  },
-  searchResultItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  resultTitle: {
-    fontSize: 16,
-    fontFamily: "Poppins_700Bold",
-    color: "#333",
-  },
-  resultSubtitle: {
-    fontSize: 13,
-    color: "#666",
-    fontFamily: "Poppins_400Regular",
-  },
-  toggleContainer: { marginHorizontal: 20, marginTop: 20 },
+  toggleContainer: { marginHorizontal: 20, marginTop: 45 },
   toggleButtons: {
     flexDirection: "row",
     backgroundColor: "#ccc",

@@ -11,6 +11,7 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, FontAwesome } from "@expo/vector-icons";
@@ -738,6 +739,8 @@ const AccountInfo = () => {
               value={email}
               setValue={setEmail}
               editable={editMode}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
             <InputField
               label="Contact Number"
@@ -1056,6 +1059,7 @@ const InputField = ({
   dynamicHeight,
   onHeightChange,
   placeholder,
+  autoCapitalize = "sentences",
 }) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
@@ -1066,6 +1070,10 @@ const InputField = ({
       placeholder={placeholder} // ← ADD THIS
       placeholderTextColor="#9F9F9F"
       multiline={multiline}
+      autoCapitalize={autoCapitalize}
+      blurOnSubmit={true}             // ← KEEP DONE BUTTON
+      returnKeyType="done"            // ← SHOW DONE BUTTON
+      onSubmitEditing={() => Keyboard.dismiss()} // ← CLOSE KEYBOARD
       onContentSizeChange={(e) => {
         if (multiline && onHeightChange) {
           const newHeight = e.nativeEvent.contentSize.height;
@@ -1079,9 +1087,10 @@ const InputField = ({
         {
           color: editable ? "#3A2E2E" : "#777",
           height: multiline ? dynamicHeight : 55,
-          textAlignVertical: multiline ? "top" : "center",
+          textAlignVertical: multiline ? "center" : "center",
         },
       ]}
+      keyboardType={keyboardType || "default"}
     />
   </View>
 );
