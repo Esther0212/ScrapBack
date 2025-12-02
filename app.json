@@ -33,7 +33,21 @@
 
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CALL_PHONE"                   
+      ],
+
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "www.facebook.com"
+            }
+          ]
+        }
       ],
 
       "edgeToEdgeEnabled": true,

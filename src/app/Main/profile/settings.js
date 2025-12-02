@@ -19,7 +19,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { db } from "../../../../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import messaging from "@react-native-firebase/messaging"; // ← ADD THIS
 
 const Settings = () => {
   const router = useRouter();
@@ -29,37 +28,30 @@ const Settings = () => {
   const [savedUsers, setSavedUsers] = useState([]);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
-  const handleLogout = async () => {
-    try {
-      const user = auth.currentUser;
-
-      if (user) {
-        // Mark user offline
-        await updateDoc(doc(db, "user", user.uid), {
-          online: false,
-          lastActive: serverTimestamp(),
-          fcmToken: "", // remove token in Firestore
-        });
-
-        console.log("🔻 User offline + token removed in Firestore");
-      }
-
-      // 🔥 Remove FCM token from device + Firestore
-      await messaging().deleteToken();
-      console.log("🗑 Device FCM token deleted");
-
-      // Sign out from Firebase
-      await signOut(auth);
-
-      // Clear local data if needed
-      await AsyncStorage.removeItem("lastUsedUser");
-
-      router.replace("/login");
-    } catch (error) {
-      console.error("Logout Failed:", error);
-      Alert.alert("Logout Failed", error.message);
+ const handleLogout = async () => {
+  try {
+    const user = auth.currentUser;
+    if (user) {
+      // 👇 Mark user offline in Firestore before logging out
+      await updateDoc(doc(db, "user", user.uid), {
+        online: false,
+        lastActive: serverTimestamp(),
+      });
+      console.log("✅ Marked user offline before logout");
     }
-  };
+
+    // 🔐 Now sign them out from Firebase
+    await signOut(auth);
+
+    // 🧹 Optional: clear any locally stored session
+    await AsyncStorage.removeItem("lastUsedUser");
+
+    router.replace("/login");
+  } catch (error) {
+    console.error("Logout Failed:", error);
+    Alert.alert("Logout Failed", error.message);
+  }
+};
 
   // Load saved accounts
   useEffect(() => {
@@ -75,6 +67,7 @@ const Settings = () => {
     };
     fetchUsers();
   }, []);
+
 
 
   // helper: profile image fallback
@@ -117,6 +110,7 @@ const Settings = () => {
               />
             }
             label="About PACAFACO"
+            onPress={() => router.push("/Main/profile/about")}
           />
         </View>
 

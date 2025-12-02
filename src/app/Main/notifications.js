@@ -158,8 +158,9 @@ export default function NotificationsScreen() {
 
   // 🔹 Handle modal action (Go / Close)
   // ✅ FINAL LOGIC:
-  // - scheduled → /Main/map (center on scheduledCoords)
-  // - pending, in progress, not approved, completed, cancelled → /Main/requestPickup
+  // - collectionPoint → /Main/map with pointId (center on that point using Firestore lat/lng)
+  // - scheduled pickup → /Main/map (center on scheduledCoords, no purple pin)
+  // - other pickup statuses → /Main/requestPickup
   const handleModalAction = async (confirm) => {
     if (!confirm || !selectedNotif) {
       setModalVisible(false);
@@ -169,9 +170,30 @@ export default function NotificationsScreen() {
 
     const type = selectedNotif.type;
 
-    // 🔵 Collection point
-    if (selectedNotif.title?.includes("Collection Point")) {
-      router.push("/Main/map");
+    // 🔵 COLLECTION POINT → deep-link to map with pointId
+    if (type === "collectionPoint" || selectedNotif.title?.includes("Collection Point")) {
+      try {
+        const pointId = selectedNotif.pointId;
+
+        if (pointId) {
+          const navKey = `${pointId}_${Date.now()}`;
+
+          router.push({
+            pathname: "/Main/map",
+            params: {
+              from: "collectionPoint",
+              pointId,
+              navKey,
+            },
+          });
+        } else {
+          // Fallback (no pointId stored)
+          router.push("/Main/map");
+        }
+      } catch (err) {
+        console.error("Error handling collectionPoint notification:", err);
+        router.push("/Main/map");
+      }
     }
 
     // ✅ PICKUP STATUS
@@ -371,7 +393,8 @@ export default function NotificationsScreen() {
                   <Text style={styles.modalBtnText}>Close</Text>
                 </TouchableOpacity>
 
-                {(selectedNotif?.title?.includes("Collection Point") ||
+                {(selectedNotif?.type === "collectionPoint" ||
+                  selectedNotif?.title?.includes("Collection Point") ||
                   selectedNotif?.type === "pickupStatus" ||
                   selectedNotif?.type === "redemptionStatus" ||
                   selectedNotif?.type === "pointsEarned" ||
