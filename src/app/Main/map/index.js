@@ -13,9 +13,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  useColorScheme,
-  Image, 
-  Linking
+  useColorScheme
 } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
@@ -453,37 +451,27 @@ export default function MapSelector() {
   /* ================================
      MAP MARKERS (GREEN / GRAY)
      ================================ */
-const renderMapMarkers = () => {
-  return points.map((p) => {
-    const sched = schedules.find((s) => s.pointId === p.id);
-    const status = sched?.status ? sched.status.toLowerCase() : "";
-    const isClosed = status === "closed" || status === "close";
+  const renderMapMarkers = () => {
+    return points.map((p) => {
+      const sched = schedules.find((s) => s.pointId === p.id);
+      const status = sched?.status ? sched.status.toLowerCase() : "";
+      const isClosed = status === "closed" || status === "close"; // handles "Closed" or "Close"
 
-    return (
-      <Marker
-        key={p.id}
-        coordinate={{ latitude: p.lat, longitude: p.lng }}
-        title={p.name}
-        description={
-          sched
-            ? `${p.address}\nStatus: ${sched.status}\nDate: ${sched.collectionDate} ${sched.collectionTime}`
-            : p.address
-        }
-      >
-        <Image
-          source={
-            isClosed
-              ? closedCollectionPointMarker
-              : collectionPointMarker
+      return (
+        <Marker
+          key={p.id}
+          coordinate={{ latitude: p.lat, longitude: p.lng }}
+          title={p.name}
+          description={
+            sched
+              ? `${p.address}\nStatus: ${sched.status}\nDate: ${sched.collectionDate} ${sched.collectionTime}`
+              : p.address
           }
-          style={{ width: 32, height: 32 }}
-          resizeMode="contain"
+          image={isClosed ? closedCollectionPointMarker : collectionPointMarker}
         />
-      </Marker>
-    );
-  });
-};
-
+      );
+    });
+  };
 
   /* ================================
      RENDER

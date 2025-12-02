@@ -9,7 +9,6 @@ import {
   Dimensions,
   TouchableOpacity,
   Linking,
-  Platform,
   Image,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -39,24 +38,13 @@ const Colors = {
  * @param {string} phone The phone number to call.
  */
 const callNumber = (phone) => {
-  // Format the number to a standard URI format for calling
-  let phoneNumber = phone;
-  // Use Platform to determine the correct URI scheme
-  if (Platform.OS === "android") {
-    phoneNumber = `tel:${phone}`;
-  } else {
-    phoneNumber = `telprompt:${phone}`;
-  }
+  const phoneNumber = `tel:${phone}`;
 
-  Linking.canOpenURL(phoneNumber)
-    .then((supported) => {
-      if (!supported) {
-        console.log("Phone call not supported on this device.");
-      } else {
-        return Linking.openURL(phoneNumber);
-      }
-    })
-    .catch((err) => console.error("An error occurred opening the link", err));
+  Linking.openURL(phoneNumber).catch((err) => {
+    console.error("Error opening phone link:", err);
+    // Optional: show something to user
+    // Alert.alert("Error", "Unable to place a call on this device.");
+  });
 };
 
 /**
@@ -64,15 +52,11 @@ const callNumber = (phone) => {
  * @param {string} url The URL to open.
  */
 const openLink = (url) => {
-  Linking.canOpenURL(url)
-    .then((supported) => {
-      if (!supported) {
-        console.log(`Cannot handle URL: ${url}`);
-      } else {
-        return Linking.openURL(url);
-      }
-    })
-    .catch((err) => console.error("An error occurred opening the link", err));
+  Linking.openURL(url).catch((err) => {
+    console.error("Error opening URL link:", err);
+    // Optional: show something to user
+    // Alert.alert("Error", "Unable to open this link on this device.");
+  });
 };
 
 // --- Reusable Components ---
@@ -176,7 +160,6 @@ export default function App() {
         >
           {/* Header Section */}
           <View style={styles.header}>
-            {/* Mock Logo/Icon (using text as a placeholder since we can't load the actual image from the file) */}
             <Image
               source={require("../../../assets/splash/pacafacoLogo.png")}
               style={styles.pacafacoLogo}
@@ -296,7 +279,6 @@ export default function App() {
           {/* Contact Footer */}
           <View style={styles.contactFooter}>
             <Text style={styles.contactHeader}>CONTACT PERSONS</Text>
-            {/* Now using the callNumber utility */}
             <ContactDetail
               name="Albert Bitang"
               role="Chairman"
@@ -316,9 +298,7 @@ export default function App() {
             <SocialLink
               name="Facebook"
               url="https://www.facebook.com/pagatpat.cagayan.de.oro.farmer.s.agricul"
-              icon={
-                <FontAwesome6 name="facebook-f" size={24} color="white" />
-              }
+              icon={<FontAwesome6 name="facebook-f" size={24} color="white" />}
             />
             {/* --- END SOCIALS SECTION --- */}
           </View>
@@ -335,7 +315,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    // Using paddingBottom to ensure footer isn't cut off on smaller screens
     paddingBottom: 0,
   },
   // --- Header Styles ---
@@ -545,7 +524,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#444",
   },
-  socialRow: { // Use same layout as contactRow for consistency
+  socialRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -556,7 +535,7 @@ const styles = StyleSheet.create({
   contactLeft: {
     flex: 1,
   },
-  socialLeft: { // Use same layout as contactLeft
+  socialLeft: {
     flex: 1,
   },
   contactName: {
@@ -574,7 +553,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  // This style defines the common button size and background
   contactRight: {
     flexDirection: "row",
     alignItems: "center",
@@ -586,7 +564,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 10,
   },
-  socialRight: { // Match contactRight's style for same size
+  socialRight: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -605,7 +583,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     textAlignVertical: "center",
   },
-  socialLinkText: { // Style for the text inside the Facebook button
+  socialLinkText: {
     fontSize: 16,
     fontFamily: "Poppins_400Regular",
     color: Colors.lightText,
@@ -618,8 +596,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#444",
     marginVertical: 15,
   },
-  // --- Misc helpers ---
-  addressCard: {
-    // subtle elevation and spacing adjustments for address block
-  },
+  addressCard: {},
 });
