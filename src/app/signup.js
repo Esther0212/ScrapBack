@@ -419,9 +419,9 @@ const Signup = () => {
       age--;
     }
 
-    if (age < 18) {
+    if (age < 13) {
       ToastAndroid.show(
-        `You must be 18 or older to sign up. Your age is ${age}.`,
+        `You must be 13 or older to sign up. Your age is ${age}.`,
         ToastAndroid.LONG
       );
       return;
@@ -669,7 +669,7 @@ const Signup = () => {
                   mode="date"
                   maximumDate={
                     new Date(
-                      new Date().setFullYear(new Date().getFullYear() - 18)
+                      new Date().setFullYear(new Date().getFullYear() - 13)
                     )
                   }
                   onConfirm={(date) => {
