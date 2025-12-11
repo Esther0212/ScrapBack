@@ -409,7 +409,7 @@ export default function RedeemRewardsQR() {
   // Dynamic Description
   // --------------------------
   const descriptionText = !selectedReward
-    ? "Please choose a reward to redeem. Tap 'Reward Item' below."
+    ? "To generate a QR code, please choose a reward to redeem first. Tap 'Reward Item' below."
     : qrPayload
       ? "Staff can scan this QR to process your onsite redemption request."
       : "A reward is selected. Tap 'Generate QR' to create the QR that staff will scan.";
@@ -422,6 +422,26 @@ export default function RedeemRewardsQR() {
 
           {!qrPayload ? (
             <>
+              {/* ⭐⭐ ADDED POINTS SECTION (same as Home) ⭐⭐ */}
+              {!qrPayload && (
+                <View style={styles.pointsColumn}>
+                  <Text style={styles.pointsLabel}>Your Total Points</Text>
+
+                  <View style={styles.pointsRow}>
+                    <Image
+                      source={require("../../../assets/home/lettermarkLogo.png")}
+                      style={styles.pointsLogo}
+                      resizeMode="contain"
+                    />
+
+                    <View>
+                      <Text style={styles.pointsValueText}>
+                        {userData?.points?.toFixed(2) || "0.00"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
               {/* Reward Picker */}
               <Text style={styles.label}>Select Reward</Text>
 
@@ -568,6 +588,32 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  /* ⭐ ADDED STYLES FOR POINTS SECTION */
+  pointsContainer: {
+    width: "100%",
+    backgroundColor: "#B6D799",
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 18,
+  },
+  pointsColumn: { width: "100%", justifyContent: "center", alignItems: "center", marginVertical: 30 },
+  pointsLabel: {
+    fontSize: 15,
+    fontFamily: "Poppins_700Bold",
+    color: "#333",
+    marginBottom: 6,
+  },
+  pointsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  pointsLogo: { width: 30, height: 30 },
+  pointsValueText: {
+    fontSize: 28,
+    fontFamily: "Poppins_800ExtraBold",
+    color: "#2E7D32",
   },
   qrContainer: {
     backgroundColor: "#D4F2B4",
