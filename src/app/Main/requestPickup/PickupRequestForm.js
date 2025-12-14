@@ -1234,7 +1234,7 @@ export default function PickupRequestForm() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingTop: 10, flexGrow: 1 },
+  container: { padding: 20, paddingTop: 20, paddingBottom: 30, flexGrow: 1 },
   label: {
     fontSize: 15,
     fontFamily: "Poppins_700Bold",

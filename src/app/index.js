@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
     height: (60 / 160) * (width * 0.45),
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 110,
+    marginTop: 150,
     position: 'relative',
   },
   scrapImg: {
