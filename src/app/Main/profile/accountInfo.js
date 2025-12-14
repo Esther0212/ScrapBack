@@ -595,7 +595,7 @@ const AccountInfo = () => {
 
   return (
     <CustomBgColor>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.container}>
             <View style={styles.imageWrapper}>
