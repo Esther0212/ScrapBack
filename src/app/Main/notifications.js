@@ -270,8 +270,20 @@ export default function NotificationsScreen() {
     }
 
     // ✅ OTHER TYPES
-    else if (type === "redemptionStatus" || type === "pointsEarned") {
-      router.push("/Main/profile");
+    else if (type === "redemptionStatus") {
+      const logId = selectedNotif.relatedId || null;
+    
+      router.push({
+        pathname: "/Main/profile",
+        params: { scrollTo: logId, tab: "rewards" }
+      });
+    } else if (type === "pointsEarned") {
+      const logId = selectedNotif.relatedId || null;
+    
+      router.push({
+        pathname: "/Main/profile",
+        params: { scrollTo: logId, tab: "points" }
+      });
     } else if (type === "staff_redemption" || type === "staff_contribution") {
       router.push("/pages/Transactions");
     }

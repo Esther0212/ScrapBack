@@ -80,7 +80,12 @@ useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const notifRef = collection(db, "notifications", user.uid, "userNotifications");
+    const notifRef = collection(
+      db,
+      "notifications",
+      user.uid,
+      "userNotifications"
+    );
     const q = query(notifRef, where("read", "==", false));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -250,8 +255,14 @@ useEffect(() => {
                 >
                   <View style={styles.card}>
                     <View style={styles.headerBar}>
-                      <Text style={styles.category}>{category} Conversion</Text>
-                      <Ionicons name="chevron-forward" size={20} color="#fff" />
+                      <Text style={styles.category}>
+                        {category} Conversion
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color="#fff"
+                      />
                     </View>
 
                     <View style={styles.table}>
@@ -263,7 +274,10 @@ useEffect(() => {
                       </View>
                       {firstRow && (
                         <View
-                          style={[styles.row, { backgroundColor: "#FFFFFF" }]}
+                          style={[
+                            styles.row,
+                            { backgroundColor: "#FFFFFF" },
+                          ]}
                         >
                           <Text style={[styles.cell, { flex: 2 }]}>
                             {firstRow.type}
@@ -326,7 +340,13 @@ const styles = StyleSheet.create({
     color: "#2E7D32",
     fontFamily: "Poppins_800ExtraBold",
     lineHeight: 32,
-    maxWidth: 150, // 🔹 prevents overflow
+    maxWidth: 150,
+  },
+  lockedPointsText: {
+    marginTop: 4,
+    fontSize: 13,
+    color: "#555",
+    fontFamily: "Poppins_500Medium",
   },
   rightContainer: { width: "50%" },
   redeemButton: {

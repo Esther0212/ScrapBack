@@ -5,6 +5,7 @@ import {
   Animated,
   StyleSheet,
   Dimensions,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icons } from "./Icons";
@@ -19,27 +20,43 @@ const tabIcons = {
 
 const ROOT_TABS = ["index", "map", "scanner", "requestPickup", "profile"];
 
-const CustomTabBar = ({ state, navigation }) => {
-  const insets = useSafeAreaInsets();
+// --------------------------------------------------------
+// Detect if Android navbar is buttons-style (Expo safe)
+// --------------------------------------------------------
+const getExtraNavPadding = (insets) => {
+  if (Platform.OS !== "android") return 0;
 
-  // check if current route is one of the root tabs
-  const currentRoute = state.routes[state.index];
-  if (!ROOT_TABS.includes(currentRoute.name)) {
-    return null; // 🔹 hide tab bar on nested screens
+  // gestures usually give 15–22 bottomInset
+  // button navbar gives 0–6 bottomInset
+  if (insets.bottom < 10) {
+    return 35; // compensate for button navbar height
   }
 
-  // Track screen dimensions dynamically
+  return 0; // gestures, no extra padding
+};
+
+// --------------------------------------------------------
+const CustomTabBar = ({ state, navigation }) => {
+  const insets = useSafeAreaInsets();
+  const currentRoute = state.routes[state.index];
+
+  if (!ROOT_TABS.includes(currentRoute.name)) {
+    return null;
+  }
+
   const [screen, setScreen] = useState(Dimensions.get("window"));
   const { width } = screen;
 
   useEffect(() => {
-    const subscription = Dimensions.addEventListener("change", ({ window }) => {
-      setScreen(window);
-    });
+    const subscription = Dimensions.addEventListener("change", ({ window }) =>
+      setScreen(window)
+    );
     return () => subscription?.remove();
   }, []);
 
-  // Icons spaced evenly
+  // Dynamic navbar compensation (Expo safe)
+  const extraNavPadding = getExtraNavPadding(insets);
+
   const spacedIcons = ROOT_TABS;
   const tabWidth = width / spacedIcons.length;
 
@@ -47,10 +64,8 @@ const CustomTabBar = ({ state, navigation }) => {
   const prevIndexRef = useRef(state.index);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const previousRoute = state.routes[prevIndexRef.current];
   const isScannerTab = currentRoute.name === "scanner";
 
-  // Animate slider (non-scanner tabs only)
   useEffect(() => {
     if (!isScannerTab) {
       const fromKey = state.routes[prevIndexRef.current].name;
@@ -69,41 +84,36 @@ const CustomTabBar = ({ state, navigation }) => {
       }
     }
 
-    // Animate scanner scaling
-    if (isScannerTab) {
-      Animated.spring(scaleAnim, {
-        toValue: 1.15,
-        useNativeDriver: true,
-        friction: 4,
-      }).start();
-    } else {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        friction: 4,
-      }).start();
-    }
+    Animated.spring(scaleAnim, {
+      toValue: isScannerTab ? 1.15 : 1,
+      useNativeDriver: true,
+      friction: 4,
+    }).start();
 
     prevIndexRef.current = state.index;
-  }, [state.index, tabWidth]);
+  }, [state.index]);
 
-  const scannerSize = 70; // diameter of scanner circle (for centering)
+  const scannerSize = 70;
+
+  const bottomPadding = insets.bottom + extraNavPadding;
+  const totalHeight = 50 + bottomPadding;
 
   return (
-    <View style={[styles.tabContainer, { paddingBottom: insets.bottom }]}>
-      {/* Oval slider (hidden on scanner) */}
+    <View style={[styles.tabContainer, { height: totalHeight, paddingBottom: bottomPadding }]}>
+
       {!isScannerTab &&
         (() => {
           const { Icon, name } = tabIcons[currentRoute.name] || {};
           const indexInSpaced = spacedIcons.indexOf(currentRoute.name);
           if (indexInSpaced === -1) return null;
+
           return (
             <Animated.View
               style={[
                 styles.slider,
                 {
-                  width: tabWidth * 0.6, // 60% of tabWidth
-                  left: tabWidth * 0.2, // center slider inside tab space
+                  width: tabWidth * 0.6,
+                  left: tabWidth * 0.2,
                   transform: [{ translateX }],
                 },
               ]}
@@ -115,96 +125,61 @@ const CustomTabBar = ({ state, navigation }) => {
           );
         })()}
 
-      {/* Left group (home + location) */}
       <View style={[styles.group, { width: tabWidth * 2 }]}>
         {["index", "map"].map((key) => {
           const route = state.routes.find((r) => r.name === key);
           if (!route) return null;
+
           const isFocused = state.index === state.routes.indexOf(route);
           const { Icon, name } = tabIcons[route.name];
-          const color = isFocused ? "transparent" : "#90C67C";
 
           return (
             <TouchableWithoutFeedback
               key={route.key}
-              onPress={() => {
-                const event = navigation.emit({
-                  type: "tabPress",
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (!isFocused && !event.defaultPrevented) {
-                  navigation.navigate(route.name);
-                }
-              }}
+              onPress={() => navigation.navigate(route.name)}
             >
               <View style={styles.tabItem}>
-                {!isFocused && <Icon name={name} size={24} color={color} />}
+                {!isFocused && <Icon name={name} size={24} color="#90C67C" />}
               </View>
             </TouchableWithoutFeedback>
           );
         })}
       </View>
 
-      {/* Right group (truck + profile) */}
       <View style={[styles.group, { width: tabWidth * 2 }]}>
         {["requestPickup", "profile"].map((key) => {
           const route = state.routes.find((r) => r.name === key);
           if (!route) return null;
+
           const isFocused = state.index === state.routes.indexOf(route);
           const { Icon, name } = tabIcons[route.name];
-          const color = isFocused ? "transparent" : "#90C67C";
 
           return (
             <TouchableWithoutFeedback
               key={route.key}
-              onPress={() => {
-                const event = navigation.emit({
-                  type: "tabPress",
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (!isFocused && !event.defaultPrevented) {
-                  navigation.navigate(route.name);
-                }
-              }}
+              onPress={() => navigation.navigate(route.name)}
             >
               <View style={styles.tabItem}>
-                {!isFocused && <Icon name={name} size={24} color={color} />}
+                {!isFocused && <Icon name={name} size={24} color="#90C67C" />}
               </View>
             </TouchableWithoutFeedback>
           );
         })}
       </View>
 
-      {/* Scanner absolutely centered */}
       {(() => {
         const route = state.routes.find((r) => r.name === "scanner");
         if (!route) return null;
+
         const { Icon, name } = tabIcons["scanner"];
         const isFocused = state.index === state.routes.indexOf(route);
 
         return (
-          <TouchableWithoutFeedback
-            key={route.key}
-            onPress={() => {
-              const event = navigation.emit({
-                type: "tabPress",
-                target: route.key,
-                canPreventDefault: true,
-              });
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
-              }
-            }}
-          >
+          <TouchableWithoutFeedback key={route.key} onPress={() => navigation.navigate("scanner")}>
             <Animated.View
               style={[
                 styles.scannerWrapper,
-                {
-                  left: width / 2 - scannerSize / 2, // true horizontal center
-                  transform: [{ scale: scaleAnim }],
-                },
+                { left: width / 2 - scannerSize / 2, transform: [{ scale: scaleAnim }] },
               ]}
             >
               <View
@@ -228,7 +203,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: "#008243",
     alignItems: "center",
-    height: 70,
     position: "relative",
     justifyContent: "space-between",
   },
@@ -248,7 +222,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#339B69",
     paddingVertical: 5,
     borderRadius: 20,
-    top: 15,
+    top: 12,
     zIndex: 0,
     justifyContent: "center",
     alignItems: "center",
@@ -261,7 +235,7 @@ const styles = StyleSheet.create({
   },
   scannerWrapper: {
     position: "absolute",
-    top: -15, // lifts scanner above icons
+    top: -25,
     zIndex: 10,
   },
   scannerCircle: {

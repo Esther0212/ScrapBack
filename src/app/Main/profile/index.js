@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -16,7 +16,14 @@ import Feather from "@expo/vector-icons/Feather";
 import { useUser } from "../../../context/userContext";
 import { useRouter } from "expo-router";
 import { db } from "../../../../firebase";
-import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore";
+import { useLocalSearchParams } from "expo-router";
 
 const { height, width } = Dimensions.get("window");
 
@@ -29,6 +36,9 @@ const Profile = () => {
   const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingRewards, setLoadingRewards] = useState(true);
+
+  const { scrollTo, tab } = useLocalSearchParams();
+  const listRef = useRef(null);
 
   const profileImageSource = userData?.profilePic
     ? { uri: userData.profilePic }
@@ -66,21 +76,47 @@ const Profile = () => {
     }, {});
   };
 
+  useEffect(() => {
+    if (tab === "rewards") setActiveTab("rewards");
+    if (tab === "points") setActiveTab("points");
+  }, [tab]);
+
+  useEffect(() => {
+    if (!scrollTo) return;
+
+    const activeList = activeTab === "rewards" ? rewards : logs;
+    const index = activeList.findIndex((i) => i.id === scrollTo);
+
+    if (index !== -1 && listRef.current) {
+      setTimeout(() => {
+        listRef.current.scrollToIndex({
+          index,
+          animated: true,
+          viewPosition: 0.3,
+        });
+      }, 300);
+    }
+  }, [scrollTo, rewards, logs, activeTab]);
+
   // 🔹 Fetch contribution logs
   useEffect(() => {
     if (!userData?.uid) return;
-  
+
     console.log("🔄 Setting up real-time listener for contribution_logs...");
-  
+
     const q = query(
       collection(db, "contribution_logs"),
       where("userId", "==", userData.uid)
     );
-  
+
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        console.log("📡 Snapshot received for contribution_logs:", snapshot.size, "docs");
+        console.log(
+          "📡 Snapshot received for contribution_logs:",
+          snapshot.size,
+          "docs"
+        );
         const logsData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -94,30 +130,33 @@ const Profile = () => {
         console.error("❌ Error in contribution_logs snapshot:", error);
       }
     );
-  
+
     // 🧹 Cleanup
     return () => {
       console.log("🧹 Unsubscribing from contribution_logs listener");
       unsubscribe();
     };
   }, [userData?.uid]);
-  
 
   // 🔹 Fetch redemption logs
   useEffect(() => {
     if (!userData?.uid) return;
-  
+
     console.log("🔄 Setting up real-time listener for redemption_logs...");
-  
+
     const q = query(
       collection(db, "redemption_logs"),
       where("userId", "==", userData.uid)
     );
-  
+
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        console.log("📡 Snapshot received for redemption_logs:", snapshot.size, "docs");
+        console.log(
+          "📡 Snapshot received for redemption_logs:",
+          snapshot.size,
+          "docs"
+        );
         const rewardsData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -133,142 +172,148 @@ const Profile = () => {
         console.error("❌ Error in redemption_logs snapshot:", error);
       }
     );
-  
+
     // 🧹 Cleanup
     return () => {
       console.log("🧹 Unsubscribing from redemption_logs listener");
       unsubscribe();
     };
   }, [userData?.uid]);
-  
 
   // 🔹 Render grouped list
-// 🔹 Render grouped list
-const renderGroupedList = (groupedData, type = "points") => (
-  <FlatList
-    data={Object.entries(groupedData)}
-    keyExtractor={([date]) => date}
-    contentContainerStyle={{ paddingBottom: 40 }}
-    renderItem={({ item }) => {
-      const [date, items] = item;
-      return (
-        <View style={{ marginBottom: 20 }}>
-          <Text style={styles.dateHeader}>{date}</Text>
+  const renderGroupedList = (groupedData, type = "points") => (
+    <FlatList
+      ref={listRef}
+      getItemLayout={(data, index) => ({
+        length: 120,   // approximate row height
+        offset: 120 * index,
+        index,
+      })}      
+      data={Object.entries(groupedData)}
+      keyExtractor={([date]) => date}
+      contentContainerStyle={{ paddingBottom: 40 }}
+      renderItem={({ item }) => {
+        const [date, items] = item;
+        return (
+          <View style={{ marginBottom: 20 }}>
+            <Text style={styles.dateHeader}>{date}</Text>
 
-          {items.map((log) => {
-            const status = (log.status || "").toLowerCase().trim();
-            const isVoided =
-              status === "voided" || status === "void" || log.void === true;
+            {items.map((log) => {
+              const status = (log.status || "").toLowerCase().trim();
+              const isVoided =
+                status === "voided" || status === "void" || log.void === true;
 
-            return (
-              <TouchableOpacity
-                key={log.id}
-                style={[
-                  styles.logCard,
-                  isVoided && {
-                    opacity: 0.7,
-                    backgroundColor: "#FFF1F1",
-                    borderColor: "#E57373",
-                  },
-                ]}
-                onPress={() =>
-                  router.push({
-                    pathname:
-                      type === "points"
-                        ? "/Main/profile/contributionLogs"
-                        : "/Main/profile/redemptionLogs",
-                    params: { id: log.id },
-                  })
-                }
-                disabled={isVoided} // 🧱 disable tap on voided
-              >
-                {/* LEFT SIDE IMAGE */}
-                <View style={styles.leftSide}>
-                  <Image
-                    source={
-                      type === "points"
-                        ? log.staffPhotoUrl
-                          ? { uri: log.staffPhotoUrl }
-                          : require("../../../assets/profile/noImage.png")
-                        : log.proofPhotoUrl
-                        ? { uri: log.proofPhotoUrl }
-                        : require("../../../assets/profile/noImage.png")
-                    }
-                    style={styles.staffPhoto}
-                  />
-                </View>
+              return (
+                <TouchableOpacity
+                  key={log.id}
+                  style={[
+                    styles.logCard,
+                    type === "points" && { borderColor: "#3cd38aff" },
+                    type === "rewards" && { borderColor: "#FF6B6B" },
+                    isVoided && {
+                      opacity: 0.7,
+                      backgroundColor: "#FFF1F1",
+                      borderColor: "#E57373",
+                    },
+                  ]}
+                  onPress={() =>
+                    router.push({
+                      pathname:
+                        type === "points"
+                          ? "/Main/profile/contributionLogs"
+                          : "/Main/profile/redemptionLogs",
+                      params: { id: log.id },
+                    })
+                  }
+                  disabled={isVoided} // 🧱 disable tap on voided
+                >
+                  {/* LEFT SIDE IMAGE */}
+                  <View style={styles.leftSide}>
+                    <Image
+                      source={
+                        type === "points"
+                          ? log.staffPhotoUrl
+                            ? { uri: log.staffPhotoUrl }
+                            : require("../../../assets/profile/noImage.png")
+                          : log.proofPhotoUrl
+                            ? { uri: log.proofPhotoUrl }
+                            : require("../../../assets/profile/noImage.png")
+                      }
+                      style={styles.staffPhoto}
+                    />
+                  </View>
 
-                {/* RIGHT SIDE CONTENT */}
-                <View style={styles.rightSide}>
-                  {type === "points" ? (
-                    <>
-                      <View style={styles.pointsRow}>
-                        <Text
-                          style={[
-                            styles.pointsText,
-                            isVoided && {
-                              textDecorationLine: "line-through",
-                              color: "#A00",
-                            },
-                          ]}
-                        >
-                          +{log.totalPoints || 0} pts
-                        </Text>
+                  {/* RIGHT SIDE CONTENT */}
+                  <View style={styles.rightSide}>
+                    {type === "points" ? (
+                      <>
+                        <View style={styles.pointsRow}>
+                          <Text
+                            style={[
+                              styles.pointsText,
+                              isVoided && {
+                                textDecorationLine: "line-through",
+                                color: "#A00",
+                              },
+                            ]}
+                          >
+                            +{log.totalPoints || 0} pts
+                          </Text>
 
-                        {isVoided && (
-                          <Text style={styles.voidedTag}>VOIDED</Text>
-                        )}
-                      </View>
-
-                      {log.selectedTypes && (
-                        <View style={styles.typeContainer}>
-                          {log.selectedTypes.map((type) => (
-                            <View key={type} style={styles.typeRow}>
-                              <Text style={styles.typeLabel}>{type}</Text>
-                              <Text style={styles.typeValue}>
-                                {log.weights?.[type]
-                                  ? `${log.weights[type]} kg`
-                                  : "0 kg"}
-                              </Text>
-                            </View>
-                          ))}
+                          {isVoided && (
+                            <Text style={styles.voidedTag}>VOIDED</Text>
+                          )}
                         </View>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <View style={styles.pointsRow}>
-                        <Text
-                          style={[
-                            styles.pointsTextRed,
-                            isVoided && {
-                              textDecorationLine: "line-through",
-                              color: "#A00",
-                            },
-                          ]}
-                        >
-                          -{log.points || 0} pts
-                        </Text>
 
-                        {isVoided && (
-                          <Text style={styles.voidedTag}>VOIDED</Text>
+                        {log.selectedTypes && (
+                          <View style={styles.typeContainer}>
+                            {log.selectedTypes.map((type) => (
+                              <View key={type} style={styles.typeRow}>
+                                <Text style={styles.typeLabel}>{type}</Text>
+                                <Text style={styles.typeValue}>
+                                  {log.weights?.[type]
+                                    ? `${log.weights[type]} kg`
+                                    : "0 kg"}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
                         )}
-                      </View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.pointsRow}>
+                          <Text
+                            style={[
+                              styles.pointsTextRed,
+                              isVoided && {
+                                textDecorationLine: "line-through",
+                                color: "#A00",
+                              },
+                            ]}
+                          >
+                            -{log.points || 0} pts
+                          </Text>
 
-                      <Text style={styles.smallText}>
-                        {log.rewardName || "Reward"}
-                      </Text>
-                    </>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      );
-    }}
-  />
-);
+                          {isVoided && (
+                            <Text style={styles.voidedTag}>VOIDED</Text>
+                          )}
+                        </View>
+
+                        <Text style={styles.smallText}>
+                          {log.rewardName || "Reward"}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      }}
+    />
+  );
 
   return (
     <CustomBgColor>
@@ -463,14 +508,14 @@ const styles = StyleSheet.create({
   typeContainer: {
     width: "100%",
   },
-  
+
   typeRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between", // keeps left & right apart
     width: "100%",
   },
-  
+
   typeLabel: {
     flexShrink: 1, // ✅ allows long text to wrap or truncate if needed
     flex: 1, // ✅ lets it take remaining space
@@ -479,7 +524,7 @@ const styles = StyleSheet.create({
     color: "#333",
     marginRight: 10, // ✅ adds breathing room before the kg value
   },
-  
+
   typeValue: {
     fontSize: 15,
     fontFamily: "Poppins_400Regular",
@@ -488,18 +533,17 @@ const styles = StyleSheet.create({
     minWidth: 50, // ✅ keeps a consistent width for the right column
   },
   voidedTag: {
-  fontSize: 12,
-  fontFamily: "Poppins_700Bold",
-  color: "#D22B2B",
-  backgroundColor: "#FADBD8",
-  paddingHorizontal: 8,
-  paddingVertical: 2,
-  borderRadius: 6,
-  textAlign: "center",
-  marginLeft: 8,
-  overflow: "hidden",
-},
-
+    fontSize: 12,
+    fontFamily: "Poppins_700Bold",
+    color: "#D22B2B",
+    backgroundColor: "#FADBD8",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    textAlign: "center",
+    marginLeft: 8,
+    overflow: "hidden",
+  },
 });
 
 export default Profile;

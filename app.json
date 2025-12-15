@@ -10,7 +10,7 @@
     "newArchEnabled": true,
 
     "splash": {
-      "image": "./src/assets/splash-icon.png",
+      "image": "./src/assets/app-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -65,7 +65,6 @@
     ],
 
     "extra": {
-      "router": {},
       "eas": {
         "projectId": "82e9e238-1aff-47d6-8778-6960b258804e"
       }

@@ -444,10 +444,10 @@ const styles = StyleSheet.create({
 
   logoRow: {
     height: (60 / 160) * (width * 0.45),
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 110,
-    position: "relative",
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 150,
+    position: 'relative',
   },
   scrapImg: {
     position: "absolute",

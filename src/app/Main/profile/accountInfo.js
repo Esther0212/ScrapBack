@@ -13,6 +13,7 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, FontAwesome, AntDesign } from "@expo/vector-icons";
@@ -335,7 +336,7 @@ const AccountInfo = () => {
 
   return (
     <CustomBgColor>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.container}>
             <View style={styles.imageWrapper}>
@@ -479,6 +480,8 @@ const AccountInfo = () => {
               value={email}
               setValue={setEmail}
               editable={editMode}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
 <InputField
   label="Contact Number"
@@ -708,6 +711,12 @@ const InputField = ({
   editable = false,
   containerStyle,
   subLabel,
+  keyboardType,
+  multiline = false,
+  dynamicHeight,
+  onHeightChange,
+  placeholder,
+  autoCapitalize = "sentences",
 }) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
@@ -715,7 +724,30 @@ const InputField = ({
       value={value}
       editable={editable}
       onChangeText={setValue}
-      style={[styles.input, { color: editable ? "#3A2E2E" : "#777" }]}
+      placeholder={placeholder} // ← ADD THIS
+      placeholderTextColor="#9F9F9F"
+      multiline={multiline}
+      autoCapitalize={autoCapitalize}
+      blurOnSubmit={true}             // ← KEEP DONE BUTTON
+      returnKeyType="done"            // ← SHOW DONE BUTTON
+      onSubmitEditing={() => Keyboard.dismiss()} // ← CLOSE KEYBOARD
+      onContentSizeChange={(e) => {
+        if (multiline && onHeightChange) {
+          const newHeight = e.nativeEvent.contentSize.height;
+
+          // Prevent shrinking below normal height
+          onHeightChange(Math.max(55, Math.min(newHeight, 160)));
+        }
+      }}
+      style={[
+        styles.input,
+        {
+          color: editable ? "#3A2E2E" : "#777",
+          height: multiline ? dynamicHeight : 55,
+          textAlignVertical: multiline ? "center" : "center",
+        },
+      ]}
+      keyboardType={keyboardType || "default"}
     />
   </View>
 );

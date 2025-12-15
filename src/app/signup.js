@@ -12,6 +12,7 @@ import {
   Modal,
   Pressable,
   Platform,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -94,8 +95,7 @@ const Signup = () => {
   const [barangayMenuVisible, setBarangayMenuVisible] = useState(false);
   const [barangay, setBarangay] = useState(null);
 
-  const [selectedBarangayFeature, setSelectedBarangayFeature] =
-    useState(null);
+  const [selectedBarangayFeature, setSelectedBarangayFeature] = useState(null);
   const [barangayPolygonCoords, setBarangayPolygonCoords] = useState([]);
   const [barangayCenter, setBarangayCenter] = useState(null);
 
@@ -163,9 +163,7 @@ const Signup = () => {
     if (cdoGeoJSON?.features?.length) {
       const uniqueNames = Array.from(
         new Set(
-          cdoGeoJSON.features
-            .map((f) => f.properties?.barangay)
-            .filter(Boolean)
+          cdoGeoJSON.features.map((f) => f.properties?.barangay).filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b));
 
@@ -421,9 +419,9 @@ const Signup = () => {
       age--;
     }
 
-    if (age < 18) {
+    if (age < 13) {
       ToastAndroid.show(
-        `You must be 18 or older to sign up. Your age is ${age}.`,
+        `You must be 13 or older to sign up. Your age is ${age}.`,
         ToastAndroid.LONG
       );
       return;
@@ -671,7 +669,7 @@ const Signup = () => {
                   mode="date"
                   maximumDate={
                     new Date(
-                      new Date().setFullYear(new Date().getFullYear() - 18)
+                      new Date().setFullYear(new Date().getFullYear() - 13)
                     )
                   }
                   onConfirm={(date) => {
@@ -898,8 +896,7 @@ const Signup = () => {
                   }}
                   style={[
                     styles.checkboxRow,
-                    privacyError &&
-                      !privacyChecked && { borderColor: "red" },
+                    privacyError && !privacyChecked && { borderColor: "red" },
                   ]}
                   activeOpacity={0.8}
                 >
@@ -997,15 +994,23 @@ const Signup = () => {
             >
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContainer}>
-                  <Text style={styles.modalTitle}>
-                    Verification Email Sent
-                  </Text>
+                  <Text style={styles.modalTitle}>Verification Email Sent</Text>
                   <ScrollView style={styles.modalContent}>
                     <Text style={styles.modalText}>
                       A verification link has been sent to your email address.
                       {"\n\n"}
-                      Please check your inbox and verify your account before
-                      logging in.
+                      Please check your{" "}
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: "#333",
+                          fontFamily: "Poppins_700Bold",
+                          lineHeight: 22,
+                        }}
+                      >
+                        spam
+                      </Text>{" "}
+                      and verify your account before logging in.
                     </Text>
                   </ScrollView>
 
@@ -1043,6 +1048,7 @@ const InputField = ({
   onHeightChange,
   placeholder,
   editable = true,
+  autoCapitalize = "sentences",
 }) => (
   <View style={[styles.inputContainer, containerStyle]}>
     <Text style={subLabel ? styles.subLabel : styles.label}>{label}</Text>
@@ -1053,6 +1059,10 @@ const InputField = ({
       placeholder={placeholder || label}
       placeholderTextColor="#777"
       multiline={multiline}
+      autoCapitalize={autoCapitalize}
+      blurOnSubmit={true}             // ← KEEP DONE BUTTON
+      returnKeyType="done"            // ← SHOW DONE BUTTON
+      onSubmitEditing={() => Keyboard.dismiss()} // ← CLOSE KEYBOARD
       onContentSizeChange={(e) => {
         if (multiline && onHeightChange) {
           const newHeight = e.nativeEvent.contentSize.height;
@@ -1063,7 +1073,7 @@ const InputField = ({
         styles.input,
         {
           height: multiline ? dynamicHeight : 55,
-          textAlignVertical: multiline ? "top" : "center",
+          textAlignVertical: multiline ? "center" : "center",
         },
       ]}
       keyboardType={keyboardType || "default"}
@@ -1092,8 +1102,7 @@ const DropdownField = ({
       ? options.filter((item) =>
           (optionKey ? item[optionKey] : item.name || item)
             .toLowerCase()
-            .includes(searchQuery.toLowerCase()
-          )
+            .includes(searchQuery.toLowerCase())
         )
       : options;
 
@@ -1194,6 +1203,9 @@ const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
         autoCorrect={false}
         autoCapitalize="none"
         importantForAutofill="no"
+        contextMenuHidden={true}       // hides copy/paste menu
+        editable={true}
+        selectTextOnFocus={false}      // prevents selecting/pasting
       />
 
       <TouchableOpacity

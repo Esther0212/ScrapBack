@@ -15,6 +15,7 @@ import {
   Image,
   ToastAndroid,
   Animated,
+  useColorScheme,
 } from "react-native";
 import MapView, { Marker, Callout, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
@@ -44,6 +45,8 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 export default function PickupRequestForm() {
   const [wasteCategories, setWasteCategories] = useState([]);
   const [selectedTypes, setSelectedTypes] = useState([]);
+
+  const systemTheme = useColorScheme(); // "light" | "dark"
 
   // only one estimated weight (total)
   const [weights, setWeights] = useState({});
@@ -772,7 +775,16 @@ export default function PickupRequestForm() {
           <Modal visible={modalVisible} animationType="slide">
             <View style={{ flex: 1 }}>
               <View style={styles.topOverlay}>
-                <Text style={styles.toggleLabel}>Edit Address</Text>
+                <Text
+                  style={[
+                    styles.toggleLabel,
+                    systemTheme === "dark"
+                      ? { color: "#FFFFFF" }
+                      : { color: "#000000" },
+                  ]}
+                >
+                  Edit Address
+                </Text>
                 <View style={styles.searchBox}>
                   <Animated.View
                     style={{
@@ -816,7 +828,16 @@ export default function PickupRequestForm() {
                     />
                   </Animated.View>
                 </View>
-                <Text style={styles.toggleLabel}>Pinpoint Location</Text>
+                <Text
+                  style={[
+                    styles.toggleLabel,
+                    systemTheme === "dark"
+                      ? { color: "#FFFFFF" }
+                      : { color: "#000000" },
+                  ]}
+                >
+                  Pinpoint Location
+                </Text>
               </View>
 
               {loadingLocation ? (
@@ -1213,7 +1234,7 @@ export default function PickupRequestForm() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingTop: 10, flexGrow: 1 },
+  container: { padding: 20, paddingTop: 20, paddingBottom: 30, flexGrow: 1 },
   label: {
     fontSize: 15,
     fontFamily: "Poppins_700Bold",
