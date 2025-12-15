@@ -105,7 +105,7 @@ const Profile = () => {
     console.log("🔄 Setting up real-time listener for contribution_logs...");
 
     const q = query(
-      collection(db, "contribution_logs"),
+      collection(db, "contributionLogs"),
       where("userId", "==", userData.uid)
     );
 
@@ -142,10 +142,10 @@ const Profile = () => {
   useEffect(() => {
     if (!userData?.uid) return;
 
-    console.log("🔄 Setting up real-time listener for redemption_logs...");
+    console.log("🔄 Setting up real-time listener for redemptionLogs...");
 
     const q = query(
-      collection(db, "redemption_logs"),
+      collection(db, "redemptionLogs"),
       where("userId", "==", userData.uid)
     );
 
@@ -153,7 +153,7 @@ const Profile = () => {
       q,
       (snapshot) => {
         console.log(
-          "📡 Snapshot received for redemption_logs:",
+          "📡 Snapshot received for redemptionLogs:",
           snapshot.size,
           "docs"
         );
@@ -169,13 +169,13 @@ const Profile = () => {
         setLoadingRewards(false);
       },
       (error) => {
-        console.error("❌ Error in redemption_logs snapshot:", error);
+        console.error("❌ Error in redemptionLogs snapshot:", error);
       }
     );
 
     // 🧹 Cleanup
     return () => {
-      console.log("🧹 Unsubscribing from redemption_logs listener");
+      console.log("🧹 Unsubscribing from redemptionLogs listener");
       unsubscribe();
     };
   }, [userData?.uid]);

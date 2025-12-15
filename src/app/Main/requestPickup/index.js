@@ -99,7 +99,7 @@ const RequestPickup = () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const contribRef = collection(db, "contribution_logs");
+    const contribRef = collection(db, "contributionLogs");
     const contribQuery = query(contribRef, where("userId", "==", user.uid));
 
     const unsub = onSnapshot(
@@ -118,7 +118,7 @@ const RequestPickup = () => {
         setContributions(map);
       },
       (error) => {
-        console.error("contribution_logs listener error:", error);
+        console.error("contributionLogs listener error:", error);
       }
     );
 
