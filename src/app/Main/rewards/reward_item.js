@@ -32,7 +32,7 @@ const RewardItem = () => {
   useEffect(() => {
     const fetchRewards = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "reward"));
+        const querySnapshot = await getDocs(collection(db, "rewardItems"));
         const allRewards = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -102,94 +102,104 @@ const RewardItem = () => {
   }, []);
 
   return (
-<CustomBgColor>
-  <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-    {loading ? (
-      <ActivityIndicator
-        size="large"
-        color="#2E7D32"
-        style={{ marginTop: 30 }}
-      />
-    ) : offers.length === 0 ? (
-      <Text style={styles.noDataText}>No rewards found in this category.</Text>
-    ) : (
-      <>
-        <View style={styles.totalPointsContainer}>
-          <Text style={styles.totalPointsLabel}>Your Total Points:</Text>
-          <Text style={styles.totalPointsValue}>
-            {userPoints.toLocaleString()} pts
+    <CustomBgColor>
+      <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color="#2E7D32"
+            style={{ marginTop: 30 }}
+          />
+        ) : offers.length === 0 ? (
+          <Text style={styles.noDataText}>
+            No rewards found in this category.
           </Text>
-        </View>
-        <ScrollView contentContainerStyle={styles.scrollView}>
-          <View style={styles.cardContainer}>
-            {offers.map((offer, index) => {
-              const notEnoughPoints = Number(offer.points) > userPoints;
-              return (
-                <TouchableOpacity
-                  key={`${offer.id}-${index}`}
-                  style={[
-                    styles.card,
-                    notEnoughPoints && styles.disabledCard,
-                  ]}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/Main/rewards/reward_description",
-                      params: { id: offer.id },
-                    })
-                  }
-                >
-                  <View style={styles.imageWrapper}>
-                    {offer.image ? (
-                      <Image
-                        source={{ uri: offer.image }}
+        ) : (
+          <>
+            <View style={styles.totalPointsContainer}>
+              <Text style={styles.totalPointsLabel}>Your Total Points:</Text>
+              <Text style={styles.totalPointsValue}>
+                {userPoints.toLocaleString()} pts
+              </Text>
+            </View>
+            <ScrollView contentContainerStyle={styles.scrollView}>
+              <View style={styles.cardContainer}>
+                {offers.map((offer, index) => {
+                  const notEnoughPoints = Number(offer.points) > userPoints;
+                  const isUnavailable =
+                    offer.status?.toLowerCase()?.trim() === "unavailable";
+
+                  const isDisabled = notEnoughPoints || isUnavailable;
+
+                  return (
+                    <TouchableOpacity
+                      key={`${offer.id}-${index}`}
+                      style={[styles.card, isDisabled && styles.disabledCard]}
+                      activeOpacity={0.85}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/Main/rewards/reward_description",
+                          params: { id: offer.id },
+                        })
+                      }
+                    >
+                      <View style={styles.imageWrapper}>
+                        {offer.image ? (
+                          <Image
+                            source={{ uri: offer.image }}
+                            style={[
+                              styles.image,
+                              isDisabled && { opacity: 0.4 },
+                            ]}
+                          />
+                        ) : (
+                          <View style={styles.imagePlaceholder}>
+                            <Text style={styles.placeholderText}>No Image</Text>
+                          </View>
+                        )}
+
+                        {category !== "cash" && (
+                          <View style={styles.pointsBadge}>
+                            <Image
+                              source={require("../../../assets/home/lettermarkLogo.png")}
+                              style={styles.logoIcon}
+                            />
+                            <Text style={styles.pointsText}>
+                              {offer.points} pts
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <Text
                         style={[
-                          styles.image,
-                          notEnoughPoints && { opacity: 0.4 },
+                          styles.cardTitle,
+                          isDisabled && { color: "#aaa" },
                         ]}
-                      />
-                    ) : (
-                      <View style={styles.imagePlaceholder}>
-                        <Text style={styles.placeholderText}>No Image</Text>
-                      </View>
-                    )}
+                      >
+                        {offer.title || "Untitled Reward"}
+                      </Text>
 
-                    {category !== "cash" && (
-                      <View style={styles.pointsBadge}>
-                        <Image
-                          source={require("../../../assets/home/lettermarkLogo.png")}
-                          style={styles.logoIcon}
-                        />
-                        <Text style={styles.pointsText}>
-                          {offer.points} pts
+                      {isUnavailable && (
+                        <Text style={styles.insufficientText}>
+                          Currently unavailable
                         </Text>
-                      </View>
-                    )}
-                  </View>
+                      )}
 
-                  <Text
-                    style={[
-                      styles.cardTitle,
-                      notEnoughPoints && { color: "#aaa" },
-                    ]}
-                  >
-                    {offer.title || "Untitled Reward"}
-                  </Text>
-
-                  {notEnoughPoints && (
-                    <Text style={styles.insufficientText}>
-                      Not enough points
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
-      </>
-    )}
-  </SafeAreaView>
-</CustomBgColor>
+                      {!isUnavailable && notEnoughPoints && (
+                        <Text style={styles.insufficientText}>
+                          Not enough points
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </>
+        )}
+      </SafeAreaView>
+    </CustomBgColor>
   );
 };
 
@@ -293,22 +303,22 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_500Medium",
     marginBottom: 8,
   },
-totalPointsContainer: {
-  alignItems: "flex-start",
-  marginTop: 12,
-  paddingTop: 0,
-  paddingHorizontal: 15,
-  marginBottom: 10,
-},
-totalPointsLabel: {
-  fontFamily: "Poppins_600SemiBold",
-  color: "#2E7D32",
-  fontSize: 14,
-  marginBottom: 2,
-},
-totalPointsValue: {
-  fontFamily: "Poppins_800ExtraBold",
-  color: "#1B5E20",
-  fontSize: 20,
-},
+  totalPointsContainer: {
+    alignItems: "flex-start",
+    marginTop: 12,
+    paddingTop: 0,
+    paddingHorizontal: 15,
+    marginBottom: 10,
+  },
+  totalPointsLabel: {
+    fontFamily: "Poppins_600SemiBold",
+    color: "#2E7D32",
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  totalPointsValue: {
+    fontFamily: "Poppins_800ExtraBold",
+    color: "#1B5E20",
+    fontSize: 20,
+  },
 });
