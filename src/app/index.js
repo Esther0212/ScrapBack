@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState } from "react";
 import {
   StyleSheet,
   View,
@@ -7,34 +7,53 @@ import {
   TouchableOpacity,
   Animated,
   TouchableWithoutFeedback,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
-import pacafacoLogo from '../assets/splash/pacafacoLogo.png';
-import upperVector from '../assets/splash/upperVector.png';
-import lowerVector from '../assets/splash/lowerVector.png';
-import scrap from '../assets/splash/scrap.png';
-import back from '../assets/splash/back.png';
+import pacafacoLogo from "../assets/splash/pacafacoLogo.png";
+import upperVector from "../assets/splash/upperVector.png";
+import lowerVector from "../assets/splash/lowerVector.png";
+import scrap from "../assets/splash/scrap.png";
+import back from "../assets/splash/back.png";
 import { auth } from "../../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 const D = 800;
 const P = 300;
 
 export default function Splash() {
+  const skipAnimations = useRef(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
-    // 🔥 AUTO-REDIRECT IF USER IS ALREADY LOGGED IN
+  // 🔥 AUTO-REDIRECT IF USER IS ALREADY LOGGED IN
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace("/Main");  // ← CHANGE THIS TO YOUR REAL HOME ROUTE
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // No user → stop checking and allow splash animations to run normally
+      if (!user) {
+        setCheckingSession(false);
+        return;
+      }
+
+      try {
+        await user.reload(); // validate token
+
+        // Valid session → skip animations and redirect
+        skipAnimations.current = true;
+        setTimeout(() => {
+          router.replace("/Main");
+        }, 0);
+      } catch (e) {
+        console.log("Invalid cached session → signing out");
+        auth.signOut();
+      } finally {
+        setCheckingSession(false);
       }
     });
 
-    return () => unsub();
+    return unsubscribe;
   }, []);
 
   const hasSkipped = useRef(false);
@@ -43,7 +62,7 @@ export default function Splash() {
 
   const logoOp = useRef(new Animated.Value(0)).current;
   const pacX = useRef(new Animated.Value(0)).current;
-const solX = useRef(new Animated.Value(0)).current;
+  const solX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const scrapOp = useRef(new Animated.Value(0)).current;
@@ -168,14 +187,14 @@ const solX = useRef(new Animated.Value(0)).current;
           duration: D,
           useNativeDriver: true,
         }),
-      ]),      
+      ]),
       Animated.delay(P),
       playMainAnimations,
     ]).start();
   };
 
   const handleSkip = () => {
-    if (hasSkipped.current) return;
+    if (hasSkipped.current || skipAnimations.current) return;
     hasSkipped.current = true;
 
     bg.setValue(1);
@@ -202,44 +221,45 @@ const solX = useRef(new Animated.Value(0)).current;
   };
 
   useEffect(() => {
-    if (layoutReady) {
+    if (checkingSession) return; // ⛔ WAIT for Firebase
+    if (layoutReady && !skipAnimations.current) {
       playInitialAnimations();
     }
-  }, [layoutReady]);
+  }, [layoutReady, checkingSession]);
 
   const backgroundColor = bg.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#F5FFED', '#B6D799'],
+    outputRange: ["#F5FFED", "#B6D799"],
   });
 
   // inside Splash.js
   useEffect(() => {
     if (pacWidth && solWidth) {
       const GAP = Math.max(20, Math.min(width * 0.03, 40));
-  
+
       let totalWidth = pacWidth + solWidth + GAP;
       let scale = 1;
       const maxAvailable = width * 0.9;
-  
+
       if (totalWidth > maxAvailable) {
         scale = maxAvailable / totalWidth;
       }
-  
+
       const scaledPac = pacWidth * scale;
       const scaledSol = solWidth * scale;
       const scaledGap = GAP * scale;
-  
+
       pacFinalX.current = (width - (scaledPac + scaledSol + scaledGap)) / 2;
       solFinalX.current = pacFinalX.current + scaledPac + scaledGap;
-  
+
       // ✅ reset starting positions OFFSCREEN
       pacX.setValue(-scaledPac); // just off left
-      solX.setValue(width);      // just off right
-  
+      solX.setValue(width); // just off right
+
       scaleAnim.setValue(scale);
       setLayoutReady(true);
     }
-  }, [pacWidth, solWidth]);  
+  }, [pacWidth, solWidth]);
 
   return (
     <TouchableWithoutFeedback onPress={handleSkip}>
@@ -252,13 +272,15 @@ const solX = useRef(new Animated.Value(0)).current;
 
         {/* Hidden measure texts */}
         <Text
-          style={[styles.bigText, { position: 'absolute', opacity: 0 }]}
-          onLayout={(e) => setPacWidth(e.nativeEvent.layout.width)}>
+          style={[styles.bigText, { position: "absolute", opacity: 0 }]}
+          onLayout={(e) => setPacWidth(e.nativeEvent.layout.width)}
+        >
           PACAFACO
         </Text>
         <Text
-          style={[styles.bigText, { position: 'absolute', opacity: 0 }]}
-          onLayout={(e) => setSolWidth(e.nativeEvent.layout.width)}>
+          style={[styles.bigText, { position: "absolute", opacity: 0 }]}
+          onLayout={(e) => setSolWidth(e.nativeEvent.layout.width)}
+        >
           Solutions
         </Text>
 
@@ -270,7 +292,8 @@ const solX = useRef(new Animated.Value(0)).current;
               transform: [{ translateX: pacX }, { scale: scaleAnim }],
               opacity: logoOp,
             },
-          ]}>
+          ]}
+        >
           PACAFACO
         </Animated.Text>
 
@@ -281,7 +304,8 @@ const solX = useRef(new Animated.Value(0)).current;
               transform: [{ translateX: solX }, { scale: scaleAnim }],
               opacity: logoOp,
             },
-          ]}>
+          ]}
+        >
           Solutions
         </Animated.Text>
 
@@ -331,7 +355,8 @@ const solX = useRef(new Animated.Value(0)).current;
                   transform: [{ translateX: exploreX }],
                   opacity: subtitleOp, // initially 0
                 },
-              ]}>
+              ]}
+            >
               Explore the app
             </Animated.Text>
 
@@ -342,15 +367,17 @@ const solX = useRef(new Animated.Value(0)).current;
                   transform: [{ translateX: descX }],
                   opacity: descOp, // initially 0
                 },
-              ]}>
+              ]}
+            >
               All your recyclables in one place,
-              {'\n'}rewarding you every step of the way.
+              {"\n"}rewarding you every step of the way.
             </Animated.Text>
 
             <Animated.View style={{ transform: [{ translateX: loginX }] }}>
               <TouchableOpacity
                 style={styles.loginButton}
-                onPress={() => router.push('/login')}>
+                onPress={() => router.push("/login")}
+              >
                 <Text style={styles.loginButtonText}>Login</Text>
               </TouchableOpacity>
             </Animated.View>
@@ -358,7 +385,8 @@ const solX = useRef(new Animated.Value(0)).current;
             <Animated.View style={{ transform: [{ translateX: signupX }] }}>
               <TouchableOpacity
                 style={styles.signUpButton}
-                onPress={() => router.push('/signup')}>
+                onPress={() => router.push("/signup")}
+              >
                 <Text style={styles.signUpButtonText}>Sign Up</Text>
               </TouchableOpacity>
             </Animated.View>
@@ -373,7 +401,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   pacLogo: {
-    position: 'absolute',
+    position: "absolute",
     top: height / 2 - 80,
     left: width / 2 - 80,
     width: 160,
@@ -381,56 +409,56 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   bigText: {
-    position: 'absolute',
+    position: "absolute",
     top: height / 2 + 90,
     fontSize: 32,
-    fontFamily: 'Poppins_700Bold',
-    color: '#3A2E2E',
+    fontFamily: "Poppins_700Bold",
+    color: "#3A2E2E",
     zIndex: 5,
   },
 
   upperVector: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     width: width,
     height: (119 / 391) * width,
     zIndex: 1,
-    alignSelf: 'center',
+    alignSelf: "center",
   },
   lowerVector: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     width: width,
     height: (482 / 393) * width,
     zIndex: 1,
-    alignSelf: 'center',
+    alignSelf: "center",
   },
 
   safeArea: { flex: 1, zIndex: 4 },
   content: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 24,
   },
 
   logoRow: {
     height: (60 / 160) * (width * 0.45),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 110,
-    position: 'relative',
+    position: "relative",
   },
   scrapImg: {
-    position: 'absolute',
+    position: "absolute",
     left: width * -0.37,
-    alignSelf: 'center',
+    alignSelf: "center",
     width: width * 0.45,
     height: (60 / 160) * (width * 0.45),
     zIndex: 1,
   },
   backImg: {
-    position: 'absolute',
+    position: "absolute",
     left: width * 0.03 + -8.5,
     top: height * 0.03 + 5,
     width: width * 0.33,
@@ -440,28 +468,28 @@ const styles = StyleSheet.create({
 
   subtitle: {
     fontSize: 35,
-    fontFamily: 'Poppins_700Bold',
-    color: '#3A2E2E',
-    textAlign: 'center',
+    fontFamily: "Poppins_700Bold",
+    color: "#3A2E2E",
+    textAlign: "center",
     marginTop: 210,
     letterSpacing: 0.5,
   },
   description: {
     fontSize: 18,
-    color: '#4A4A4A',
-    textAlign: 'center',
+    color: "#4A4A4A",
+    textAlign: "center",
     lineHeight: 26,
     marginVertical: 16,
     letterSpacing: 0.3,
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: "Poppins_400Regular",
   },
 
   loginButton: {
-    backgroundColor: '#008243',
+    backgroundColor: "#008243",
     paddingVertical: 16,
     width: width - 50,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 28,
   },
   loginButtonText: {
@@ -472,15 +500,15 @@ const styles = StyleSheet.create({
   },
   signUpButton: {
     borderWidth: 1.5,
-    borderColor: '#008243',
+    borderColor: "#008243",
     paddingVertical: 16,
     width: width - 50,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 14,
   },
   signUpButtonText: {
-    color: '#008243',
+    color: "#008243",
     fontSize: 18,
     fontFamily: "Poppins_700Bold",
     letterSpacing: 0.5,
