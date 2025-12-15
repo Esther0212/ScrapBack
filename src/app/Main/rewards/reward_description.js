@@ -83,7 +83,7 @@ const RewardDescription = () => {
   useEffect(() => {
     const fetchReward = async () => {
       try {
-        const docRef = doc(db, "reward", id);
+        const docRef = doc(db, "rewardItems", id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setReward({ id: docSnap.id, ...docSnap.data() });

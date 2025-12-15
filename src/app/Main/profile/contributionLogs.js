@@ -34,7 +34,7 @@ export default function ContributionLogs() {
     const fetchLog = async () => {
       try {
         if (!id) return;
-        const ref = doc(db, "contribution_logs", id);
+        const ref = doc(db, "contributionLogs", id);
         const snap = await getDoc(ref);
         if (snap.exists()) setLogData(snap.data());
       } catch (err) {

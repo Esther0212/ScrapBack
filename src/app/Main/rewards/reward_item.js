@@ -32,7 +32,7 @@ const RewardItem = () => {
   useEffect(() => {
     const fetchRewards = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "reward"));
+        const querySnapshot = await getDocs(collection(db, "rewardItems"));
         const allRewards = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),

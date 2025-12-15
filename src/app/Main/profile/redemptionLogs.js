@@ -32,7 +32,7 @@ export default function RedemptionLogs() {
     const fetchData = async () => {
       try {
         if (!id) return;
-        const ref = doc(db, "redemption_logs", id);
+        const ref = doc(db, "redemptionLogs", id);
         const snap = await getDoc(ref);
         if (snap.exists()) setLogData(snap.data());
       } catch (err) {

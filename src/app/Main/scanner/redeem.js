@@ -124,7 +124,7 @@ export default function RedeemRewardsQR() {
   useEffect(() => {
     const fetchRewards = async () => {
       try {
-        const snap = await getDocs(collection(db, "reward"));
+        const snap = await getDocs(collection(db, "rewardItems"));
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         const order = { sack: 1, cash: 2, load: 3, other: 4 };
         const sortedList = [...list].sort((a, b) => {

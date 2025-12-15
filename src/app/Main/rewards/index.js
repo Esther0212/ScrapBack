@@ -26,7 +26,7 @@ const RewardsIndex = () => {
 
   // 🔹 Real-time Firestore listener — ignoring modeAvailable entirely
   useEffect(() => {
-    const rewardRef = collection(db, "reward");
+    const rewardRef = collection(db, "rewardItems");
     const unsubscribe = onSnapshot(rewardRef, (snapshot) => {
       const rewards = snapshot.docs.map((doc) => doc.data());
 
