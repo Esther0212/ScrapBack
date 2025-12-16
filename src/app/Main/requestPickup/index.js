@@ -99,7 +99,7 @@ const RequestPickup = () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const contribRef = collection(db, "contribution_logs");
+    const contribRef = collection(db, "contributionLogs");
     const contribQuery = query(contribRef, where("userId", "==", user.uid));
 
     const unsub = onSnapshot(

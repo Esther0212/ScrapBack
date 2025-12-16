@@ -105,7 +105,7 @@ const Profile = () => {
     console.log("🔄 Setting up real-time listener for contribution_logs...");
 
     const q = query(
-      collection(db, "contribution_logs"),
+      collection(db, "contributionLogs"),
       where("userId", "==", userData.uid)
     );
 
@@ -145,7 +145,7 @@ const Profile = () => {
     console.log("🔄 Setting up real-time listener for redemption_logs...");
 
     const q = query(
-      collection(db, "redemption_logs"),
+      collection(db, "redemptionLogs"),
       where("userId", "==", userData.uid)
     );
 
