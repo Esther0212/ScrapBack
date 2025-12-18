@@ -679,10 +679,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
     color: "#117D2E",
+    marginBottom: 4,
   },
   cardTitleWrapper: {
     flex: 1,
-    paddingRight: 10,
   },
   cardAddress: {
     fontSize: 14,
@@ -720,11 +720,12 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 6,
+    marginBottom: 4,
   },
   statusBadgeText: {
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: "Poppins_400Regular",
     textAlign: "center",
   },
