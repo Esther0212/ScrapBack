@@ -373,14 +373,14 @@ const styles = StyleSheet.create({
   saveText: { color: "#fff", fontSize: 16, fontFamily: "Poppins_700Bold" },
   checkingText: {
     fontSize: 14,
-    fontFamily: "Poppins_500Medium",
+    fontFamily: "Poppins_400Regular",
     color: "#71695B",
     marginLeft: 4,
     marginBottom: 8,
   },
   correctText: {
     fontSize: 14,
-    fontFamily: "Poppins_600SemiBold",
+    fontFamily: "Poppins_400Regular",
     color: "#2ECC71",
     marginLeft: 4,
     marginBottom: 8,
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: "#E74C3C",
     fontSize: 14,
-    fontFamily: "Poppins_500Medium",
+    fontFamily: "Poppins_400Regular",
     marginLeft: 4,
     marginBottom: 8,
   },
