@@ -599,7 +599,24 @@ export default function PickupRequestForm() {
           requestId: newDoc.id,
         });
 
-        showAnimatedToast("Pickup request created!");
+        // 🔔 Notify USER — pickup pending approval
+        await addDoc(
+          collection(db, "notifications", user.uid, "userNotifications"),
+          {
+            title: "Pickup Request Submitted",
+            body:
+              "Your pickup request is now <b>pending</b> and is waiting for admin approval.",
+            type: "pickupStatus",
+            requestId: newDoc.id,
+            read: false,
+            createdAt: serverTimestamp(),
+          }
+        );
+
+        showAnimatedToast(
+          "Pickup request submitted. Waiting for admin approval."
+        );
+
         setTimeout(() => router.push("/Main/requestPickup"), 1000);
       }
 

@@ -30,7 +30,7 @@ import { Ionicons, FontAwesome } from "@expo/vector-icons";
  */
 
 // change this value to control the QR expiry (in seconds)
-const EXPIRY_SECONDS = 9999 * 60;
+const EXPIRY_SECONDS = 5 * 60;
 
 export default function RedeemRewardsQR() {
   const router = useRouter();

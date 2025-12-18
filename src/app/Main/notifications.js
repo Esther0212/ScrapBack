@@ -96,8 +96,8 @@ export default function NotificationsScreen() {
           d?.createdAt?.toDate
             ? d.createdAt.toDate().getTime()
             : typeof d?.createdAt === "number"
-            ? d.createdAt
-            : 0;
+              ? d.createdAt
+              : 0;
         return getTime(b) - getTime(a);
       });
 
@@ -171,7 +171,10 @@ export default function NotificationsScreen() {
     const type = selectedNotif.type;
 
     // 🔵 COLLECTION POINT → deep-link to map with pointId
-    if (type === "collectionPoint" || selectedNotif.title?.includes("Collection Point")) {
+    if (
+      type === "collectionPoint" ||
+      selectedNotif.title?.includes("Collection Point")
+    ) {
       try {
         const pointId = selectedNotif.pointId;
 
@@ -269,20 +272,29 @@ export default function NotificationsScreen() {
       }
     }
 
-    // ✅ OTHER TYPES
+    // ✅ CONTRIBUTION → scroll to points log
+    else if (type === "contributionEarned") {
+      const logId = selectedNotif.relatedId || null;
+
+      router.push({
+        pathname: "/Main/profile",
+        params: {
+          tab: "points",
+          scrollTo: logId, // 👈 scroll only, no open
+        },
+      });
+    }
+
+    // ✅ REDEMPTION → scroll to rewards log
     else if (type === "redemptionStatus") {
       const logId = selectedNotif.relatedId || null;
-    
+
       router.push({
         pathname: "/Main/profile",
-        params: { scrollTo: logId, tab: "rewards" }
-      });
-    } else if (type === "pointsEarned") {
-      const logId = selectedNotif.relatedId || null;
-    
-      router.push({
-        pathname: "/Main/profile",
-        params: { scrollTo: logId, tab: "points" }
+        params: {
+          tab: "rewards",
+          scrollTo: logId,
+        },
       });
     } else if (type === "staff_redemption" || type === "staff_contribution") {
       router.push("/pages/Transactions");
@@ -377,48 +389,60 @@ export default function NotificationsScreen() {
           />
         )}
 
-        {/* 🧩 Modal */}
+        {/* 🧩 Notification Action Modal */}
         <Modal
           visible={modalVisible}
           transparent
           animationType="fade"
-          onRequestClose={() => setModalVisible(false)}
+          onRequestClose={() => {
+            setModalVisible(false);
+            setSelectedNotif(null);
+          }}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalBox}>
-              <Ionicons name="notifications" size={36} color="#008243" />
-              <Text style={styles.modalTitle}>{selectedNotif?.title}</Text>
+          <View style={styles.modalOverlayCenter}>
+            <View style={styles.confirmModal}>
+              {/* Icon */}
+              <Ionicons
+                name="notifications"
+                size={36}
+                color="#008243"
+                style={{ marginBottom: 8 }}
+              />
 
-              {/* Rich Text Body */}
-              <View style={{ marginVertical: 10 }}>
+              {/* Title */}
+              <Text style={styles.confirmTitle}>{selectedNotif?.title}</Text>
+
+              {/* Body */}
+              <View style={{ marginBottom: 20 }}>
                 {renderRichBody(
                   selectedNotif?.body || "",
                   !selectedNotif?.read
                 )}
               </View>
 
-              <View style={styles.modalButtons}>
+              {/* Buttons */}
+              <View style={styles.confirmButtons}>
+                {/* Close */}
                 <TouchableOpacity
-                  style={[styles.modalBtn, { backgroundColor: "#ccc" }]}
+                  style={[styles.cancelButton, { flex: 0.45 }]}
                   onPress={() => handleModalAction(false)}
                 >
-                  <Text style={styles.modalBtnText}>Close</Text>
+                  <Text style={styles.cancelText}>Close</Text>
                 </TouchableOpacity>
 
+                {/* Go */}
                 {(selectedNotif?.type === "collectionPoint" ||
                   selectedNotif?.title?.includes("Collection Point") ||
                   selectedNotif?.type === "pickupStatus" ||
                   selectedNotif?.type === "redemptionStatus" ||
                   selectedNotif?.type === "pointsEarned" ||
-                  selectedNotif?.type === "staff_redemption" ||
-                  selectedNotif?.type === "staff_contribution") && (
+                  selectedNotif?.type === "contributionEarned" ||
+                  selectedNotif?.type === "redemptionStatus") && (
                   <TouchableOpacity
-                    style={[styles.modalBtn, { backgroundColor: "#008243" }]}
+                    style={[styles.saveButton, { flex: 0.45 }]}
                     onPress={() => handleModalAction(true)}
                   >
-                    <Text style={[styles.modalBtnText, { color: "#fff" }]}>
-                      Go
-                    </Text>
+                    <Text style={styles.saveText}>Go</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -487,10 +511,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
-  title: { fontSize: 14, fontFamily: "Poppins_700Bold", color: "#2E7D32" },
+  title: { fontSize: 17, fontFamily: "Poppins_700Bold", color: "#2E7D32" },
   titleUnread: { fontFamily: "Poppins_800ExtraBold", color: "#008243" },
   body: {
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: "Poppins_400Regular",
     color: "#333",
     marginTop: 4,
@@ -505,7 +529,7 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
   },
   date: {
-    fontSize: 11,
+    fontSize: 12,
     color: "#666",
     fontFamily: "Poppins_400Regular",
     marginTop: 6,
@@ -513,43 +537,69 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { fontSize: 14, color: "#888" },
 
-  modalOverlay: {
+  modalOverlayCenter: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
+    padding: 24,
   },
-  modalBox: {
+
+  confirmModal: {
     backgroundColor: "#fff",
-    width: "85%",
     borderRadius: 16,
-    padding: 20,
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+    width: "90%",
     alignItems: "center",
+
+    // Shadow (Android + iOS)
+    elevation: 6,
     shadowColor: "#000",
     shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 6,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
   },
-  modalTitle: {
-    fontSize: 17,
+
+  confirmTitle: {
+    fontSize: 18,
     fontFamily: "Poppins_700Bold",
-    color: "#008243",
-    marginTop: 10,
+    color: "#3A2E2E",
+    marginBottom: 10,
     textAlign: "center",
   },
-  modalButtons: {
+
+  confirmButtons: {
     flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 10,
+    justifyContent: "space-between",
+    width: "100%",
   },
-  modalBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginHorizontal: 6,
+
+  saveButton: {
+    backgroundColor: "#008243",
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
   },
-  modalBtnText: {
-    fontFamily: "Poppins_600SemiBold",
-    color: "#000",
+
+  saveText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
+  },
+
+  cancelButton: {
+    backgroundColor: "#888",
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+
+  cancelText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
   },
 });
