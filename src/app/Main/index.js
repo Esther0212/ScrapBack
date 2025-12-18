@@ -66,6 +66,11 @@ async function registerForPushNotificationsAsync() {
   return token;
 }
 
+const formatPoints = (points = 0) => {
+  if (points >= 1_000_000) return (points / 1_000_000).toFixed(1) + "M";
+  if (points >= 1_000) return (points / 1_000).toFixed(1) + "K";
+  return points.toFixed(2);
+};
 const Home = () => {
   const { userData } = useUser();
   const { educationalContent, setSelectedType } = useEducational();
@@ -95,8 +100,7 @@ const Home = () => {
             : 0;
 
         const locked =
-          typeof data.locked_points === "number" &&
-            !isNaN(data.locked_points)
+          typeof data.locked_points === "number" && !isNaN(data.locked_points)
             ? parseFloat(data.locked_points.toFixed(2))
             : 0;
 
@@ -227,7 +231,6 @@ const Home = () => {
 
           {/* ✅ Points Section (Dynamic Firestore Data) */}
 
-
           <View style={styles.pointsContainer}>
             <View style={styles.pointsColumn}>
               <Text style={styles.pointsLabel}>Your Total Points</Text>
@@ -240,8 +243,8 @@ const Home = () => {
                 />
 
                 <View style={styles.pointsTextColumn}>
-                  <Text style={styles.pointsValueText}>
-                    {userPoints?.toFixed(2) || "0.00"}
+                  <Text style={styles.pointsValueText} numberOfLines={1}>
+                    {formatPoints(userPoints)}
                   </Text>
 
                   {lockedPoints > 0 && (
@@ -268,7 +271,6 @@ const Home = () => {
               </TouchableOpacity>
             </View>
           </View>
-
 
           {/* Recycling Guide */}
           <Text style={styles.sectionTitle}>Recycling Guide</Text>
@@ -310,14 +312,8 @@ const Home = () => {
                 >
                   <View style={styles.card}>
                     <View style={styles.headerBar}>
-                      <Text style={styles.category}>
-                        {category} Conversion
-                      </Text>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={20}
-                        color="#fff"
-                      />
+                      <Text style={styles.category}>{category} Conversion</Text>
+                      <Ionicons name="chevron-forward" size={20} color="#fff" />
                     </View>
 
                     <View style={styles.table}>
@@ -329,17 +325,12 @@ const Home = () => {
                       </View>
                       {firstRow && (
                         <View
-                          style={[
-                            styles.row,
-                            { backgroundColor: "#FFFFFF" },
-                          ]}
+                          style={[styles.row, { backgroundColor: "#FFFFFF" }]}
                         >
                           <Text style={[styles.cell, { flex: 2 }]}>
                             {firstRow.type}
                           </Text>
-                          <Text style={styles.cell}>
-                            {firstRow.points} pts
-                          </Text>
+                          <Text style={styles.cell}>{firstRow.points} pts</Text>
                         </View>
                       )}
                     </View>
@@ -490,27 +481,27 @@ const styles = StyleSheet.create({
   },
   /* ✅ ADD these styles */
 
-pointsColumn: {
-  width: "50%",
-  justifyContent: "center",
-},
+  pointsColumn: {
+    width: "50%",
+    justifyContent: "center",
+  },
 
-pointsRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 8,
-},
+  pointsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
 
-pointsTextColumn: {
-  justifyContent: "center",
-},
+  pointsTextColumn: {
+    justifyContent: "center",
+  },
 
-lockedPointsText: {
-  marginTop: 2,
-  fontSize: 13,
-  color: "#555",
-  fontFamily: "Poppins_500Medium",
-},
+  lockedPointsText: {
+    marginTop: 2,
+    fontSize: 13,
+    color: "#555",
+    fontFamily: "Poppins_500Medium",
+  },
 
   cell: {
     flex: 1,

@@ -26,6 +26,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Animated } from "react-native";
 import MapView, { Marker, Polygon, Polyline } from "react-native-maps";
 import * as Location from "expo-location";
+import { useNavigation } from "@react-navigation/native";
 
 // 🟢 Turf for point-in-polygon
 import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
@@ -61,6 +62,7 @@ const AccountInfo = () => {
   const [dob, setDob] = useState(userData?.dob || "");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [street, setStreet] = useState(userData?.address?.street || "");
+  const navigation = useNavigation();
 
   const [barangay, setBarangay] = useState(
     userData?.address?.barangay ? { name: userData.address.barangay } : null
@@ -553,6 +555,10 @@ const AccountInfo = () => {
 
       showToast("Profile updated successfully!", 2000);
       setEditMode(false);
+      setTimeout(() => {
+        navigation.goBack();
+        // or navigation.navigate("Settings")
+      }, 1500);
     } catch (err) {
       console.error(err);
       showToast("Failed to update profile.", 2500);
@@ -598,6 +604,24 @@ const AccountInfo = () => {
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.container}>
+            {/* Top Right Action Button */}
+            <View style={styles.topActionWrapper}>
+              {editMode ? (
+                <TouchableOpacity
+                  style={styles.topSaveButton}
+                  onPress={() => setConfirmModalVisible(true)}
+                >
+                  <Text style={styles.topActionText}>Save</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.topEditButton}
+                  onPress={() => setEditMode(true)}
+                >
+                  <Text style={styles.topActionText}>Edit</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.imageWrapper}>
               <TouchableOpacity
                 disabled={!editMode}
@@ -679,7 +703,10 @@ const AccountInfo = () => {
                   <View style={styles.confirmButtons}>
                     <TouchableOpacity
                       style={[styles.cancelButton, { flex: 0.45 }]}
-                      onPress={() => setConfirmModalVisible(false)}
+                      onPress={() => {
+                        setConfirmModalVisible(false);
+                        handleCancel(); // 🔥 EXIT edit mode + reset fields
+                      }}
                     >
                       <Text style={styles.cancelText}>No</Text>
                     </TouchableOpacity>
@@ -1004,36 +1031,6 @@ const AccountInfo = () => {
                 </View>
               </>
             )}
-
-            {/* Buttons */}
-            {editMode ? (
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <TouchableOpacity
-                  style={[styles.cancelButton, { flex: 0.48 }]}
-                  onPress={handleCancel}
-                >
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.saveButton, { flex: 0.48 }]}
-                  onPress={() => setConfirmModalVisible(true)}
-                >
-                  <Text style={styles.saveText}>Save Changes</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => setEditMode(true)}
-              >
-                <Text style={styles.editButtonText}>Edit Profile</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </ScrollView>
         {toastVisible && (
@@ -1071,8 +1068,8 @@ const InputField = ({
       placeholderTextColor="#9F9F9F"
       multiline={multiline}
       autoCapitalize={autoCapitalize}
-      blurOnSubmit={true}             // ← KEEP DONE BUTTON
-      returnKeyType="done"            // ← SHOW DONE BUTTON
+      blurOnSubmit={true} // ← KEEP DONE BUTTON
+      returnKeyType="done" // ← SHOW DONE BUTTON
       onSubmitEditing={() => Keyboard.dismiss()} // ← CLOSE KEYBOARD
       onContentSizeChange={(e) => {
         if (multiline && onHeightChange) {
@@ -1202,7 +1199,7 @@ const DropdownField = ({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  scrollContainer: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20 },
+  scrollContainer: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 0 },
   container: { flex: 1 },
   imageWrapper: {
     alignSelf: "center",
@@ -1462,6 +1459,32 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     fontSize: 15,
     textAlign: "center",
+  },
+topActionWrapper: {
+  width: "100%",
+  flexDirection: "row",
+  justifyContent: "flex-end",
+  marginBottom: 10, 
+},
+
+  topEditButton: {
+    backgroundColor: "#008243",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+
+  topSaveButton: {
+    backgroundColor: "#008243",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+
+  topActionText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Poppins_700Bold",
   },
 });
 
