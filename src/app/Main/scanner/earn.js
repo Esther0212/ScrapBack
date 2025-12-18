@@ -19,6 +19,9 @@ export default function EarnPointsQR() {
 
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expiredByMinimize, setExpiredByMinimize] = useState(false);
+const intervalRef = useRef(null);
+
 
   // ⏳ expiry-based timer (SOURCE OF TRUTH)
   const EXPIRY_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -39,34 +42,42 @@ export default function EarnPointsQR() {
   };
 
   // foreground/background listener
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (nextState) => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextState === "active"
-      ) {
-        recalcTimeLeft(); // 👈 FIX: recompute when app resumes
+ // 🔵 Live countdown while app is active
+useEffect(() => {
+  const subscription = AppState.addEventListener("change", (nextState) => {
+    if (nextState === "background" || nextState === "inactive") {
+      // EXPIRE QR IMMEDIATELY
+      setExpiredByMinimize(true);
+      setTimeLeft(0);
+
+      // STOP INTERVAL
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
-      appState.current = nextState;
-    });
-
-    return () => subscription.remove();
-  }, [expiryTimestamp]);
-
-  // live countdown while app is active
-  useEffect(() => {
-    const interval = setInterval(recalcTimeLeft, 1000);
-    return () => clearInterval(interval);
-  }, [expiryTimestamp]);
-
-  // regenerate QR when expired
-  useEffect(() => {
-    if (timeLeft === 0) {
-      const newExpiry = Date.now() + EXPIRY_DURATION;
-      setExpiryTimestamp(newExpiry);
-      setTimeLeft(5 * 60);
     }
-  }, [timeLeft]);
+    appState.current = nextState;
+  });
+
+  // Start countdown interval
+  intervalRef.current = setInterval(() => {
+    setTimeLeft(prev => {
+      if (expiredByMinimize) return 0; // stop countdown immediately
+      const diff = Math.floor((expiryTimestamp - Date.now()) / 1000);
+      return diff > 0 ? diff : 0;
+    });
+  }, 1000);
+
+  // Cleanup on unmount
+  return () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    subscription.remove();
+  };
+}, [expiryTimestamp, expiredByMinimize]);
+
 
   /* =========================
      FETCH USER DATA
@@ -122,7 +133,7 @@ export default function EarnPointsQR() {
             Staff can scan this QR to award points.
           </Text>
 
-          {userData && timeLeft > 0 ? (
+          {userData && timeLeft > 0 && !expiredByMinimize ? (
             <QRCode
               value={JSON.stringify({
                 type: "earn",
@@ -137,7 +148,7 @@ export default function EarnPointsQR() {
             />
           ) : (
             <Text style={styles.expiredMessage}>
-              ⚠️ QR code expired.
+              QR code expired.
             </Text>
           )}
 
