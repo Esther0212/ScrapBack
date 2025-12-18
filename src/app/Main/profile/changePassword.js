@@ -22,6 +22,8 @@ import {
   updatePassword,
 } from "firebase/auth";
 import { useUser } from "../../../context/userContext";
+import { KeyboardAvoidingView } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
 const ChangePassword = () => {
   const { userData } = useUser();
@@ -41,6 +43,7 @@ const ChangePassword = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [checkingPass, setCheckingPass] = useState(false);
   const [passwordStatus, setPasswordStatus] = useState(null); // ✅ "correct" | "wrong" | null
+  const navigation = useNavigation();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -120,6 +123,9 @@ const ChangePassword = () => {
       setPasswordStatus(null);
       showToast("Password updated successfully!");
       setConfirmModalVisible(false);
+      setTimeout(() => {
+        navigation.goBack(); // or navigation.navigate("Settings")
+      }, 800);
     } catch (err) {
       console.error("Error changing password:", err);
       let msg = "Failed to change password.";
@@ -134,172 +140,184 @@ const ChangePassword = () => {
   return (
     <CustomBgColor>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.container}>
-            {/* Current Password */}
-            <Text style={styles.label}>Current Password</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter current password"
-                secureTextEntry={!showCurrent}
-                value={currentPassword}
-                autoCapitalize="none"
-                onChangeText={(text) => {
-                  setCurrentPassword(text);
-                  setPasswordStatus(null);
-                }}
-                onBlur={handleCheckPassword}
-                placeholderTextColor="#777"
-              />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setShowCurrent(!showCurrent)}
-              >
-                <Ionicons
-                  name={showCurrent ? "eye" : "eye-off"}
-                  size={22}
-                  color="#3A2E2E"
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* ✅ Status Feedback */}
-            {checkingPass ? (
-              <Text style={styles.checkingText}>Checking password...</Text>
-            ) : passwordStatus === "correct" ? (
-              <Text style={styles.correctText}>
-                ✓ Current password verified
-              </Text>
-            ) : passwordStatus === "wrong" ? (
-              <Text style={styles.errorText}>✗ Incorrect password</Text>
-            ) : null}
-
-            {/* New Password */}
-            <Text style={[styles.label, { marginTop: 10 }]}>New Password</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter new password"
-                secureTextEntry={!showNew}
-                value={newPassword}
-                autoCapitalize="none"
-                onChangeText={(text) => setNewPassword(text)}
-                placeholderTextColor="#777"
-              />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setShowNew(!showNew)}
-              >
-                <Ionicons
-                  name={showNew ? "eye" : "eye-off"}
-                  size={22}
-                  color="#3A2E2E"
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* ✅ live feedback for password strength */}
-            {newPassword.length > 0 &&
-            !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(newPassword) ? (
-              <Text style={styles.errorText}>
-                Password must be at least 8 characters, include uppercase,
-                lowercase, and number.
-              </Text>
-            ) : null}
-
-            {/* Confirm Password */}
-            <Text style={styles.label}>Confirm New Password</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="Re-enter new password"
-                secureTextEntry={!showConfirm}
-                value={confirmPassword}
-                autoCapitalize="none"
-                onChangeText={setConfirmPassword}
-                placeholderTextColor="#777"
-              />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setShowConfirm(!showConfirm)}
-              >
-                <Ionicons
-                  name={showConfirm ? "eye" : "eye-off"}
-                  size={22}
-                  color="#3A2E2E"
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Immediate warning if mismatch */}
-            {confirmPassword && newPassword !== confirmPassword && (
-              <Text style={styles.errorText}>⚠️ Passwords do not match</Text>
-            )}
-
-            {/* Button */}
-            <TouchableOpacity
-              style={[styles.saveButton, { opacity: isSaving ? 0.8 : 1 }]}
-              onPress={() => setConfirmModalVisible(true)}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <ActivityIndicator size="small" color="#fff" />
-                  <Text style={[styles.saveText, { marginLeft: 8 }]}>
-                    Saving...
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.saveText}>Change Password</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-
-        {/* Confirm Modal */}
-        <Modal
-          visible={confirmModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setConfirmModalVisible(false)}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
         >
-          <View style={styles.modalOverlayCenter}>
-            <View style={styles.confirmModal}>
-              <Text style={styles.confirmTitle}>Confirm Change</Text>
-              <Text style={styles.confirmText}>
-                Are you sure you want to update your password?
-              </Text>
-
-              <View style={styles.confirmButtons}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.container}>
+              {/* Current Password */}
+              <Text style={styles.label}>Current Password</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter current password"
+                  secureTextEntry={!showCurrent}
+                  value={currentPassword}
+                  autoCapitalize="none"
+                  onChangeText={(text) => {
+                    setCurrentPassword(text);
+                    setPasswordStatus(null);
+                  }}
+                  onBlur={handleCheckPassword}
+                  placeholderTextColor="#777"
+                />
                 <TouchableOpacity
-                  style={styles.noButton}
-                  onPress={() => setConfirmModalVisible(false)}
+                  style={styles.eyeIcon}
+                  onPress={() => setShowCurrent(!showCurrent)}
                 >
-                  <Text style={styles.noText}>No</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={handleChangePassword}
-                >
-                  {isSaving ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.confirmTextBtn}>Confirm</Text>
-                  )}
+                  <Ionicons
+                    name={showCurrent ? "eye" : "eye-off"}
+                    size={22}
+                    color="#3A2E2E"
+                  />
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
-        </Modal>
 
-        {/* Toast */}
-        {toastVisible && (
-          <Animated.View style={[styles.toast, { opacity: fadeAnim }]}>
-            <Text style={styles.toastText}>{toastMessage}</Text>
-          </Animated.View>
-        )}
+              {/* ✅ Status Feedback */}
+              {checkingPass ? (
+                <Text style={styles.checkingText}>Checking password...</Text>
+              ) : passwordStatus === "correct" ? (
+                <Text style={styles.correctText}>
+                  ✓ Current password verified
+                </Text>
+              ) : passwordStatus === "wrong" ? (
+                <Text style={styles.errorText}>✗ Incorrect password</Text>
+              ) : null}
+
+              {/* New Password */}
+              <Text style={[styles.label, { marginTop: 10 }]}>
+                New Password
+              </Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter new password"
+                  secureTextEntry={!showNew}
+                  value={newPassword}
+                  autoCapitalize="none"
+                  onChangeText={(text) => setNewPassword(text)}
+                  placeholderTextColor="#777"
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowNew(!showNew)}
+                >
+                  <Ionicons
+                    name={showNew ? "eye" : "eye-off"}
+                    size={22}
+                    color="#3A2E2E"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* ✅ live feedback for password strength */}
+              {newPassword.length > 0 &&
+              !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(newPassword) ? (
+                <Text style={styles.errorText}>
+                  Password must be at least 8 characters, include uppercase,
+                  lowercase, and number.
+                </Text>
+              ) : null}
+
+              {/* Confirm Password */}
+              <Text style={styles.label}>Confirm New Password</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Re-enter new password"
+                  secureTextEntry={!showConfirm}
+                  value={confirmPassword}
+                  autoCapitalize="none"
+                  onChangeText={setConfirmPassword}
+                  placeholderTextColor="#777"
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowConfirm(!showConfirm)}
+                >
+                  <Ionicons
+                    name={showConfirm ? "eye" : "eye-off"}
+                    size={22}
+                    color="#3A2E2E"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Immediate warning if mismatch */}
+              {confirmPassword && newPassword !== confirmPassword && (
+                <Text style={styles.errorText}>⚠️ Passwords do not match</Text>
+              )}
+
+              {/* Button */}
+              <TouchableOpacity
+                style={[styles.saveButton, { opacity: isSaving ? 0.8 : 1 }]}
+                onPress={() => setConfirmModalVisible(true)}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={[styles.saveText, { marginLeft: 8 }]}>
+                      Saving...
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.saveText}>Change Password</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          {/* Confirm Modal */}
+          <Modal
+            visible={confirmModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setConfirmModalVisible(false)}
+          >
+            <View style={styles.modalOverlayCenter}>
+              <View style={styles.confirmModal}>
+                <Text style={styles.confirmTitle}>Confirm Change</Text>
+                <Text style={styles.confirmText}>
+                  Are you sure you want to update your password?
+                </Text>
+
+                <View style={styles.confirmButtons}>
+                  <TouchableOpacity
+                    style={styles.noButton}
+                    onPress={() => setConfirmModalVisible(false)}
+                  >
+                    <Text style={styles.noText}>No</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={handleChangePassword}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.confirmTextBtn}>Confirm</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Toast */}
+          {toastVisible && (
+            <Animated.View style={[styles.toast, { opacity: fadeAnim }]}>
+              <Text style={styles.toastText}>{toastMessage}</Text>
+            </Animated.View>
+          )}
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </CustomBgColor>
   );
