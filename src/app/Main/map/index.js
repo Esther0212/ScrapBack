@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   FlatList,
   useColorScheme,
+  Linking,
 } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
@@ -363,14 +364,22 @@ export default function MapSelector() {
   /* ================================
      OPEN GOOGLE MAPS
      ================================ */
-  const openGoogleMaps = (lat, lng) => {
-    // NOTE: this function is still used when tapping list cards;
-    // user origin is marker (user location)
+  const openGoogleMaps = async (lat, lng) => {
     if (!marker) return;
+
     const { latitude, longitude } = marker;
     const url = `https://www.google.com/maps/dir/?api=1&origin=${latitude},${longitude}&destination=${lat},${lng}&travelmode=driving`;
-    // eslint-disable-next-line no-undef
-    Linking.openURL(url);
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        console.warn("Cannot open Google Maps");
+      }
+    } catch (err) {
+      console.error("Google Maps error:", err);
+    }
   };
 
   /* ================================
@@ -385,11 +394,10 @@ export default function MapSelector() {
         style={[styles.scheduleCard, { borderLeftColor: borderColor }]}
         onPress={() => openGoogleMaps(item.lat, item.lng)}
       >
-        <View style={styles.cardHeader}>
+        <View style={styles.cardTitleWrapper}>
           <Text style={styles.cardTitle}>{item.name}</Text>
           <StatusBadge status={item.status} />
         </View>
-
         <Text style={styles.cardAddress}>{item.address}</Text>
 
         {/* Lat/Lng */}
@@ -671,6 +679,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
     color: "#117D2E",
+  },
+  cardTitleWrapper: {
+    flex: 1,
+    paddingRight: 10,
   },
   cardAddress: {
     fontSize: 14,
