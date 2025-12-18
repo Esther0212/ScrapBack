@@ -507,7 +507,7 @@ const RewardDescription = () => {
         return "Gcash Offer";
       case "load":
         return "Load Offer";
-      case "sack":
+      case "rice":
         return "Rice Offer";
       default:
         return "Reward Details";

@@ -10,7 +10,7 @@ export default function RewardsCategoryPage() {
         return "List of Cash Rewards";
       case "load":
         return "List of Load Offers";
-      case "sack":
+      case "rice":
         return "List of Rice Rewards";
       case "other":
         return "List of Other Rewards";

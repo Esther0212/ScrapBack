@@ -41,7 +41,7 @@ const RewardsIndex = () => {
 
       const uniqueCategories = [...new Set(normalized)];
 
-      const order = ["sack", "load", "cash", "other"];
+      const order = ["rice", "load", "cash", "other"];
       const sorted = uniqueCategories.sort(
         (a, b) => order.indexOf(a) - order.indexOf(b)
       );
@@ -56,7 +56,7 @@ const RewardsIndex = () => {
   // 🔸 Category image selector
   const getCategoryImage = (cat) => {
     switch (cat) {
-      case "sack":
+      case "rice":
         return require("../../../assets/redeem/rice.png");
       case "load":
         return require("../../../assets/redeem/load.png");
@@ -70,8 +70,8 @@ const RewardsIndex = () => {
   // 🔸 Category title
   const getCategoryTitle = (cat) => {
     switch (cat) {
-      case "sack":
-        return "Rice Sack";
+      case "rice":
+        return "Rice";
       case "load":
         return "Load";
       case "cash":
