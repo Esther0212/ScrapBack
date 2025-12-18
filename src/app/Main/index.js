@@ -1,3 +1,4 @@
+// src/app/Main/Home.jsx
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -6,6 +7,7 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
+  Platform,
   Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,16 +19,58 @@ import {
   query,
   where,
   onSnapshot,
+  setDoc,
   doc,
 } from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useUser } from "../../context/userContext";
 import { useEducational } from "../../context/educationalContext";
-
-
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
 
 const { width } = Dimensions.get("window");
 
+async function registerForPushNotificationsAsync() {
+  if (!Device.isDevice) {
+    alert("Must use physical device for Push Notifications");
+    return null;
+  }
+
+  let { status } = await Notifications.getPermissionsAsync();
+  if (status !== "granted") {
+    const { status: newStatus } = await Notifications.requestPermissionsAsync();
+    status = newStatus;
+  }
+  if (status !== "granted") {
+    alert("Push notification permissions not granted!");
+    return null;
+  }
+
+  const projectId =
+    Constants?.expoConfig?.extra?.eas?.projectId ??
+    Constants?.easConfig?.projectId;
+
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  console.log("Expo push token:", token);
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF231F7C",
+    });
+  }
+
+  return token;
+}
+
+const formatPoints = (points = 0) => {
+  if (points >= 1_000_000) return (points / 1_000_000).toFixed(1) + "M";
+  if (points >= 1_000) return (points / 1_000).toFixed(1) + "K";
+  return points.toFixed(2);
+};
 const Home = () => {
   const { userData } = useUser();
   const { educationalContent, setSelectedType } = useEducational();
@@ -40,40 +84,53 @@ const Home = () => {
   const [lockedPoints, setLockedPoints] = useState(0);
   const router = useRouter();
 
+  // ✅ Fetch and listen to user's current points + locked points
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-// ✅ Fetch and listen to user's current points + locked points
-useEffect(() => {
-  const user = auth.currentUser;
-  if (!user) return;
+    const userRef = doc(db, "user", user.uid);
+    const unsub = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
 
-  const userRef = doc(db, "user", user.uid);
-  const unsub = onSnapshot(userRef, (snap) => {
-    if (snap.exists()) {
-      const data = snap.data();
+        const points =
+          typeof data.points === "number" && !isNaN(data.points)
+            ? parseFloat(data.points.toFixed(2))
+            : 0;
 
-      const points =
-        typeof data.points === "number" && !isNaN(data.points)
-          ? parseFloat(data.points.toFixed(2))
-          : 0;
+        const locked =
+          typeof data.locked_points === "number" && !isNaN(data.locked_points)
+            ? parseFloat(data.locked_points.toFixed(2))
+            : 0;
 
-      const locked =
-        typeof data.locked_points === "number" &&
-        !isNaN(data.locked_points)
-          ? parseFloat(data.locked_points.toFixed(2))
-          : 0;
+        setUserPoints(points);
+        setLockedPoints(locked);
+      } else {
+        setUserPoints(0);
+        setLockedPoints(0);
+      }
+    });
 
-      setUserPoints(points);
-      setLockedPoints(locked);
-    } else {
-      setUserPoints(0);
-      setLockedPoints(0);
-    }
-  });
+    return unsub;
+  }, []);
 
-  return unsub;
-}, []);
-
-
+  // ✅ Save Expo Push Token to Firestore
+  useEffect(() => {
+    const saveToken = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await setDoc(
+          doc(db, "user", user.uid),
+          { expoPushToken: token },
+          { merge: true }
+        );
+      }
+    };
+    saveToken();
+  }, []);
 
   // ✅ Real-time badge for nested notifications path
   useEffect(() => {
@@ -173,7 +230,8 @@ useEffect(() => {
           </Text>
 
           {/* ✅ Points Section (Dynamic Firestore Data) */}
-         <View style={styles.pointsContainer}>
+
+          <View style={styles.pointsContainer}>
             <View style={styles.pointsColumn}>
               <Text style={styles.pointsLabel}>Your Total Points</Text>
 
@@ -185,8 +243,8 @@ useEffect(() => {
                 />
 
                 <View style={styles.pointsTextColumn}>
-                  <Text style={styles.pointsValueText}>
-                    {userPoints?.toFixed(2) || "0.00"}
+                  <Text style={styles.pointsValueText} numberOfLines={1}>
+                    {formatPoints(userPoints)}
                   </Text>
 
                   {lockedPoints > 0 && (
@@ -213,7 +271,6 @@ useEffect(() => {
               </TouchableOpacity>
             </View>
           </View>
-
 
           {/* Recycling Guide */}
           <Text style={styles.sectionTitle}>Recycling Guide</Text>
@@ -255,14 +312,8 @@ useEffect(() => {
                 >
                   <View style={styles.card}>
                     <View style={styles.headerBar}>
-                      <Text style={styles.category}>
-                        {category} Conversion
-                      </Text>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={20}
-                        color="#fff"
-                      />
+                      <Text style={styles.category}>{category} Conversion</Text>
+                      <Ionicons name="chevron-forward" size={20} color="#fff" />
                     </View>
 
                     <View style={styles.table}>
@@ -274,17 +325,12 @@ useEffect(() => {
                       </View>
                       {firstRow && (
                         <View
-                          style={[
-                            styles.row,
-                            { backgroundColor: "#FFFFFF" },
-                          ]}
+                          style={[styles.row, { backgroundColor: "#FFFFFF" }]}
                         >
                           <Text style={[styles.cell, { flex: 2 }]}>
                             {firstRow.type}
                           </Text>
-                          <Text style={styles.cell}>
-                            {firstRow.points} pts
-                          </Text>
+                          <Text style={styles.cell}>{firstRow.points} pts</Text>
                         </View>
                       )}
                     </View>
@@ -432,28 +478,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Poppins_700Bold",
     color: "#333",
-  },  
-pointsColumn: {
-  width: "50%",
-  justifyContent: "center",
-},
+  },
+  /* ✅ ADD these styles */
 
-pointsRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 8,
-},
+  pointsColumn: {
+    width: "50%",
+    justifyContent: "center",
+  },
 
-pointsTextColumn: {
-  justifyContent: "center",
-},
+  pointsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
 
-lockedPointsText: {
-  marginTop: 2,
-  fontSize: 13,
-  color: "#555",
-  fontFamily: "Poppins_500Medium",
-},
+  pointsTextColumn: {
+    justifyContent: "center",
+  },
+
+  lockedPointsText: {
+    marginTop: 2,
+    fontSize: 13,
+    color: "#555",
+    fontFamily: "Poppins_500Medium",
+  },
 
   cell: {
     flex: 1,

@@ -118,7 +118,7 @@ const RequestPickup = () => {
         setContributions(map);
       },
       (error) => {
-        console.error("contribution_logs listener error:", error);
+        console.error("contributionLogs listener error:", error);
       }
     );
 
