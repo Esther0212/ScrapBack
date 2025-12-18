@@ -14,6 +14,7 @@ import {
   Platform,
   ToastAndroid,
   Alert,
+  AppState,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { useRouter } from "expo-router";
@@ -44,6 +45,12 @@ export default function RedeemRewardsQR() {
     Date.now() + EXPIRY_SECONDS * 1000
   );
 
+  const appState = React.useRef(AppState.currentState);
+  const recalcTimeLeft = () => {
+    const diff = Math.floor((expiryTimestamp - Date.now()) / 1000);
+    setTimeLeft(diff > 0 ? diff : 0);
+  };
+
   // Rewards
   const [rewards, setRewards] = useState([]);
   const [groupedRewards, setGroupedRewards] = useState({});
@@ -70,25 +77,32 @@ export default function RedeemRewardsQR() {
   // Countdown effect (based on timeLeft)
   // --------------------------
   useEffect(() => {
-    // If no QR generated, keep the counter at EXPIRY_SECONDS (or paused).
-    // When qrPayload exists, timeLeft will be set to EXPIRY_SECONDS in handleGenerateQR.
     if (!qrPayload) return;
 
     if (timeLeft <= 0) {
-      // expire QR locally
       setQrPayload(null);
-      // reset to default expiry values (so UI can generate again)
       setExpiryTimestamp(Date.now() + EXPIRY_SECONDS * 1000);
       setTimeLeft(EXPIRY_SECONDS);
       return;
     }
 
-    const interval = setInterval(() => {
-      setTimeLeft((t) => (t > 0 ? t - 1 : 0));
-    }, 1000);
-
+    const interval = setInterval(recalcTimeLeft, 1000);
     return () => clearInterval(interval);
-  }, [timeLeft, qrPayload]);
+  }, [qrPayload, expiryTimestamp]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextState === "active"
+      ) {
+        recalcTimeLeft(); // 👈 FIX when app resumes
+      }
+      appState.current = nextState;
+    });
+
+    return () => subscription.remove();
+  }, [expiryTimestamp]);
 
   // --------------------------
   // Fetch user data
@@ -440,27 +454,30 @@ export default function RedeemRewardsQR() {
           <Text style={styles.description}>{descriptionText}</Text>
 
           {!qrPayload ? (
-            <>
-              {/* ⭐⭐ ADDED POINTS SECTION (same as Home) ⭐⭐ */}
-              {!qrPayload && (
-                <View style={styles.pointsColumn}>
-                  <Text style={styles.pointsLabel}>Your Total Points</Text>
+            <ScrollView
+              style={{ width: "100%" }}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* ⭐⭐ POINTS SECTION ⭐⭐ */}
+              <View style={styles.pointsColumn}>
+                <Text style={styles.pointsLabel}>Your Total Points</Text>
 
-                  <View style={styles.pointsRow}>
-                    <Image
-                      source={require("../../../assets/home/lettermarkLogo.png")}
-                      style={styles.pointsLogo}
-                      resizeMode="contain"
-                    />
+                <View style={styles.pointsRow}>
+                  <Image
+                    source={require("../../../assets/home/lettermarkLogo.png")}
+                    style={styles.pointsLogo}
+                    resizeMode="contain"
+                  />
 
-                    <View>
-                      <Text style={styles.pointsValueText}>
-                        {userData?.points?.toFixed(2) || "0.00"}
-                      </Text>
-                    </View>
+                  <View>
+                    <Text style={styles.pointsValueText}>
+                      {userData?.points?.toFixed(2) || "0.00"}
+                    </Text>
                   </View>
                 </View>
-              )}
+              </View>
+
               {/* Reward Picker */}
               <Text style={styles.label}>Select Reward</Text>
 
@@ -495,6 +512,7 @@ export default function RedeemRewardsQR() {
                   selectedReward?.title?.toLowerCase().includes("cash")) && (
                   <>
                     <Text style={styles.label}>Enter Amount (₱)</Text>
+
                     <TextInput
                       style={styles.inputEditable}
                       keyboardType="numeric"
@@ -529,7 +547,7 @@ export default function RedeemRewardsQR() {
                   </>
                 )}
 
-              {/* Generate QR — only if reward selected */}
+              {/* Generate QR */}
               {selectedReward && (
                 <TouchableOpacity
                   style={[
@@ -554,7 +572,7 @@ export default function RedeemRewardsQR() {
               >
                 <Text style={styles.closeButtonText}>CLOSE</Text>
               </TouchableOpacity>
-            </>
+            </ScrollView>
           ) : (
             <>
               {qrValue ? (
@@ -570,11 +588,10 @@ export default function RedeemRewardsQR() {
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => {
-                  // allow user to clear generated QR and choose another
                   setQrPayload(null);
                   setSelectedReward(null);
                   setCustomAmount("");
-                  // reset expiry/timeLeft
+
                   const nowExpiry = Date.now() + EXPIRY_SECONDS * 1000;
                   setExpiryTimestamp(nowExpiry);
                   setTimeLeft(EXPIRY_SECONDS);
@@ -796,29 +813,28 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
   },
   wasteOption: {
-  backgroundColor: "#fff",
-  borderRadius: 10,
-  padding: 14,
-  marginBottom: 12,
-  borderWidth: 1,
-  borderColor: "#ddd",
-  position: "relative", // 👈 IMPORTANT
-},
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    position: "relative", // 👈 IMPORTANT
+  },
 
-unavailableBadge: {
-  position: "absolute",
-  bottom: 8,
-  right: 8,
-  backgroundColor: "#FDECEA",
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 6,
-},
+  unavailableBadge: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "#FDECEA",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
 
-unavailableBadgeText: {
-  fontSize: 11,
-  fontFamily: "Poppins_700Bold",
-  color: "#B00020",
-},
-
+  unavailableBadgeText: {
+    fontSize: 11,
+    fontFamily: "Poppins_700Bold",
+    color: "#B00020",
+  },
 });
