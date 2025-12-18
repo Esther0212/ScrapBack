@@ -66,10 +66,22 @@ async function registerForPushNotificationsAsync() {
   return token;
 }
 
+const roundToHundredths = (value) => {
+  return Math.floor(value * 100 + 0.5) / 100;
+};
+
 const formatPoints = (points = 0) => {
-  if (points >= 1_000_000) return (points / 1_000_000).toFixed(1) + "M";
-  if (points >= 1_000) return (points / 1_000).toFixed(1) + "K";
-  return points.toFixed(2);
+  if (points >= 1_000_000) {
+    const value = points / 1_000_000;
+    return roundToHundredths(value).toFixed(2) + "M";
+  }
+
+  if (points >= 1_000) {
+    const value = points / 1_000;
+    return roundToHundredths(value).toFixed(2) + "K";
+  }
+
+  return roundToHundredths(points).toFixed(2);
 };
 const Home = () => {
   const { userData } = useUser();
@@ -96,7 +108,7 @@ const Home = () => {
 
         const points =
           typeof data.points === "number" && !isNaN(data.points)
-            ? parseFloat(data.points.toFixed(2))
+            ? data.points // 🔥 keep FULL precision
             : 0;
 
         const locked =
