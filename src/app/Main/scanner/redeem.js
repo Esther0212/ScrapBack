@@ -321,14 +321,21 @@ export default function RedeemRewardsQR() {
                 {collapsedCategories[category] &&
                   items.map((r) => {
                     const isSelected = selectedReward?.id === r.id;
+                    const isUnavailable =
+                      r.status?.toLowerCase()?.trim() === "unavailable";
+
                     return (
                       <TouchableOpacity
                         key={r.id}
+                        disabled={isUnavailable}
                         style={[
                           styles.wasteOption,
                           isSelected && styles.wasteOptionSelected,
+                          isUnavailable && styles.wasteOptionUnavailable,
                         ]}
                         onPress={() => {
+                          if (isUnavailable) return;
+
                           if (isSelected) setSelectedReward(null);
                           else {
                             setSelectedReward(r);
@@ -355,8 +362,10 @@ export default function RedeemRewardsQR() {
                               height: 60,
                               borderRadius: 8,
                               marginRight: 12,
+                              opacity: isUnavailable ? 0.4 : 1,
                             }}
                           />
+
                           <View style={{ flex: 1 }}>
                             <Text
                               style={[
@@ -366,6 +375,7 @@ export default function RedeemRewardsQR() {
                             >
                               {r.title}
                             </Text>
+
                             <Text style={styles.wastePoints}>
                               {r.points == 0 &&
                               (r.category === "other" ||
@@ -374,6 +384,15 @@ export default function RedeemRewardsQR() {
                                 : `${r.points} pts`}
                             </Text>
                           </View>
+
+                          {/* 🔴 UNAVAILABLE BADGE */}
+                          {isUnavailable && (
+                            <View style={styles.unavailableBadge}>
+                              <Text style={styles.unavailableBadgeText}>
+                                Unavailable
+                              </Text>
+                            </View>
+                          )}
                         </View>
                       </TouchableOpacity>
                     );
@@ -614,7 +633,12 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 18,
   },
-  pointsColumn: { width: "100%", justifyContent: "center", alignItems: "center", marginVertical: 30 },
+  pointsColumn: {
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 30,
+  },
   pointsLabel: {
     fontSize: 15,
     fontFamily: "Poppins_700Bold",
@@ -774,14 +798,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontFamily: "Poppins_700Bold",
     fontSize: 16,
-  },
-  wasteOption: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#ddd",
   },
   wasteOptionSelected: { borderColor: "#0E9247", backgroundColor: "#E6F4EA" },
   wasteText: { fontSize: 15, color: "#333", fontFamily: "Poppins_700Bold" },
