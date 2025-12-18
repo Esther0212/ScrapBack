@@ -21,7 +21,7 @@ const { width } = Dimensions.get("window");
 
 const RewardItem = () => {
   const router = useRouter();
-  const { category } = useLocalSearchParams(); // e.g. "cash", "load", "sack", "other"
+  const { category } = useLocalSearchParams(); 
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +42,7 @@ const RewardItem = () => {
         const filtered = allRewards.filter((r) => {
           const cat = r.category?.toLowerCase()?.trim();
           if (category === "other")
-            return !["sack", "load", "cash"].includes(cat);
+            return !["rice", "load", "cash"].includes(cat);
           return cat === category?.toLowerCase()?.trim();
         });
 

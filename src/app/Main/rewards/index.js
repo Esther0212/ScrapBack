@@ -30,26 +30,18 @@ const RewardsIndex = () => {
     const unsubscribe = onSnapshot(rewardRef, (snapshot) => {
       const rewards = snapshot.docs.map((doc) => doc.data());
 
-      // Filter available only
-      const available = rewards.filter(
-        (r) => r.status?.toLowerCase()?.trim() !== "unavailable"
-      );
-
-      // Extract and normalize categories
-      const rawCategories = available
+      // ✅ DO NOT filter out unavailable rewards here
+      const rawCategories = rewards
         .map((r) => r.category?.toLowerCase()?.trim())
         .filter(Boolean);
 
-      // Collapse any "others" variant to "other"
       const normalized = rawCategories.map((c) =>
         c === "others" ? "other" : c
       );
 
-      // Deduplicate
       const uniqueCategories = [...new Set(normalized)];
 
-      // Sort logically
-      const order = ["sack", "load", "cash", "other"];
+      const order = ["rice", "load", "cash", "other"];
       const sorted = uniqueCategories.sort(
         (a, b) => order.indexOf(a) - order.indexOf(b)
       );
@@ -64,7 +56,7 @@ const RewardsIndex = () => {
   // 🔸 Category image selector
   const getCategoryImage = (cat) => {
     switch (cat) {
-      case "sack":
+      case "rice":
         return require("../../../assets/redeem/rice.png");
       case "load":
         return require("../../../assets/redeem/load.png");
@@ -78,8 +70,8 @@ const RewardsIndex = () => {
   // 🔸 Category title
   const getCategoryTitle = (cat) => {
     switch (cat) {
-      case "sack":
-        return "Rice Sack";
+      case "rice":
+        return "Rice";
       case "load":
         return "Load";
       case "cash":

@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  AppState,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { useRouter } from "expo-router";
@@ -19,29 +20,57 @@ export default function EarnPointsQR() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ⏳ countdown state
-  const [timeLeft, setTimeLeft] = useState(5 * 60); // 5 minutes in seconds
+  // ⏳ expiry-based timer (SOURCE OF TRUTH)
+  const EXPIRY_DURATION = 5 * 60 * 1000; // 5 minutes
   const [expiryTimestamp, setExpiryTimestamp] = useState(
-    Date.now() + 5 * 60 * 1000
+    Date.now() + EXPIRY_DURATION
   );
-  //const [timeLeft, setTimeLeft] = useState(10); // 10 seconds for testing expired code, dont remove
-  //const [expiryTimestamp] = useState(Date.now() + 10 * 1000); // 10 seconds for testing expired code, dont remove
+  const [timeLeft, setTimeLeft] = useState(5 * 60);
 
+  const appState = useRef(AppState.currentState);
+
+  /* =========================
+     TIMER – REAL TIME SAFE
+  ========================= */
+
+  const recalcTimeLeft = () => {
+    const diff = Math.floor((expiryTimestamp - Date.now()) / 1000);
+    setTimeLeft(diff > 0 ? diff : 0);
+  };
+
+  // foreground/background listener
   useEffect(() => {
-    if (timeLeft <= 0) {
-      // ⏱ When expired → regenerate QR
-      const newExpiry = Date.now() + 5 * 60 * 1000;
-      setExpiryTimestamp(newExpiry);
-      setTimeLeft(5 * 60); // reset countdown
-      return;
-    }
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextState === "active"
+      ) {
+        recalcTimeLeft(); // 👈 FIX: recompute when app resumes
+      }
+      appState.current = nextState;
+    });
 
-    const interval = setInterval(() => {
-      setTimeLeft((t) => (t > 0 ? t - 1 : 0));
-    }, 1000);
+    return () => subscription.remove();
+  }, [expiryTimestamp]);
 
+  // live countdown while app is active
+  useEffect(() => {
+    const interval = setInterval(recalcTimeLeft, 1000);
     return () => clearInterval(interval);
+  }, [expiryTimestamp]);
+
+  // regenerate QR when expired
+  useEffect(() => {
+    if (timeLeft === 0) {
+      const newExpiry = Date.now() + EXPIRY_DURATION;
+      setExpiryTimestamp(newExpiry);
+      setTimeLeft(5 * 60);
+    }
   }, [timeLeft]);
+
+  /* =========================
+     FETCH USER DATA
+  ========================= */
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -67,17 +96,6 @@ export default function EarnPointsQR() {
 
     fetchUserData();
   }, [user]);
-
-  // ⏳ countdown logic
-  useEffect(() => {
-    if (timeLeft <= 0) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((t) => (t > 0 ? t - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [timeLeft]);
 
   if (!user) {
     return <Text style={styles.errorText}>Please log in</Text>;
@@ -107,19 +125,19 @@ export default function EarnPointsQR() {
           {userData && timeLeft > 0 ? (
             <QRCode
               value={JSON.stringify({
-                type: "earn", // 👈 add this line
+                type: "earn",
                 uid: user.uid,
                 email: user.email,
-                name: `${userData.firstName || ""} ${userData.lastName || ""}`,
-                exp: expiryTimestamp, // ✅ stays constant for 5 min
+                name: `${userData.firstName || ""} ${
+                  userData.lastName || ""
+                }`,
+                exp: expiryTimestamp,
               })}
               size={180}
             />
           ) : (
             <Text style={styles.expiredMessage}>
-              {timeLeft === 0
-                ? "⚠️ QR code expired."
-                : "No Firestore data found."}
+              ⚠️ QR code expired.
             </Text>
           )}
 
@@ -184,13 +202,16 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 18,
     textAlign: "center",
-    marginVertical: 40, // pushes it away from description and button
+    marginVertical: 40,
   },
-
   closeButtonText: {
     fontSize: 15,
     fontFamily: "Poppins_700Bold",
     color: "#000",
   },
-  errorText: { color: "red", fontWeight: "bold", textAlign: "center" },
+  errorText: {
+    color: "red",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
 });
