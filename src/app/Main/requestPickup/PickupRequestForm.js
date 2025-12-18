@@ -37,6 +37,7 @@ import {
   getDoc,
   updateDoc,
   addDoc,
+  setDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
@@ -600,16 +601,23 @@ export default function PickupRequestForm() {
         });
 
         // 🔔 Notify USER — pickup pending approval
-        await addDoc(
-          collection(db, "notifications", user.uid, "userNotifications"),
+        await setDoc(
+          doc(
+            db,
+            "notifications",
+            user.uid,
+            "userNotifications",
+            newDoc.id // 👈 SAME AS pickupRequestId
+          ),
           {
             title: "Pickup Request Submitted",
-            body:
-              "Your pickup request is now <b>pending</b> and is waiting for admin approval.",
+            body: "Your pickup request is now <b>pending</b> and is waiting for admin approval.",
             type: "pickupStatus",
             requestId: newDoc.id,
+            status: "pending",
             read: false,
             createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
           }
         );
 

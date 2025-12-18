@@ -26,6 +26,15 @@ import {
 import CustomBgColor from "../../components/customBgColor";
 import { useRouter } from "expo-router";
 
+const PICKUP_STEPS = [
+  { key: "pending", label: "Pending" },
+  { key: "in progress", label: "In Progress" },
+  { key: "scheduled", label: "Scheduled" },
+  { key: "completed", label: "Completed" },
+];
+
+const TERMINAL_STATUSES = ["cancelled", "not approved"];
+
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -69,6 +78,53 @@ export default function NotificationsScreen() {
 
     return (
       <Text style={[styles.body, isUnread && styles.bodyUnread]}>{result}</Text>
+    );
+  };
+
+  const PickupProgress = ({ status }) => {
+    const currentIndex = PICKUP_STEPS.findIndex((s) => s.key === status);
+
+    return (
+      <View style={styles.progressContainer}>
+        {PICKUP_STEPS.map((step, index) => {
+          const isDone = index <= currentIndex;
+          const isLast = index === PICKUP_STEPS.length - 1;
+
+          return (
+            <View key={step.key} style={styles.progressItem}>
+              {/* Circle */}
+              <View
+                style={[
+                  styles.progressCircle,
+                  isDone && styles.progressCircleActive,
+                ]}
+              >
+                <Text style={styles.progressNumber}>{index + 1}</Text>
+              </View>
+
+              {/* Label */}
+              <Text
+                style={[
+                  styles.progressLabel,
+                  isDone && styles.progressLabelActive,
+                ]}
+              >
+                {step.label}
+              </Text>
+
+              {/* Line */}
+              {!isLast && (
+                <View
+                  style={[
+                    styles.progressLine,
+                    isDone && styles.progressLineActive,
+                  ]}
+                />
+              )}
+            </View>
+          );
+        })}
+      </View>
     );
   };
 
@@ -312,6 +368,18 @@ export default function NotificationsScreen() {
       activeOpacity={0.9}
     >
       {!item.read && <View style={styles.unreadBar} />}
+      {item.type === "pickupStatus" &&
+        !TERMINAL_STATUSES.includes(item.status) && (
+          <PickupProgress status={item.status} />
+        )}
+      {item.type === "pickupStatus" &&
+        TERMINAL_STATUSES.includes(item.status) && (
+          <Text style={styles.cancelledText}>
+            {item.status === "cancelled"
+              ? "Pickup request was cancelled"
+              : "Pickup request was not approved"}
+          </Text>
+        )}
 
       {/* 🔸 Title Row */}
       <View style={styles.titleRow}>
@@ -601,5 +669,70 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
+  },
+
+  progressContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+
+  progressItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+
+  progressCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#E0E0E0",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
+  },
+
+  progressCircleActive: {
+    backgroundColor: "#008243",
+  },
+
+  progressNumber: {
+    fontSize: 12,
+    color: "#fff",
+    fontFamily: "Poppins_700Bold",
+  },
+
+  progressLabel: {
+    fontSize: 11,
+    marginTop: 4,
+    color: "#999",
+    textAlign: "center",
+  },
+
+  progressLabelActive: {
+    color: "#008243",
+    fontFamily: "Poppins_600SemiBold",
+  },
+
+  progressLine: {
+    position: "absolute",
+    top: 12,
+    left: "50%",
+    right: "-50%",
+    height: 2,
+    backgroundColor: "#E0E0E0",
+    zIndex: 1,
+  },
+
+  progressLineActive: {
+    backgroundColor: "#008243",
+  },
+  cancelledText: {
+    fontSize: 13,
+    fontFamily: "Poppins_400Regular",
+    color: "#D22B2B",
+    marginBottom: 6,
   },
 });
