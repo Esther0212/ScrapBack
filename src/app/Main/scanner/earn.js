@@ -21,11 +21,11 @@ export default function EarnPointsQR() {
   const [loading, setLoading] = useState(true);
 
   // ⏳ expiry-based timer (SOURCE OF TRUTH)
-  const EXPIRY_DURATION = 5 * 60 * 1000; // 5 minutes
+  const EXPIRY_DURATION = 9999 * 60 * 1000; // 5 minutes
   const [expiryTimestamp, setExpiryTimestamp] = useState(
     Date.now() + EXPIRY_DURATION
   );
-  const [timeLeft, setTimeLeft] = useState(5 * 60);
+  const [timeLeft, setTimeLeft] = useState(9999 * 60);
 
   const appState = useRef(AppState.currentState);
 

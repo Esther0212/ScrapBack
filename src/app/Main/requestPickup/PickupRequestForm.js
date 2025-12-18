@@ -106,6 +106,8 @@ export default function PickupRequestForm() {
 
   const [addressChanged, setAddressChanged] = useState(false);
 
+  const [coordsChanged, setCoordsChanged] = useState(false);
+
   const [region, setRegion] = useState({
     latitude: 8.4542,
     longitude: 124.6319,
@@ -429,6 +431,7 @@ export default function PickupRequestForm() {
 
   const confirmLocation = () => {
     setPickupAddress(addressName || "Unknown address");
+    // markerCoords is already correct — no need to reset it
     setModalVisible(false);
   };
 
@@ -769,7 +772,7 @@ export default function PickupRequestForm() {
               value={date}
               mode="date"
               display={Platform.OS === "ios" ? "spinner" : "default"}
-              minimumDate={tomorrow}   // ✅ DISABLE past + today
+              minimumDate={tomorrow} // ✅ DISABLE past + today
               onChange={onChangeDate}
             />
           )}
@@ -874,12 +877,10 @@ export default function PickupRequestForm() {
                   onPress={() => {
                     setEditAddressModalVisible(false);
 
-                    if (addressChanged) {
-                      // ✅ user edited → save new address
-                      confirmLocation();
+                    if (addressChanged || coordsChanged) {
+                      confirmLocation(); // ✅ saves address + coords
                     } else {
-                      // ✅ no edits → just close everything
-                      setModalVisible(false);
+                      setModalVisible(false); // truly unchanged
                     }
                   }}
                 >
@@ -1215,6 +1216,7 @@ export default function PickupRequestForm() {
                 if (isLocked) return;
                 const coords = e.nativeEvent.coordinate;
                 setMarkerCoords(coords);
+                setCoordsChanged(true); // ✅ TRACK CHANGE
                 fetchAddressName(coords);
               }}
             >
@@ -1228,6 +1230,7 @@ export default function PickupRequestForm() {
                     if (isLocked) return;
                     const coords = e.nativeEvent.coordinate;
                     setMarkerCoords(coords);
+                    setCoordsChanged(true); // ✅ TRACK CHANGE
                     fetchAddressName(coords);
                   }}
                 />
