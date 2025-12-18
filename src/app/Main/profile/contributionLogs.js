@@ -8,6 +8,7 @@ import {
   Image,
   ScrollView,
   Dimensions,
+  Modal
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
@@ -28,6 +29,8 @@ export default function ContributionLogs() {
 
   const zigHeight = 14;
   const approxTeeth = 15;
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   // 🔹 Fetch contribution log
   useEffect(() => {
@@ -240,7 +243,28 @@ export default function ContributionLogs() {
             {staffPhotoUrl ? (
               <View style={{ width: "100%", marginTop: 10 }}>
                 <Text style={styles.subHeader}>Proof Photo:</Text>
-                <Image source={{ uri: staffPhotoUrl }} style={styles.image} />
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setPreviewImage(staffPhotoUrl);
+                    setPreviewVisible(true);
+                  }}
+                >
+                  <Image source={{ uri: staffPhotoUrl }} style={styles.image} />
+                </TouchableOpacity>
+
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#666",
+                    textAlign: "center",
+                    marginTop: 4,
+                    fontFamily: "Poppins_400Regular",
+                  }}
+                >
+                  Tap image to view full size
+                </Text>
               </View>
             ) : null}
           </View>
@@ -265,6 +289,53 @@ export default function ContributionLogs() {
         >
           <Text style={styles.doneButtonText}>BACK TO PROFILE</Text>
         </TouchableOpacity>
+
+        <Modal
+          visible={previewVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPreviewVisible(false)}
+        >
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.9)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                position: "absolute",
+                top: 40,
+                right: 20,
+                zIndex: 2,
+              }}
+              onPress={() => setPreviewVisible(false)}
+            >
+              <Text
+                style={{
+                  color: "#fff",
+                  fontSize: 28,
+                  fontWeight: "bold",
+                }}
+              >
+                ✕
+              </Text>
+            </TouchableOpacity>
+
+            {previewImage && (
+              <Image
+                source={{ uri: previewImage }}
+                style={{
+                  width: "100%",
+                  height: "80%",
+                  resizeMode: "contain",
+                }}
+              />
+            )}
+          </View>
+        </Modal>
       </ScrollView>
     </CustomBgColor>
   );
