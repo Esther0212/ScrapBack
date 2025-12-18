@@ -166,6 +166,8 @@ const ChangePassword = () => {
                   }}
                   onBlur={handleCheckPassword}
                   placeholderTextColor="#777"
+                  contextMenuHidden={true}
+                  selectTextOnFocus={false}
                 />
                 <TouchableOpacity
                   style={styles.eyeIcon}
@@ -203,6 +205,8 @@ const ChangePassword = () => {
                   autoCapitalize="none"
                   onChangeText={(text) => setNewPassword(text)}
                   placeholderTextColor="#777"
+                  contextMenuHidden={true}
+                  selectTextOnFocus={false}
                 />
                 <TouchableOpacity
                   style={styles.eyeIcon}
@@ -236,6 +240,8 @@ const ChangePassword = () => {
                   autoCapitalize="none"
                   onChangeText={setConfirmPassword}
                   placeholderTextColor="#777"
+                  contextMenuHidden={true}
+                  selectTextOnFocus={false}
                 />
                 <TouchableOpacity
                   style={styles.eyeIcon}
