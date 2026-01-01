@@ -37,7 +37,8 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [loadingRewards, setLoadingRewards] = useState(true);
 
-  const { scrollTo, tab } = useLocalSearchParams();
+  const { scrollTo, tab, fromNotification } = useLocalSearchParams();
+
   const listRef = useRef(null);
 
   const profileImageSource = userData?.profilePic
@@ -185,10 +186,10 @@ const Profile = () => {
     <FlatList
       ref={listRef}
       getItemLayout={(data, index) => ({
-        length: 120,   // approximate row height
+        length: 120, // approximate row height
         offset: 120 * index,
         index,
-      })}      
+      })}
       data={Object.entries(groupedData)}
       keyExtractor={([date]) => date}
       contentContainerStyle={{ paddingBottom: 40 }}
@@ -216,15 +217,17 @@ const Profile = () => {
                       borderColor: "#E57373",
                     },
                   ]}
-                  onPress={() =>
+                  onPress={() => {
+                    if (fromNotification === "true") return;
+
                     router.push({
                       pathname:
                         type === "points"
                           ? "/Main/profile/contributionLogs"
                           : "/Main/profile/redemptionLogs",
                       params: { id: log.id },
-                    })
-                  }
+                    });
+                  }}
                   disabled={isVoided} // 🧱 disable tap on voided
                 >
                   {/* LEFT SIDE IMAGE */}

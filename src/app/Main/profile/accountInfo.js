@@ -492,10 +492,16 @@ const AccountInfo = () => {
     try {
       if (!userData?.uid) return;
 
-      // 🚫 Require pinpointed location before saving
-      if (!marker) {
-        showToast("Please tap the map to pinpoint your exact location.", 2500);
-        return;
+      const isInside =
+        selectedBarangayFeature &&
+        marker &&
+        isInsideSelectedBarangay(marker.latitude, marker.longitude);
+
+      if (!isInside) {
+        showToast(
+          "Your pinned location is outside the selected barangay. Saving anyway.",
+          2500
+        );
       }
 
       setIsSaving(true);
@@ -601,7 +607,7 @@ const AccountInfo = () => {
 
   return (
     <CustomBgColor>
-      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+      <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.container}>
             {/* Top Right Action Button */}
@@ -920,24 +926,26 @@ const AccountInfo = () => {
                           const { latitude, longitude } =
                             e.nativeEvent.coordinate;
 
-                          if (
+                          const isInside =
                             selectedBarangayFeature &&
-                            !isInsideSelectedBarangay(latitude, longitude)
-                          ) {
+                            isInsideSelectedBarangay(latitude, longitude);
+
+                          if (!isInside) {
                             showToast(
-                              "Location must be inside selected barangay.",
-                              2200
+                              "Pin is outside the selected barangay. Make sure this is correct.",
+                              2500
                             );
-                            if (barangayCenter) {
-                              setMarker(null);
-                              setMapRegion((prev) => ({
-                                ...(prev || {}),
-                                latitude: barangayCenter.latitude,
-                                longitude: barangayCenter.longitude,
-                                latitudeDelta: prev?.latitudeDelta ?? 0.03,
-                                longitudeDelta: prev?.longitudeDelta ?? 0.03,
-                              }));
-                            }
+
+                            // ✅ Always keep the pin
+                            setMarker({ latitude, longitude });
+                            setMapRegion((prev) => ({
+                              ...(prev || {}),
+                              latitude,
+                              longitude,
+                              latitudeDelta: prev?.latitudeDelta ?? 0.03,
+                              longitudeDelta: prev?.longitudeDelta ?? 0.03,
+                            }));
+
                             return;
                           }
 
@@ -980,25 +988,26 @@ const AccountInfo = () => {
                               const { latitude, longitude } =
                                 e.nativeEvent.coordinate;
 
-                              if (
+                              const isInside =
                                 selectedBarangayFeature &&
-                                !isInsideSelectedBarangay(latitude, longitude)
-                              ) {
+                                isInsideSelectedBarangay(latitude, longitude);
+
+                              if (!isInside) {
                                 showToast(
-                                  "Pin must stay inside the selected barangay.",
-                                  2400
+                                  "Pin is outside the selected barangay. Please double-check your address.",
+                                  2500
                                 );
-                                if (barangayCenter) {
-                                  setMarker(barangayCenter);
-                                  setMapRegion((prev) => ({
-                                    ...(prev || {}),
-                                    latitude: barangayCenter.latitude,
-                                    longitude: barangayCenter.longitude,
-                                    latitudeDelta: prev?.latitudeDelta ?? 0.03,
-                                    longitudeDelta:
-                                      prev?.longitudeDelta ?? 0.03,
-                                  }));
-                                }
+
+                                // ✅ Always allow pin placement
+                                setMarker({ latitude, longitude });
+                                setMapRegion((prev) => ({
+                                  ...(prev || {}),
+                                  latitude,
+                                  longitude,
+                                  latitudeDelta: prev?.latitudeDelta ?? 0.03,
+                                  longitudeDelta: prev?.longitudeDelta ?? 0.03,
+                                }));
+
                                 return;
                               }
 
@@ -1199,7 +1208,7 @@ const DropdownField = ({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  scrollContainer: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 0 },
+  scrollContainer: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 20, paddingTop: 30, },
   container: { flex: 1 },
   imageWrapper: {
     alignSelf: "center",
@@ -1323,6 +1332,7 @@ const styles = StyleSheet.create({
     borderColor: "#E0D4C3",
     height: 300,
     position: "relative",
+    marginBottom: 20,
   },
   map: {
     width: "100%",
@@ -1460,12 +1470,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: "center",
   },
-topActionWrapper: {
-  width: "100%",
-  flexDirection: "row",
-  justifyContent: "flex-end",
-  marginBottom: 10, 
-},
+  topActionWrapper: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 10,
+  },
 
   topEditButton: {
     backgroundColor: "#008243",
