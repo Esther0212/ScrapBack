@@ -40,6 +40,8 @@ const RewardDescription = () => {
   const [lockedPoints, setLockedPoints] = useState(0);
   const [loading, setLoading] = useState(true);
   const [hasPendingRedemption, setHasPendingRedemption] = useState(false);
+  const [collectionPoints, setCollectionPoints] = useState([]);
+  const [showCollectionPoints, setShowCollectionPoints] = useState(false);
 
   // 🔹 Modals
   const [choiceModalVisible, setChoiceModalVisible] = useState(false);
@@ -100,6 +102,24 @@ const RewardDescription = () => {
     if (id) fetchReward();
   }, [id]);
 
+  useEffect(() => {
+    const fetchCollectionPoints = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "collectionPoint"));
+        setCollectionPoints(
+          snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+        );
+      } catch (err) {
+        console.error("Error fetching collection points:", err);
+      }
+    };
+
+    fetchCollectionPoints();
+  }, []);
+
   // ✅ Fetch user points
   useEffect(() => {
     const fetchUserPoints = async () => {
@@ -153,7 +173,6 @@ const RewardDescription = () => {
       });
     });
 
-  
   // ✅ Send notification to all admins (shared adminNotifications collection)
   const notifyAdmins = async (title, body, userId, type = "redemption") => {
     try {
@@ -555,6 +574,111 @@ const RewardDescription = () => {
               </>
             )}
 
+            {/* ✅ STOCK INFO */}
+            {/* ✅ STOCK INFO */}
+            {typeof reward.totalStock === "number" && (
+              <>
+                <Text style={styles.sectionTitle}>Availability</Text>
+                <Text
+                  style={[
+                    styles.text,
+                    reward.totalStock === 0
+                      ? styles.outOfStock
+                      : styles.inStock,
+                  ]}
+                >
+                  {reward.totalStock === 0
+                    ? "Out of Stock"
+                    : `${reward.totalStock} item(s) available`}
+                </Text>
+
+                {/* ✅ COLLECTION POINTS */}
+                {reward.collectionStocks &&
+                  Object.keys(reward.collectionStocks).length > 0 && (
+                    <>
+                      {/* 🔽 TOGGLE HEADER */}
+                      <TouchableOpacity
+                        onPress={() => setShowCollectionPoints((prev) => !prev)}
+                        activeOpacity={0.7}
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginTop: 12,
+                        }}
+                      >
+                        <Text style={styles.sectionTitle}>
+                          Available at Collection Points (
+                          {
+                            collectionPoints.filter(
+                              (cp) => reward.collectionStocks?.[cp.id] > 0
+                            ).length
+                          }
+                          )
+                        </Text>
+
+                        <Text
+                          style={{
+                            fontSize: 18,
+                            fontFamily: "Poppins_700Bold",
+                            color: "#2E7D32",
+                          }}
+                        >
+                          {showCollectionPoints ? "▲" : "▼"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* 🔹 EXPANDED LIST */}
+                      {showCollectionPoints && (
+                        <>
+                          {collectionPoints
+                            .filter(
+                              (cp) => reward.collectionStocks?.[cp.id] > 0
+                            )
+                            .map((cp) => (
+                              <TouchableOpacity
+                                key={cp.id}
+                                style={styles.collectionRow}
+                                activeOpacity={0.8}
+                                onPress={() =>
+                                  router.push({
+                                    pathname: "Main/map",
+                                    params: { highlightId: cp.id },
+                                  })
+                                }
+                              >
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.collectionName}>
+                                    {cp.name}
+                                  </Text>
+                                  <Text style={styles.collectionAddress}>
+                                    {cp.address}
+                                  </Text>
+                                </View>
+
+                                <Text style={styles.collectionStock}>
+                                  Stock: {reward.collectionStocks[cp.id]}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+
+                          {/* ❗ EMPTY STATE */}
+                          {collectionPoints.filter(
+                            (cp) => reward.collectionStocks?.[cp.id] > 0
+                          ).length === 0 && (
+                            <Text style={styles.text}>
+                              No collection points currently have available
+                              stock.
+                            </Text>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+              </>
+            )}
+
+            {/* ✅ NOW OUTSIDE NA SIYA */}
             <Text style={styles.sectionTitle}>How to Redeem</Text>
             <Text style={styles.text}>
               {reward.howToRedeem ||
@@ -651,8 +775,7 @@ const RewardDescription = () => {
               </Text>
 
               <View style={{ flexDirection: "row", gap: 10 }}>
-
-                 <TouchableOpacity
+                <TouchableOpacity
                   style={[styles.choiceButton, { backgroundColor: "#5F934A" }]}
                   onPress={() => {
                     setChoiceModalVisible(false);
@@ -670,8 +793,6 @@ const RewardDescription = () => {
                 >
                   <Text style={styles.okButtonText}>Request Online</Text>
                 </TouchableOpacity>
-
-               
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -1151,23 +1272,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  userPointsFooter: {
-    textAlign: "center",
-    fontFamily: "Poppins_700Bold",
-    fontSize: 15,
-    marginTop: 2,
-  },
   enoughPoints: {
     color: "#2E7D32", // green
   },
   notEnoughPoints: {
     color: "#D32F2F", // red
   },
-  lockedFooterText: {
-    textAlign: "center",
-    fontFamily: "Poppins_500Medium",
-    color: "#777",
+  inStock: {
+    color: "#2E7D32", // green
+    fontFamily: "Poppins_600SemiBold",
+  },
+
+  outOfStock: {
+    color: "#D32F2F", // red
+    fontFamily: "Poppins_700Bold",
+  },
+  collectionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#F9F9F9",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+
+  collectionName: {
+    fontSize: 14,
+    fontFamily: "Poppins_700Bold",
+    color: "#1B5E20",
+  },
+
+  collectionAddress: {
+    fontSize: 11,
+    color: "#666",
+    marginTop: 2,
+  },
+
+  collectionStock: {
     fontSize: 13,
-    marginTop: 3,
+    fontFamily: "Poppins_700Bold",
+    color: "#2E7D32",
   },
 });

@@ -21,7 +21,7 @@ const { width } = Dimensions.get("window");
 
 const RewardItem = () => {
   const router = useRouter();
-  const { category } = useLocalSearchParams(); 
+  const { category } = useLocalSearchParams();
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -158,6 +158,7 @@ const RewardItem = () => {
                           </View>
                         )}
 
+                        {/* POINTS BADGE (existing) */}
                         {category !== "cash" && (
                           <View style={styles.pointsBadge}>
                             <Image
@@ -166,6 +167,22 @@ const RewardItem = () => {
                             />
                             <Text style={styles.pointsText}>
                               {offer.points} pts
+                            </Text>
+                          </View>
+                        )}
+
+                        {/* ✅ NEW: STOCK BADGE (BOTTOM RIGHT) */}
+                        {typeof offer.totalStock === "number" && (
+                          <View
+                            style={[
+                              styles.stockBadge,
+                              offer.totalStock === 0
+                                ? styles.stockBadgeOut
+                                : styles.stockBadgeIn,
+                            ]}
+                          >
+                            <Text style={styles.stockBadgeText}>
+                              Stock {offer.totalStock}
                             </Text>
                           </View>
                         )}
@@ -320,5 +337,30 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_800ExtraBold",
     color: "#1B5E20",
     fontSize: 20,
+  },
+
+  stockBadge: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "#E8F5E9", // soft green
+    opacity: 0.95,
+  },
+
+  stockBadgeIn: {
+    backgroundColor: "#E8F5E9",
+  },
+
+  stockBadgeOut: {
+    backgroundColor: "#FDECEA",
+  },
+
+  stockBadgeText: {
+    fontSize: 11,
+    fontFamily: "Poppins_700Bold", // ✅ BOLD NA JUD
+    color: "#1B5E20",
   },
 });
