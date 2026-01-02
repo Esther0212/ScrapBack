@@ -38,7 +38,7 @@ const RewardItem = () => {
           ...doc.data(),
         }));
 
-        // ✅ Filter by category
+        // Filter by category
         const filtered = allRewards.filter((r) => {
           const cat = r.category?.toLowerCase()?.trim();
           if (category === "other")
@@ -46,7 +46,7 @@ const RewardItem = () => {
           return cat === category?.toLowerCase()?.trim();
         });
 
-        // ✅ Sort rewards from lowest to highest based on points
+        // Sort rewards from lowest to highest based on points
         const sorted = filtered.sort((a, b) => {
           const pointsA = Number(a.points) || 0;
           const pointsB = Number(b.points) || 0;
@@ -69,7 +69,7 @@ const RewardItem = () => {
       try {
         const authInstance = getAuth();
 
-        // ✅ Wait for user to be ready (handles async auth)
+        // Wait for user to be ready (handles async auth)
         const user = await new Promise((resolve) => {
           if (authInstance.currentUser)
             return resolve(authInstance.currentUser);
@@ -84,7 +84,7 @@ const RewardItem = () => {
           return;
         }
 
-        // ✅ Correct collection name and field (matches your RewardDescription)
+        //Correct collection name and field (matches your RewardDescription)
         const userRef = doc(db, "user", user.uid);
         const snap = await getDoc(userRef);
 
@@ -171,7 +171,7 @@ const RewardItem = () => {
                           </View>
                         )}
 
-                        {/* ✅ NEW: STOCK BADGE (BOTTOM RIGHT) */}
+                        {/*NEW: STOCK BADGE (BOTTOM RIGHT) */}
                         {typeof offer.totalStock === "number" && (
                           <View
                             style={[
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: "#E8F5E9", // soft green
+    backgroundColor: "#E8F5E9", 
     opacity: 0.95,
   },
 
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
 
   stockBadgeText: {
     fontSize: 11,
-    fontFamily: "Poppins_700Bold", // ✅ BOLD NA JUD
+    fontFamily: "Poppins_700Bold", 
     color: "#1B5E20",
   },
 });

@@ -16,7 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import CustomBgColor from "../../../components/customBgColor";
-// ✅ Firebase
+//  Firebase
 import { db } from "../../../../firebase";
 import {
   doc,
@@ -48,16 +48,16 @@ const RewardDescription = () => {
   const [confirmMapModalVisible, setConfirmMapModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [failedModalVisible, setFailedModalVisible] = useState(false);
-  // 🪙 Cash modal (user sets amount)
+  //  Cash modal (user sets amount)
   const [cashModalVisible, setCashModalVisible] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState("");
-  // ✅ ADD NEW STATE (near other modals)
+  //  ADD NEW STATE (near other modals)
   const [confirmOnlineModalVisible, setConfirmOnlineModalVisible] =
     useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ✅ Toast animation
+  //  Toast animation
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -81,7 +81,7 @@ const RewardDescription = () => {
     });
   };
 
-  // ✅ Fetch reward
+  //  Fetch reward
   useEffect(() => {
     const fetchReward = async () => {
       try {
@@ -120,7 +120,7 @@ const RewardDescription = () => {
     fetchCollectionPoints();
   }, []);
 
-  // ✅ Fetch user points
+  //  Fetch user points
   useEffect(() => {
     const fetchUserPoints = async () => {
       try {
@@ -140,7 +140,7 @@ const RewardDescription = () => {
     fetchUserPoints();
   }, []);
 
-  // ✅ Check if user already has pending redemption for this reward
+  // Check if user already has pending redemption for this reward
   useEffect(() => {
     const checkPendingRedemption = async () => {
       try {
@@ -162,7 +162,7 @@ const RewardDescription = () => {
     checkPendingRedemption();
   }, [id]);
 
-  // ✅ Helper: get current user
+  // Helper: get current user
   const getCurrentUser = () =>
     new Promise((resolve) => {
       const authInstance = getAuth();
@@ -173,7 +173,7 @@ const RewardDescription = () => {
       });
     });
 
-  // ✅ Send notification to all admins (shared adminNotifications collection)
+  //  Send notification to all admins (shared adminNotifications collection)
   const notifyAdmins = async (title, body, userId, type = "redemption") => {
     try {
       const auth = getAuth();
@@ -223,7 +223,7 @@ const RewardDescription = () => {
     }
   };
 
-  // ✅ Handle redeem (online request)
+  // Handle redeem (online request)
   const handleRedeemOnline = async () => {
     setIsSubmitting(true);
     try {
@@ -253,7 +253,7 @@ const RewardDescription = () => {
         return;
       }
 
-      // ✅ Create redemption request
+      // Create redemption request
       await addDoc(collection(db, "redemptionRequest"), {
         userId: user.uid,
         name: `${userProfile.firstName || ""} ${
@@ -265,7 +265,7 @@ const RewardDescription = () => {
         rewardName: reward.title || "Reward",
         rewardCategory: reward.category || "Other",
         points: requiredPoints,
-        seenByAdmin: false, // 👈 add this
+        seenByAdmin: false, 
         status: "pending",
         createdAt: serverTimestamp(),
       });
@@ -303,7 +303,7 @@ const RewardDescription = () => {
     }
   };
 
-  // ✅ Handle redeem for CASH (user decides amount)
+  // Handle redeem for CASH (user decides amount)
   const handleCashRedeem = async () => {
     if (
       !selectedAmount ||
@@ -351,7 +351,7 @@ const RewardDescription = () => {
         rewardCategory: reward.category || "cash",
         cashAmount: Number(selectedAmount),
         points: requiredPoints,
-        seenByAdmin: false, // 👈 add this
+        seenByAdmin: false, 
         status: "pending",
         createdAt: serverTimestamp(),
       });
@@ -386,25 +386,22 @@ const RewardDescription = () => {
     }
   };
 
-  // ✅ Handle redeem button click
+  // Handle redeem button click
   const handleRedeemClick = () => {
     const mode = reward?.modeAvailable?.toLowerCase() || "online";
     const category = reward?.category?.toLowerCase();
 
-    // ✅ GCash / Cash but ONLINE = open cash modal
+    // GCash / Cash but ONLINE = open cash modal
     if (category === "cash" && (mode === "online" || mode === "both")) {
       setCashModalVisible(true);
       return;
     }
 
-    // ✅ CASH but ONSITE ONLY = go to map like other onsite items
+    // CASH but ONSITE ONLY = go to map like other onsite items
     if (category === "cash" && mode === "onsite") {
       setConfirmMapModalVisible(true);
       return;
     }
-
-    // ✅ NORMAL FLOW
-    // ✅ REPLACE this inside handleRedeemClick()
     if (mode === "online") {
       setConfirmOnlineModalVisible(true);
       return;
@@ -415,7 +412,7 @@ const RewardDescription = () => {
     }
   };
 
-  // ✅ Loading
+  //Loading
   if (loading) {
     return (
       <CustomBgColor>
@@ -486,7 +483,7 @@ const RewardDescription = () => {
     );
   }
 
-  // ✅ Redeemable mode badge helpers
+  //Redeemable mode badge helpers
   const formatMode = (mode) => {
     if (!mode) return "N/A";
     const formatted = mode.toString().trim().toLowerCase();
@@ -512,14 +509,14 @@ const RewardDescription = () => {
   const isUnavailable = reward?.status?.toLowerCase() === "unavailable";
   const isCash = reward?.category?.toLowerCase() === "cash";
 
-  // ✅ FIX: Cash items should only check if user has points
+  //Cash items should only check if user has points
   const canRedeem =
     reward &&
     !hasPendingRedemption &&
     !isUnavailable &&
     (isCash ? userPoints > 0 : userPoints >= Number(reward.points || 0));
 
-  // ✅ Header title logic
+  //Header title logic
   const getHeaderTitle = (category) => {
     switch (category) {
       case "gcash":
@@ -1273,18 +1270,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   enoughPoints: {
-    color: "#2E7D32", // green
+    color: "#2E7D32", 
   },
   notEnoughPoints: {
-    color: "#D32F2F", // red
+    color: "#D32F2F", 
   },
   inStock: {
-    color: "#2E7D32", // green
+    color: "#2E7D32", 
     fontFamily: "Poppins_600SemiBold",
   },
 
   outOfStock: {
-    color: "#D32F2F", // red
+    color: "#D32F2F", 
     fontFamily: "Poppins_700Bold",
   },
   collectionRow: {
