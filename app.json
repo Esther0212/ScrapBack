@@ -7,23 +7,23 @@
     "orientation": "portrait",
     "icon": "./src/assets/app-logo.png",
     "userInterfaceStyle": "automatic",
-
     "splash": {
       "image": "./src/assets/app-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-
     "ios": {
       "supportsTablet": true
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/logo.png",
         "backgroundColor": "#F0F1C5"
       },
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "edgeToEdgeEnabled": true,
       "package": "com.missel012.ScrapBack",
       "config": {
@@ -32,12 +32,10 @@
         }
       }
     },
-
     "web": {
       "favicon": "./src/assets/favicon.png",
       "bundler": "metro"
     },
-
     "plugins": [
       [
         "expo-build-properties",
@@ -50,15 +48,14 @@
         }
       ],
       "expo-font",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-router"
     ],
-
     "extra": {
       "eas": {
         "projectId": "82e9e238-1aff-47d6-8778-6960b258804e"
       }
     },
-
     "owner": "missel012",
     "newArchEnabled": false,
     "updates": {

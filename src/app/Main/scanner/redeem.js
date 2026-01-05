@@ -19,7 +19,14 @@ import {
 import QRCode from "react-native-qrcode-svg";
 import { useRouter } from "expo-router";
 import { auth, db } from "../../../../firebase";
-import { doc, getDoc, getDocs, collection } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+} from "firebase/firestore";
 import CustomBgColor from "../../../components/customBgColor";
 import { Ionicons, FontAwesome } from "@expo/vector-icons";
 
@@ -50,6 +57,12 @@ export default function RedeemRewardsQR() {
     const diff = Math.floor((expiryTimestamp - Date.now()) / 1000);
     setTimeLeft(diff > 0 ? diff : 0);
   };
+
+  // Reservations
+  const [reservations, setReservations] = useState([]);
+  const [reservationsLoading, setReservationsLoading] = useState(false);
+  // Set of rewardIds the user has active reservations for
+  const [reservedRewardIds, setReservedRewardIds] = useState(new Set());
 
   // Rewards
   const [rewards, setRewards] = useState([]);
@@ -163,6 +176,51 @@ export default function RedeemRewardsQR() {
 
     fetchRewards();
   }, []);
+
+  // --------------------------
+  // Fetch reservations (IMPORTANT)
+  // --------------------------
+  const fetchReservations = async () => {
+    if (!user?.uid) return;
+
+    try {
+      setReservationsLoading(true);
+
+      console.log("FETCHING RESERVATIONS FOR UID:", user.uid);
+
+      const q = query(
+        collection(db, "reservations"),
+        where("userId", "==", user.uid),
+        where("status", "==", "active")
+      );
+
+      const snap = await getDocs(q);
+
+      console.log("RESERVATIONS FOUND:", snap.size);
+
+      const resList = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      setReservations(resList);
+
+      // Also store a set of reserved reward IDs for quick lookup
+      const ids = new Set(resList.map((r) => r.rewardId));
+      setReservedRewardIds(ids);
+    } catch (err) {
+      console.error("Failed to fetch reservations:", err);
+    } finally {
+      setReservationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    fetchReservations();
+  }, [user?.uid]);
+
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = String(timeLeft % 60).padStart(2, "0");
@@ -323,6 +381,7 @@ export default function RedeemRewardsQR() {
                     const isSelected = selectedReward?.id === r.id;
                     const isUnavailable =
                       r.status?.toLowerCase()?.trim() === "unavailable";
+                    const isReserved = reservedRewardIds.has(r.id);
 
                     return (
                       <TouchableOpacity
@@ -332,26 +391,23 @@ export default function RedeemRewardsQR() {
                           styles.wasteOption,
                           isSelected && styles.wasteOptionSelected,
                           isUnavailable && styles.wasteOptionUnavailable,
+                          isReserved && styles.wasteOptionReserved,
                         ]}
                         onPress={() => {
                           if (isUnavailable) return;
 
-                          if (isSelected) setSelectedReward(null);
-                          else {
-                            setSelectedReward(r);
-                            if (
-                              !(
-                                r.points == 0 &&
-                                (r.category === "cash" ||
-                                  r.title?.toLowerCase().includes("cash"))
-                              )
-                            ) {
-                              setCustomAmount("");
-                            }
-                            setRewardModalVisible(false);
-                          }
+                          // Reserved items behave like normal ones
+                          setSelectedReward(r);
+                          setCustomAmount("");
+                          setRewardModalVisible(false);
                         }}
                       >
+                        {/* Reserved badge */}
+                        {isReserved && (
+                          <View style={styles.reservedBadgeModal}>
+                            <Text style={styles.reservedBadgeModalText}>Reserved</Text>
+                          </View>
+                        )}
                         <View
                           style={{ flexDirection: "row", alignItems: "center" }}
                         >
@@ -451,6 +507,7 @@ export default function RedeemRewardsQR() {
     <CustomBgColor>
       <View style={styles.container}>
         <View style={styles.qrContainer}>
+
           <Text style={styles.description}>{descriptionText}</Text>
 
           {!qrPayload ? (
@@ -550,15 +607,12 @@ export default function RedeemRewardsQR() {
               {/* Generate QR */}
               {selectedReward && (
                 <TouchableOpacity
-                  style={[
-                    styles.button,
-                    { backgroundColor: "#6FA45D", marginTop: 18 },
-                  ]}
+                  style={[styles.button, { backgroundColor: "#6FA45D", marginTop: 18 }]}
                   onPress={handleGenerateQR}
                   disabled={creatingPayload}
                 >
                   {creatingPayload ? (
-                    <ActivityIndicator color="#fff" />
+                    <Text style={styles.buttonText}>Generating...</Text>
                   ) : (
                     <Text style={styles.buttonText}>Generate QR</Text>
                   )}
@@ -607,7 +661,7 @@ export default function RedeemRewardsQR() {
       </View>
     </CustomBgColor>
   );
-}
+};
 
 // ================================
 // Styles
@@ -837,4 +891,24 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     color: "#B00020",
   },
+
+  /* Reserved styles for modal */
+  reservedBadgeModal: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "#FFF3CD",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  reservedBadgeModalText: {
+    fontSize: 11,
+    fontFamily: "Poppins_700Bold",
+    color: "#8A6D3B",
+  },
+  wasteOptionReserved: {
+    backgroundColor: "#FCF8E3",
+    borderColor: "#F0E2A8",
+  }
 });

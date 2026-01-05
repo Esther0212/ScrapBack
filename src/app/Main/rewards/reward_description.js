@@ -28,6 +28,7 @@ import {
   query,
   where,
   updateDoc,
+  runTransaction,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
@@ -46,6 +47,11 @@ const RewardDescription = () => {
   // 🔹 Modals
   const [choiceModalVisible, setChoiceModalVisible] = useState(false);
   const [confirmMapModalVisible, setConfirmMapModalVisible] = useState(false);
+  // 🔒 Reserve modal
+  const [reserveModalVisible, setReserveModalVisible] = useState(false);
+  const [selectedCollectionPoint, setSelectedCollectionPoint] = useState(null);
+  const [isReserving, setIsReserving] = useState(false);
+
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [failedModalVisible, setFailedModalVisible] = useState(false);
   //  Cash modal (user sets amount)
@@ -222,6 +228,65 @@ const RewardDescription = () => {
       console.error("❌ Error sending user notification:", err);
     }
   };
+
+  const handleReserveStock = async () => {
+    if (!selectedCollectionPoint || !reward) return;
+
+    try {
+      setIsReserving(true);
+
+      const user = await getCurrentUser();
+      if (!user) {
+        showAnimatedToast("Please log in to reserve.");
+        return;
+      }
+
+      const rewardRef = doc(db, "rewardItems", reward.id);
+
+      await runTransaction(db, async (transaction) => {
+        const rewardSnap = await transaction.get(rewardRef);
+        if (!rewardSnap.exists()) throw new Error("Reward not found");
+
+        const data = rewardSnap.data();
+        const currentStock =
+          data.collectionStocks?.[selectedCollectionPoint] || 0;
+
+        if (currentStock <= 0) {
+          throw new Error("Out of stock at this collection point");
+        }
+
+        // 🔒 LOCK ONLY THE SELECTED COLLECTION POINT
+        transaction.update(rewardRef, {
+          [`collectionStocks.${selectedCollectionPoint}`]:
+            currentStock - 1,
+        });
+
+        // ✅ Create reservation record
+        transaction.set(
+          doc(collection(db, "reservations")),
+          {
+            userId: user.uid,
+            rewardId: reward.id,
+            collectionPointId: selectedCollectionPoint,
+            status: "active",
+            createdAt: serverTimestamp(),
+          }
+        );
+      });
+
+      // ✅ UI updates
+      setReserveModalVisible(false);
+      setSelectedCollectionPoint(null);
+      showAnimatedToast("Reservation successful!");
+
+    } catch (err) {
+      console.error("Reserve error:", err);
+      showAnimatedToast(err.message || "Failed to reserve");
+    } finally {
+      setIsReserving(false);
+    }
+  };
+
 
   // Handle redeem (online request)
   const handleRedeemOnline = async () => {
@@ -687,48 +752,74 @@ const RewardDescription = () => {
               redeeming.
             </Text>
 
-            {/* Redeem Button */}
-            <TouchableOpacity
-              activeOpacity={
-                canRedeem && !isUnavailable && !isSubmitting ? 0.85 : 1
-              }
-              onPress={() => {
-                if (canRedeem && !isUnavailable && !isSubmitting)
-                  handleRedeemClick();
-              }}
-              style={[
-                styles.ctaButtonSolid,
-                (!canRedeem || isUnavailable || isSubmitting) &&
-                  styles.disabledButton,
-              ]}
-              disabled={!canRedeem || isUnavailable || isSubmitting}
-            >
-              {isSubmitting ? (
-                <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-                >
-                  <ActivityIndicator size="small" color="#fff" />
-                  <Text style={styles.ctaText}>Processing...</Text>
-                </View>
-              ) : (
-                <Text
+            {/* ACTION BUTTONS */}
+            {reward?.modeAvailable?.toLowerCase() === "onsite" ? (
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 24 }}>
+                {/* 🟢 RESERVE ITEM */}
+                <TouchableOpacity
                   style={[
-                    styles.ctaText,
-                    (!canRedeem || isUnavailable) && styles.disabledText,
+                    styles.ctaButtonSolid,
+                    { flex: 1 },
+                    (!canRedeem || isUnavailable) && styles.disabledButton,
                   ]}
+                  disabled={!canRedeem || isUnavailable}
+                  onPress={() => {
+                    if (!canRedeem || isUnavailable) return;
+                    setReserveModalVisible(true);
+                  }}
                 >
-                  {isUnavailable
-                    ? "Reward Not Available"
-                    : hasPendingRedemption
-                      ? "Already Redeemed (Pending Approval)"
-                      : reward?.modeAvailable?.toLowerCase() === "onsite"
-                        ? "Onsite Only — Check Map for Collection Points"
-                        : reward?.category?.toLowerCase() === "cash"
-                          ? "Redeem Cash Amount"
-                          : `Redeem for ${reward.points} Points`}
-                </Text>
-              )}
-            </TouchableOpacity>
+                  <Text style={styles.ctaText}>Reserve Item</Text>
+                </TouchableOpacity>
+
+                {/* ⚪ FIND COLLECTION POINT */}
+                <TouchableOpacity
+                  style={[
+                    styles.ctaButtonSolid,
+                    {
+                      flex: 1,
+                      backgroundColor: "#FFFFFF",
+                      borderWidth: 2,
+                      borderColor: "#008243",
+                    },
+                  ]}
+                  onPress={() => router.push("Main/map")}
+                >
+                  <Text style={[styles.ctaText, { color: "#008243" }]}>
+                    Find Collection Point
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* fallback for online / cash / both */
+              <TouchableOpacity
+                activeOpacity={
+                  canRedeem && !isUnavailable && !isSubmitting ? 0.85 : 1
+                }
+                onPress={() => {
+                  if (canRedeem && !isUnavailable && !isSubmitting)
+                    handleRedeemClick();
+                }}
+                style={[
+                  styles.ctaButtonSolid,
+                  (!canRedeem || isUnavailable || isSubmitting) &&
+                    styles.disabledButton,
+                ]}
+                disabled={!canRedeem || isUnavailable || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={styles.ctaText}>Processing...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.ctaText}>
+                    {reward?.category?.toLowerCase() === "cash"
+                      ? "Redeem Cash Amount"
+                      : `Redeem for ${reward.points} Points`}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
 
             {/* ✅ Subtle points info below the redeem button */}
             {/* ✅ Points status below the redeem button */}
@@ -827,6 +918,92 @@ const RewardDescription = () => {
             </View>
           </View>
         </Modal>
+
+        {/* 🔒 RESERVE MODAL */}
+        <Modal
+          visible={reserveModalVisible}
+          transparent
+          animationType="fade"
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: "90%" }]}>
+              <Text style={styles.sectionTitle}>
+                Choose Collection Point
+              </Text>
+
+              {/* CLOSE */}
+              <TouchableOpacity
+                onPress={() => {
+                  setReserveModalVisible(false);
+                  setSelectedCollectionPoint(null);
+                }}
+                style={{ position: "absolute", top: 12, right: 12 }}
+              >
+                <Text style={{ fontSize: 18 }}>✕</Text>
+              </TouchableOpacity>
+
+              {/* COLLECTION POINTS WITH STOCK */}
+              <ScrollView style={{ maxHeight: 350, width: "100%" }}>
+                {collectionPoints
+                  .filter((cp) => reward.collectionStocks?.[cp.id] > 0)
+                  .map((cp) => {
+                    const isSelected =
+                      selectedCollectionPoint === cp.id;
+
+                    return (
+                      <TouchableOpacity
+                        key={cp.id}
+                        activeOpacity={0.8}
+                        onPress={() => setSelectedCollectionPoint(cp.id)}
+                        style={[
+                          styles.collectionRow,
+                          isSelected && {
+                            borderColor: "#2E7D32",
+                            borderWidth: 2,
+                            backgroundColor: "#E8F5E9",
+                          },
+                        ]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.collectionName}>
+                            {cp.name}
+                          </Text>
+                          <Text style={styles.collectionAddress}>
+                            {cp.address}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.collectionStock}>
+                          Stock: {reward.collectionStocks[cp.id]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+
+              {/* RESERVE BUTTON */}
+              <TouchableOpacity
+                disabled={!selectedCollectionPoint || isReserving}
+                style={[
+                  styles.ctaButtonSolid,
+                  {
+                    marginTop: 16,
+                    opacity:
+                      !selectedCollectionPoint || isReserving ? 0.6 : 1,
+                  },
+                ]}
+                onPress={handleReserveStock}
+              >
+                {isReserving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.ctaText}>Reserve</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
 
         {/*CASH AMOUNT MODAL */}
         <Modal visible={cashModalVisible} transparent animationType="fade">
