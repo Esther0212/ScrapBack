@@ -13,57 +13,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import CustomBgColor from "../../../components/customBgColor";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useIsFocused } from "@react-navigation/native";
 import { db } from "../../../../firebase";
-import { collection, getDocs, doc, getDoc, query, where } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const { width } = Dimensions.get("window");
 
 const RewardItem = () => {
   const router = useRouter();
-  const { category } = useLocalSearchParams();
+  const { category } = useLocalSearchParams(); 
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [userPoints, setUserPoints] = useState(0); // start at 0 until loaded
-  const [reservedRewardIds, setReservedRewardIds] = useState(new Set());
   const auth = getAuth(); // 🔹 get current Firebase user
-  const isFocused = useIsFocused();
-
-  // Helper to get current user (handles async auth)
-  const getCurrentUser = () =>
-    new Promise((resolve) => {
-      const authInstance = getAuth();
-      if (authInstance.currentUser) return resolve(authInstance.currentUser);
-      const unsub = onAuthStateChanged(authInstance, (u) => {
-        unsub();
-        resolve(u || null);
-      });
-    });
-
-  // Fetch current user's active reservations and map rewardIds
-  useEffect(() => {
-    const fetchReservations = async () => {
-      try {
-        const user = await getCurrentUser();
-        if (!user) return;
-        const q = query(
-          collection(db, "reservations"),
-          where("userId", "==", user.uid),
-          where("status", "==", "active")
-        );
-        const snap = await getDocs(q);
-        const ids = new Set(snap.docs.map((d) => d.data().rewardId));
-        setReservedRewardIds(ids);
-      } catch (err) {
-        console.error("Error fetching reservations:", err);
-      }
-    };
-
-    // Only fetch after offers are loaded
-    if (!loading) fetchReservations();
-  }, [loading, isFocused]);
 
   // 🔹 Fetch Firestore rewards filtered by category and sorted by lowest points
   useEffect(() => {
@@ -75,7 +38,7 @@ const RewardItem = () => {
           ...doc.data(),
         }));
 
-        // Filter by category
+        // ✅ Filter by category
         const filtered = allRewards.filter((r) => {
           const cat = r.category?.toLowerCase()?.trim();
           if (category === "other")
@@ -83,7 +46,7 @@ const RewardItem = () => {
           return cat === category?.toLowerCase()?.trim();
         });
 
-        // Sort rewards from lowest to highest based on points
+        // ✅ Sort rewards from lowest to highest based on points
         const sorted = filtered.sort((a, b) => {
           const pointsA = Number(a.points) || 0;
           const pointsB = Number(b.points) || 0;
@@ -106,7 +69,7 @@ const RewardItem = () => {
       try {
         const authInstance = getAuth();
 
-        // Wait for user to be ready (handles async auth)
+        // ✅ Wait for user to be ready (handles async auth)
         const user = await new Promise((resolve) => {
           if (authInstance.currentUser)
             return resolve(authInstance.currentUser);
@@ -121,7 +84,7 @@ const RewardItem = () => {
           return;
         }
 
-        //Correct collection name and field (matches your RewardDescription)
+        // ✅ Correct collection name and field (matches your RewardDescription)
         const userRef = doc(db, "user", user.uid);
         const snap = await getDoc(userRef);
 
@@ -168,8 +131,6 @@ const RewardItem = () => {
 
                   const isDisabled = notEnoughPoints || isUnavailable;
 
-                  const isReserved = reservedRewardIds.has(offer.id);
-
                   return (
                     <TouchableOpacity
                       key={`${offer.id}-${index}`}
@@ -182,12 +143,6 @@ const RewardItem = () => {
                         })
                       }
                     >
-                      {/* Reserved badge for items the user has already reserved */}
-                      {isReserved && (
-                        <View style={styles.reservedBadge}>
-                          <Text style={styles.reservedBadgeText}>Reserved</Text>
-                        </View>
-                      )}
                       <View style={styles.imageWrapper}>
                         {offer.image ? (
                           <Image
@@ -203,7 +158,6 @@ const RewardItem = () => {
                           </View>
                         )}
 
-                        {/* POINTS BADGE (existing) */}
                         {category !== "cash" && (
                           <View style={styles.pointsBadge}>
                             <Image
@@ -212,22 +166,6 @@ const RewardItem = () => {
                             />
                             <Text style={styles.pointsText}>
                               {offer.points} pts
-                            </Text>
-                          </View>
-                        )}
-
-                        {/*NEW: STOCK BADGE (BOTTOM RIGHT) */}
-                        {typeof offer.totalStock === "number" && (
-                          <View
-                            style={[
-                              styles.stockBadge,
-                              offer.totalStock === 0
-                                ? styles.stockBadgeOut
-                                : styles.stockBadgeIn,
-                            ]}
-                          >
-                            <Text style={styles.stockBadgeText}>
-                              Stock {offer.totalStock}
                             </Text>
                           </View>
                         )}
@@ -382,48 +320,5 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_800ExtraBold",
     color: "#1B5E20",
     fontSize: 20,
-  },
-
-  stockBadge: {
-    position: "absolute",
-    bottom: 12,
-    right: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: "#E8F5E9", 
-    opacity: 0.95,
-  },
-
-  stockBadgeIn: {
-    backgroundColor: "#E8F5E9",
-  },
-
-  stockBadgeOut: {
-    backgroundColor: "#FDECEA",
-  },
-
-  stockBadgeText: {
-    fontSize: 11,
-    fontFamily: "Poppins_700Bold", 
-    color: "#1B5E20",
-  },
-
-  /* Reserved badge */
-  reservedBadge: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: "#FFD54F",
-    elevation: 3,
-  },
-
-  reservedBadgeText: {
-    fontSize: 11,
-    fontFamily: "Poppins_700Bold",
-    color: "#5D4037",
   },
 });
