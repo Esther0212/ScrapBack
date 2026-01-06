@@ -19,7 +19,14 @@ import {
 import QRCode from "react-native-qrcode-svg";
 import { useRouter } from "expo-router";
 import { auth, db } from "../../../../firebase";
-import { doc, getDoc, getDocs, collection } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+} from "firebase/firestore";
 import CustomBgColor from "../../../components/customBgColor";
 import { Ionicons, FontAwesome } from "@expo/vector-icons";
 
@@ -50,6 +57,15 @@ export default function RedeemRewardsQR() {
     const diff = Math.floor((expiryTimestamp - Date.now()) / 1000);
     setTimeLeft(diff > 0 ? diff : 0);
   };
+
+  // Reservations
+  const [reservations, setReservations] = useState([]);
+  const [reservationsLoading, setReservationsLoading] = useState(false);
+  // Set of rewardIds the user has active reservations for
+  const [reservedRewardIds, setReservedRewardIds] = useState(new Set());
+
+  // Collapse state for reserved dropdown
+  const [reservedCollapsed, setReservedCollapsed] = useState(true);
 
   // Rewards
   const [rewards, setRewards] = useState([]);
@@ -164,6 +180,62 @@ export default function RedeemRewardsQR() {
     fetchRewards();
   }, []);
 
+  // --------------------------
+  // Fetch reservations (IMPORTANT)
+  // --------------------------
+  const fetchReservations = async () => {
+    if (!user?.uid) return;
+
+    try {
+      setReservationsLoading(true);
+
+      console.log("FETCHING RESERVATIONS FOR UID:", user.uid);
+
+      const q = query(
+        collection(db, "reservations"),
+        where("userId", "==", user.uid),
+        where("status", "==", "active")
+      );
+
+      const snap = await getDocs(q);
+
+      console.log("RESERVATIONS FOUND:", snap.size);
+
+      const resList = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      setReservations(resList);
+
+      // Also store a set of reserved reward IDs for quick lookup
+      const ids = new Set(resList.map((r) => r.rewardId));
+      setReservedRewardIds(ids);
+    } catch (err) {
+      console.error("Failed to fetch reservations:", err);
+    } finally {
+      setReservationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    fetchReservations();
+  }, [user?.uid]);
+
+  // Derived: actual reward objects that the user reserved
+  const reservedRewards = useMemo(() => {
+    if (!reservations.length || !rewards.length) return [];
+
+    return reservations
+      .map((res) => rewards.find((r) => r.id === res.rewardId))
+      .filter(Boolean);
+  }, [reservations, rewards]);
+
+  // Helper: check if a reward is reserved by the current user
+  const isRewardReserved = (rewardId) => reservedRewardIds.has(rewardId);
+
   const minutes = Math.floor(timeLeft / 60);
   const seconds = String(timeLeft % 60).padStart(2, "0");
 
@@ -173,62 +245,69 @@ export default function RedeemRewardsQR() {
   // - Then builds a JSON payload including reward info and user metadata.
   // - The payload is stored locally (qrPayload) and encoded into the QR.
   // --------------------------
-  const createQrPayload = async ({ reward, cashAmount = null }) => {
-    if (!userData) return null;
+// Fetch freshest user points from Firestore
+  const fetchFreshUserPoints = async () => {
+    if (!user?.uid) return 0;
+    try {
+      const snap = await getDoc(doc(db, "user", user.uid));
+      if (!snap.exists()) return 0;
+      return Number(snap.data().points || 0);
+    } catch (err) {
+      console.error("Failed to fetch fresh user points:", err);
+      return 0;
+    }
+  };
 
-    // POINT CHECK ONLY — NO DEDUCTION AND NO LOCKED POINTS
-    const userPoints = Number(userData.points || 0);
-    const requiredPoints =
-      reward.points && reward.points !== 0
-        ? Number(reward.points)
-        : cashAmount
+  const createQrPayload = async ({ reward, cashAmount = null }) => {
+    if (!user) return null;
+
+    setCreatingPayload(true);
+
+    try {
+      // 🔥 ALWAYS fetch latest points from Firestore
+      const freshPoints = await fetchFreshUserPoints();
+
+      // Sync UI with latest points
+      setUserData((prev) => (prev ? { ...prev, points: freshPoints } : prev));
+
+      const requiredPoints =
+        reward.points && reward.points !== 0
+          ? Number(reward.points)
+          : cashAmount
           ? Number(cashAmount)
           : 0;
 
-    if (userPoints < requiredPoints) {
-      showToast("Insufficient points for this reward.");
-      return null;
-    }
+      if (freshPoints < requiredPoints) {
+        showToast("Insufficient points for this reward.");
+        return null;
+      }
 
-    setCreatingPayload(true);
-    try {
-      const pointsRounded = parseFloat(Number(requiredPoints).toFixed(2));
-
-      // Build payload object to encode inside the QR
-      // You can include any fields staff needs to process redemption.
       const payload = {
         type: "redeem",
         uid: user.uid,
         email: user.email || null,
-        name:
-          `${userData.firstName || ""} ${userData.lastName || ""}`.trim() ||
-          userData.name ||
-          user.displayName ||
-          "",
-        contact: userData.contact || "N/A",
+        name: `${userData?.firstName || ""} ${userData?.lastName || ""}`.trim(),
+        contact: userData?.contact || "N/A",
         exp: Date.now() + EXPIRY_SECONDS * 1000,
 
-        // Reward info
         rewardId: reward.id,
-        rewardName: reward.title || "Reward",
-        rewardCategory: reward.category || "other",
+        rewardName: reward.title,
+        rewardCategory: reward.category,
         rewardImage: reward.image || null,
 
         points:
           reward.points && reward.points !== 0
-            ? Number(Number(reward.points).toFixed(2))
+            ? Number(reward.points)
             : cashAmount
-              ? Number(Number(cashAmount).toFixed(2))
-              : 0,
+            ? Number(cashAmount)
+            : 0,
 
         cashAmount:
           reward.points == 0 ? (cashAmount ? Number(cashAmount) : null) : null,
       };
 
-      // Save locally so UI shows QR immediately
       setQrPayload(payload);
 
-      // Set expiry timer based on EXPIRY_SECONDS
       const newExpiry = Date.now() + EXPIRY_SECONDS * 1000;
       setExpiryTimestamp(newExpiry);
       setTimeLeft(EXPIRY_SECONDS);
@@ -236,7 +315,7 @@ export default function RedeemRewardsQR() {
       showToast("QR generated. Show QR to staff for scanning.");
       return payload;
     } catch (err) {
-      console.error("Failed to create QR payload:", err);
+      console.error("QR generation failed:", err);
       showToast("Could not generate QR. Try again.");
       return null;
     } finally {
@@ -269,57 +348,146 @@ export default function RedeemRewardsQR() {
   };
 
   // --------------------------
-  // Memoized Reward Modal
+  // Reward Modal
   // --------------------------
-  const RewardSelectionModal = useMemo(() => {
-    return (
-      <Modal visible={rewardModalVisible} animationType="slide">
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#F0F1C5" }}>
-          <Text style={styles.modalHeader}>Select Reward</Text>
-          <ScrollView contentContainerStyle={styles.modalList}>
-            {Object.entries(groupedRewards).map(([category, items]) => (
-              <View key={category}>
-                <TouchableOpacity
+  const RewardSelectionModal = (
+    <Modal visible={rewardModalVisible} animationType="slide">
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F0F1C5" }}>
+        <Text style={styles.modalHeader}>Select Reward</Text>
+        <ScrollView contentContainerStyle={styles.modalList}>
+          {/* ⭐ YOUR RESERVED ITEMS */}
+          {reservedRewards.length > 0 && (
+            <View style={{ marginBottom: 16 }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingVertical: 10,
+                  backgroundColor: "#008243",
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  marginBottom: 8,
+                }}
+                onPress={() => setReservedCollapsed((prev) => !prev)}
+              >
+                <Text
                   style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    paddingVertical: 10,
-                    backgroundColor: "#008243",
-                    borderRadius: 8,
-                    paddingHorizontal: 12,
-                    marginBottom: 8,
+                    fontFamily: "Poppins_700Bold",
+                    fontSize: 16,
+                    color: "#fff",
+                    textTransform: "capitalize",
                   }}
-                  onPress={() =>
-                    setCollapsedCategories((prev) => ({
-                      ...prev,
-                      [category]: !prev[category],
-                    }))
-                  }
                 >
-                  <Text
-                    style={{
-                      fontFamily: "Poppins_700Bold",
-                      fontSize: 16,
-                      color: "#fff",
-                      textTransform: "capitalize",
+                  Your Reserved Items
+                </Text>
+
+                <Ionicons
+                  name={reservedCollapsed ? "chevron-down" : "chevron-forward"}
+                  size={20}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+
+              {reservedCollapsed &&
+                reservedRewards.map((r) => (
+                  <TouchableOpacity
+                    key={`reserved-${r.id}`}
+                    style={[
+                      styles.wasteOption,
+                      styles.wasteOptionReserved,
+                      styles.wasteOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedReward(r);
+                      setCustomAmount("");
+                      setRewardModalVisible(false);
                     }}
                   >
-                    {category} rewards
-                  </Text>
-                  <Ionicons
-                    name={
-                      collapsedCategories[category]
-                        ? "chevron-down"
-                        : "chevron-forward"
-                    }
-                    size={20}
-                    color="#fff"
-                  />
-                </TouchableOpacity>
+                    {/* Reserved badge */}
+                    <View style={styles.reservedBadgeModal}>
+                      <Text style={styles.reservedBadgeModalText}>Reserved</Text>
+                    </View>
 
-                {collapsedCategories[category] &&
-                  items.map((r) => {
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Image
+                        source={{ uri: r.image }}
+                        style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: 8,
+                          marginRight: 12,
+                        }}
+                      />
+
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.wasteText}>{r.title}</Text>
+
+                        <Text style={styles.wastePoints}>
+                          {r.points == 0 &&
+                          (r.category === "cash" ||
+                            r.title?.toLowerCase().includes("cash"))
+                            ? "Enter amount"
+                            : `${r.points} pts`}
+                        </Text>
+
+                        {r.category && (
+                          <Text style={styles.reservedCategory}>
+                            {r.category.charAt(0).toUpperCase() + r.category.slice(1)}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          )}
+
+          {Object.entries(groupedRewards).map(([category, items]) => (
+            <View key={category}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingVertical: 10,
+                  backgroundColor: "#008243",
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  marginBottom: 8,
+                }}
+                onPress={() =>
+                  setCollapsedCategories((prev) => ({
+                    ...prev,
+                    [category]: !prev[category],
+                  }))
+                }
+              >
+                <Text
+                  style={{
+                    fontFamily: "Poppins_700Bold",
+                    fontSize: 16,
+                    color: "#fff",
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {category} rewards
+                </Text>
+                <Ionicons
+                  name={
+                    collapsedCategories[category]
+                      ? "chevron-down"
+                      : "chevron-forward"
+                  }
+                  size={20}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+
+              {collapsedCategories[category] &&
+                items
+                  .filter((r) => !isRewardReserved(r.id)) // skip reserved items
+                  .map((r) => {
                     const isSelected = selectedReward?.id === r.id;
                     const isUnavailable =
                       r.status?.toLowerCase()?.trim() === "unavailable";
@@ -336,20 +504,10 @@ export default function RedeemRewardsQR() {
                         onPress={() => {
                           if (isUnavailable) return;
 
-                          if (isSelected) setSelectedReward(null);
-                          else {
-                            setSelectedReward(r);
-                            if (
-                              !(
-                                r.points == 0 &&
-                                (r.category === "cash" ||
-                                  r.title?.toLowerCase().includes("cash"))
-                              )
-                            ) {
-                              setCustomAmount("");
-                            }
-                            setRewardModalVisible(false);
-                          }
+                          // Reserved items are not rendered here (they're under Reserved)
+                          setSelectedReward(r);
+                          setCustomAmount("");
+                          setRewardModalVisible(false);
                         }}
                       >
                         <View
@@ -411,7 +569,6 @@ export default function RedeemRewardsQR() {
         </SafeAreaView>
       </Modal>
     );
-  }, [rewardModalVisible, groupedRewards, collapsedCategories, selectedReward]);
 
   if (!user) {
     return (
@@ -451,6 +608,7 @@ export default function RedeemRewardsQR() {
     <CustomBgColor>
       <View style={styles.container}>
         <View style={styles.qrContainer}>
+
           <Text style={styles.description}>{descriptionText}</Text>
 
           {!qrPayload ? (
@@ -550,15 +708,12 @@ export default function RedeemRewardsQR() {
               {/* Generate QR */}
               {selectedReward && (
                 <TouchableOpacity
-                  style={[
-                    styles.button,
-                    { backgroundColor: "#6FA45D", marginTop: 18 },
-                  ]}
+                  style={[styles.button, { backgroundColor: "#6FA45D", marginTop: 18 }]}
                   onPress={handleGenerateQR}
                   disabled={creatingPayload}
                 >
                   {creatingPayload ? (
-                    <ActivityIndicator color="#fff" />
+                    <Text style={styles.buttonText}>Generating...</Text>
                   ) : (
                     <Text style={styles.buttonText}>Generate QR</Text>
                   )}
@@ -607,7 +762,7 @@ export default function RedeemRewardsQR() {
       </View>
     </CustomBgColor>
   );
-}
+};
 
 // ================================
 // Styles
@@ -837,4 +992,30 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     color: "#B00020",
   },
+
+  /* Reserved styles for modal */
+  reservedBadgeModal: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "#FFF3CD",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  reservedBadgeModalText: {
+    fontSize: 11,
+    fontFamily: "Poppins_700Bold",
+    color: "#8A6D3B",
+  },
+  reservedCategory: {
+    fontSize: 12,
+    color: "#6b6b6b",
+    marginTop: 4,
+    fontFamily: "Poppins_400Regular",
+  },
+  wasteOptionReserved: {
+    backgroundColor: "#FCF8E3",
+    borderColor: "#F0E2A8",
+  }
 });
