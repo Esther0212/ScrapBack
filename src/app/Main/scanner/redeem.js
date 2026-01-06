@@ -26,6 +26,7 @@ import {
   collection,
   query,
   where,
+  onSnapshot,
 } from "firebase/firestore";
 import CustomBgColor from "../../../components/customBgColor";
 import { Ionicons, FontAwesome } from "@expo/vector-icons";
@@ -183,46 +184,38 @@ export default function RedeemRewardsQR() {
   // --------------------------
   // Fetch reservations (IMPORTANT)
   // --------------------------
-  const fetchReservations = async () => {
-    if (!user?.uid) return;
+ useEffect(() => {
+  if (!user?.uid) return;
 
-    try {
-      setReservationsLoading(true);
+  setReservationsLoading(true);
 
-      console.log("FETCHING RESERVATIONS FOR UID:", user.uid);
+  const q = query(
+    collection(db, "reservations"),
+    where("userId", "==", user.uid),
+    where("status", "==", "active")
+  );
 
-      const q = query(
-        collection(db, "reservations"),
-        where("userId", "==", user.uid),
-        where("status", "==", "active")
-      );
-
-      const snap = await getDocs(q);
-
-      console.log("RESERVATIONS FOUND:", snap.size);
-
+  const unsubscribe = onSnapshot(
+    q,
+    (snap) => {
       const resList = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
       }));
 
       setReservations(resList);
-
-      // Also store a set of reserved reward IDs for quick lookup
-      const ids = new Set(resList.map((r) => r.rewardId));
-      setReservedRewardIds(ids);
-    } catch (err) {
-      console.error("Failed to fetch reservations:", err);
-    } finally {
+      setReservedRewardIds(new Set(resList.map((r) => r.rewardId)));
+      setReservationsLoading(false);
+    },
+    (error) => {
+      console.error("Reservation listener error:", error);
       setReservationsLoading(false);
     }
-  };
+  );
 
-  useEffect(() => {
-    if (!user?.uid) return;
+  return () => unsubscribe(); // ✅ cleanup
+}, [user?.uid]);
 
-    fetchReservations();
-  }, [user?.uid]);
 
   // Derived: actual reward objects that the user reserved
   const reservedRewards = useMemo(() => {
