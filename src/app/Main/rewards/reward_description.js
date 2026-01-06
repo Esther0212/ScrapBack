@@ -54,7 +54,8 @@ const RewardDescription = () => {
 
   // Confirm reserve modal + viewing/cancelling reservation
   const [confirmReserveVisible, setConfirmReserveVisible] = useState(false);
-  const [confirmCancelReservationVisible, setConfirmCancelReservationVisible] = useState(false);
+  const [confirmCancelReservationVisible, setConfirmCancelReservationVisible] =
+    useState(false);
   const [cancelingReservation, setCancelingReservation] = useState(false);
   const [userReservation, setUserReservation] = useState(null);
 
@@ -202,6 +203,11 @@ const RewardDescription = () => {
     checkReservation();
   }, [reward?.id]);
 
+  const getCollectionPointName = (cpId) => {
+    const cp = collectionPoints.find((p) => p.id === cpId);
+    return cp?.name || "Selected Collection Point";
+  };
+
   // Helper: get current user
   const getCurrentUser = () =>
     new Promise((resolve) => {
@@ -214,7 +220,13 @@ const RewardDescription = () => {
     });
 
   //  Send notification to all admins (shared adminNotifications collection)
-  const notifyAdmins = async (title, body, userId, type = "redemption") => {
+  const notifyAdmins = async (
+    title,
+    body,
+    userId,
+    type = "redemption",
+    pointId = null
+  ) => {
     try {
       const auth = getAuth();
       const user = await new Promise((resolve) => {
@@ -228,17 +240,17 @@ const RewardDescription = () => {
       if (!user)
         throw new Error("No authenticated user when sending admin notif.");
 
-      console.log("🔹 Auth UID:", user.uid); // debug
       await addDoc(collection(db, "adminNotifications"), {
         title,
         body,
         userId,
+        pointId, // ✅ THIS IS THE KEY FIX
         createdAt: serverTimestamp(),
         read: false,
         type,
       });
 
-      console.log("✅ Sent admin notification");
+      console.log("✅ Sent admin notification with pointId:", pointId);
     } catch (err) {
       console.error("❌ Error sending admin notification:", err);
     }
@@ -293,8 +305,7 @@ const RewardDescription = () => {
 
         // 🔒 LOCK ONLY THE SELECTED COLLECTION POINT
         transaction.update(rewardRef, {
-          [`collectionStocks.${selectedCollectionPoint}`]:
-            currentStock - 1,
+          [`collectionStocks.${selectedCollectionPoint}`]: currentStock - 1,
         });
 
         // ✅ Create reservation record (use ref so we can reference it later)
@@ -323,10 +334,36 @@ const RewardDescription = () => {
 
       // refresh reward data (update local stock info)
       const updatedRewardSnap = await getDoc(rewardRef);
-      if (updatedRewardSnap.exists()) setReward({ id: updatedRewardSnap.id, ...updatedRewardSnap.data() });
+      if (updatedRewardSnap.exists())
+        setReward({ id: updatedRewardSnap.id, ...updatedRewardSnap.data() });
 
       showAnimatedToast("Reservation successful!");
+      const userDocSnap = await getDoc(doc(db, "user", user.uid));
+      const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+      const userName =
+        `${userData.firstName || ""} ${userData.lastName || ""}`.trim() ||
+        "A user";
 
+      const collectionPointName = getCollectionPointName(
+        selectedCollectionPoint
+      );
+
+      // 🔔 ADMIN notification
+      await notifyAdmins(
+        "New Item Reservation",
+        `<b>${userName}</b> has reserved <b>${reward.title}</b> at the <b>${collectionPointName}</b> collection point. One stock has been temporarily deducted and is awaiting onsite claiming.`,
+        user.uid,
+        "reservation",
+        selectedCollectionPoint // ✅ THIS
+      );
+
+      // 🔔 USER notification
+      await notifyUser(
+        user.uid,
+        "Reservation Confirmed",
+        `You have successfully reserved <b>${reward.title}</b> at the <b>${collectionPointName}</b> collection point. Please visit the location and present your QR code to claim your item.`,
+        "reservation"
+      );
     } catch (err) {
       console.error("Reserve error:", err);
       showAnimatedToast(err.message || "Failed to reserve");
@@ -334,7 +371,6 @@ const RewardDescription = () => {
       setIsReserving(false);
     }
   };
-
 
   // Cancel reservation handler
   const handleCancelReservation = async () => {
@@ -352,7 +388,8 @@ const RewardDescription = () => {
         const rewardSnap = await transaction.get(rewardRef);
         if (!rewardSnap.exists()) throw new Error("Reward not found");
 
-        const currentStock = rewardSnap.data().collectionStocks?.[collectionPointId] || 0;
+        const currentStock =
+          rewardSnap.data().collectionStocks?.[collectionPointId] || 0;
 
         // increment stock back
         transaction.update(rewardRef, {
@@ -368,11 +405,48 @@ const RewardDescription = () => {
 
       // refresh reward data
       const updatedRewardSnap = await getDoc(doc(db, "rewardItems", reward.id));
-      if (updatedRewardSnap.exists()) setReward({ id: updatedRewardSnap.id, ...updatedRewardSnap.data() });
+      if (updatedRewardSnap.exists())
+        setReward({ id: updatedRewardSnap.id, ...updatedRewardSnap.data() });
 
       setUserReservation(null);
       setConfirmCancelReservationVisible(false);
       showAnimatedToast("Reservation cancelled.");
+
+      const user = await getCurrentUser();
+
+      // 🔹 Fetch user profile (same source as redemption)
+      const userDocSnap = await getDoc(doc(db, "user", user.uid));
+      const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+      const userName =
+        `${userData.firstName || ""} ${userData.lastName || ""}`.trim() ||
+        "A user";
+
+      const collectionPointName = getCollectionPointName(
+        userReservation.collectionPointId
+      );
+      await notifyAdmins(
+        "Reservation Cancelled",
+        `<b>${userName}</b> has cancelled their reservation for <b>${reward.title}</b> at the <b>${collectionPointName}</b> collection point. The reserved stock has been returned to inventory.`,
+        user.uid,
+        "reservation",
+        userReservation.collectionPointId // ✅ THIS
+      );
+
+      // 🔔 ADMIN notification
+      await notifyAdmins(
+        "Reservation Cancelled",
+        `<b>${user.displayName || "A user"}</b> has cancelled their reservation for <b>${reward.title}</b> at the <b>${collectionPointName}</b> collection point. The reserved stock has been returned to inventory.`,
+        user.uid,
+        "reservation"
+      );
+
+      // 🔔 USER notification
+      await notifyUser(
+        user.uid,
+        "Reservation Cancelled",
+        `Your reservation for <b>${reward.title}</b> at the <b>${collectionPointName}</b> collection point has been cancelled. The item is now available again for reservation.`,
+        "reservation"
+      );
     } catch (err) {
       console.error("Cancel reservation error:", err);
       showAnimatedToast("Failed to cancel reservation.");
@@ -423,7 +497,7 @@ const RewardDescription = () => {
         rewardName: reward.title || "Reward",
         rewardCategory: reward.category || "Other",
         points: requiredPoints,
-        seenByAdmin: false, 
+        seenByAdmin: false,
         status: "pending",
         createdAt: serverTimestamp(),
       });
@@ -509,7 +583,7 @@ const RewardDescription = () => {
         rewardCategory: reward.category || "cash",
         cashAmount: Number(selectedAmount),
         points: requiredPoints,
-        seenByAdmin: false, 
+        seenByAdmin: false,
         status: "pending",
         createdAt: serverTimestamp(),
       });
@@ -908,7 +982,9 @@ const RewardDescription = () => {
                     ]}
                     onPress={() => router.push("Main/map")}
                   >
-                    <Text style={[styles.ctaText, { color: "#008243" }]}>Find Collection Point</Text>
+                    <Text style={[styles.ctaText, { color: "#008243" }]}>
+                      Find Collection Point
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )
@@ -930,7 +1006,13 @@ const RewardDescription = () => {
                 disabled={!canRedeem || isUnavailable || isSubmitting}
               >
                 {isSubmitting ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
                     <ActivityIndicator size="small" color="#fff" />
                     <Text style={styles.ctaText}>Processing...</Text>
                   </View>
@@ -1043,16 +1125,10 @@ const RewardDescription = () => {
         </Modal>
 
         {/* 🔒 RESERVE MODAL */}
-        <Modal
-          visible={reserveModalVisible}
-          transparent
-          animationType="fade"
-        >
+        <Modal visible={reserveModalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { width: "90%" }]}>
-              <Text style={styles.sectionTitle}>
-                Choose Collection Point
-              </Text>
+              <Text style={styles.sectionTitle}>Choose Collection Point</Text>
 
               {/* CLOSE */}
               <TouchableOpacity
@@ -1070,8 +1146,7 @@ const RewardDescription = () => {
                 {collectionPoints
                   .filter((cp) => reward.collectionStocks?.[cp.id] > 0)
                   .map((cp) => {
-                    const isSelected =
-                      selectedCollectionPoint === cp.id;
+                    const isSelected = selectedCollectionPoint === cp.id;
 
                     return (
                       <TouchableOpacity
@@ -1088,9 +1163,7 @@ const RewardDescription = () => {
                         ]}
                       >
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.collectionName}>
-                            {cp.name}
-                          </Text>
+                          <Text style={styles.collectionName}>{cp.name}</Text>
                           <Text style={styles.collectionAddress}>
                             {cp.address}
                           </Text>
@@ -1111,8 +1184,7 @@ const RewardDescription = () => {
                   styles.ctaButtonSolid,
                   {
                     marginTop: 16,
-                    opacity:
-                      !selectedCollectionPoint || isReserving ? 0.6 : 1,
+                    opacity: !selectedCollectionPoint || isReserving ? 0.6 : 1,
                   },
                 ]}
                 onPress={() => setConfirmReserveVisible(true)}
@@ -1131,7 +1203,9 @@ const RewardDescription = () => {
         <Modal visible={confirmReserveVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalText}>Confirm reservation at this collection point?</Text>
+              <Text style={styles.modalText}>
+                Confirm reservation at this collection point?
+              </Text>
 
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <TouchableOpacity
@@ -1156,8 +1230,6 @@ const RewardDescription = () => {
           </View>
         </Modal>
 
-
-
         {/** Resolve reserved collection point */}
         {(() => {
           const reservedPoint = collectionPoints.find(
@@ -1170,8 +1242,7 @@ const RewardDescription = () => {
               animationType="fade"
             >
               <View style={styles.modalOverlay}>
-                <View style={[styles.modalContent, { width: "90%" }]}> 
-
+                <View style={[styles.modalContent, { width: "90%" }]}>
                   {/* ITEM INFO */}
                   <View style={{ alignItems: "center", marginBottom: 14 }}>
                     {reward?.image && (
@@ -1250,7 +1321,10 @@ const RewardDescription = () => {
                   {/* ACTIONS */}
                   <View style={{ flexDirection: "row", gap: 10 }}>
                     <TouchableOpacity
-                      style={[styles.choiceButton, { backgroundColor: "#B00020" }]}
+                      style={[
+                        styles.choiceButton,
+                        { backgroundColor: "#B00020" },
+                      ]}
                       onPress={() => setConfirmCancelReservationVisible(false)}
                     >
                       <Text style={styles.okButtonText}>No</Text>
@@ -1716,18 +1790,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   enoughPoints: {
-    color: "#2E7D32", 
+    color: "#2E7D32",
   },
   notEnoughPoints: {
-    color: "#D32F2F", 
+    color: "#D32F2F",
   },
   inStock: {
-    color: "#2E7D32", 
+    color: "#2E7D32",
     fontFamily: "Poppins_600SemiBold",
   },
 
   outOfStock: {
-    color: "#D32F2F", 
+    color: "#D32F2F",
     fontFamily: "Poppins_700Bold",
   },
   collectionRow: {
