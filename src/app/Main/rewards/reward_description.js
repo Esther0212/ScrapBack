@@ -52,6 +52,12 @@ const RewardDescription = () => {
   const [selectedCollectionPoint, setSelectedCollectionPoint] = useState(null);
   const [isReserving, setIsReserving] = useState(false);
 
+  // Confirm reserve modal + viewing/cancelling reservation
+  const [confirmReserveVisible, setConfirmReserveVisible] = useState(false);
+  const [confirmCancelReservationVisible, setConfirmCancelReservationVisible] = useState(false);
+  const [cancelingReservation, setCancelingReservation] = useState(false);
+  const [userReservation, setUserReservation] = useState(null);
+
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [failedModalVisible, setFailedModalVisible] = useState(false);
   //  Cash modal (user sets amount)
@@ -168,6 +174,34 @@ const RewardDescription = () => {
     checkPendingRedemption();
   }, [id]);
 
+  // Fetch existing reservation (CRITICAL)
+  useEffect(() => {
+    const checkReservation = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user || !reward?.id) return;
+
+        const q = query(
+          collection(db, "reservations"),
+          where("userId", "==", user.uid),
+          where("rewardId", "==", reward.id),
+          where("status", "==", "active")
+        );
+
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          setUserReservation({ id: snap.docs[0].id, ...snap.docs[0].data() });
+        } else {
+          setUserReservation(null);
+        }
+      } catch (err) {
+        console.error("Error checking reservation:", err);
+      }
+    };
+
+    checkReservation();
+  }, [reward?.id]);
+
   // Helper: get current user
   const getCurrentUser = () =>
     new Promise((resolve) => {
@@ -238,10 +272,12 @@ const RewardDescription = () => {
       const user = await getCurrentUser();
       if (!user) {
         showAnimatedToast("Please log in to reserve.");
+        setIsReserving(false);
         return;
       }
 
       const rewardRef = doc(db, "rewardItems", reward.id);
+      const reservationRef = doc(collection(db, "reservations"));
 
       await runTransaction(db, async (transaction) => {
         const rewardSnap = await transaction.get(rewardRef);
@@ -261,22 +297,34 @@ const RewardDescription = () => {
             currentStock - 1,
         });
 
-        // ✅ Create reservation record
-        transaction.set(
-          doc(collection(db, "reservations")),
-          {
-            userId: user.uid,
-            rewardId: reward.id,
-            collectionPointId: selectedCollectionPoint,
-            status: "active",
-            createdAt: serverTimestamp(),
-          }
-        );
+        // ✅ Create reservation record (use ref so we can reference it later)
+        transaction.set(reservationRef, {
+          userId: user.uid,
+          rewardId: reward.id,
+          collectionPointId: selectedCollectionPoint,
+          status: "active",
+          createdAt: serverTimestamp(),
+        });
       });
 
       // ✅ UI updates
       setReserveModalVisible(false);
+      setConfirmReserveVisible(false);
       setSelectedCollectionPoint(null);
+      // store a local copy of the reservation so user can view/cancel it
+      setUserReservation({
+        id: reservationRef.id,
+        userId: (await getCurrentUser()).uid,
+        rewardId: reward.id,
+        collectionPointId: selectedCollectionPoint,
+        status: "active",
+        createdAt: new Date(),
+      });
+
+      // refresh reward data (update local stock info)
+      const updatedRewardSnap = await getDoc(rewardRef);
+      if (updatedRewardSnap.exists()) setReward({ id: updatedRewardSnap.id, ...updatedRewardSnap.data() });
+
       showAnimatedToast("Reservation successful!");
 
     } catch (err) {
@@ -287,6 +335,51 @@ const RewardDescription = () => {
     }
   };
 
+
+  // Cancel reservation handler
+  const handleCancelReservation = async () => {
+    if (!userReservation || !reward) return;
+    try {
+      setCancelingReservation(true);
+      const rewardRef = doc(db, "rewardItems", reward.id);
+      const reservationRef = doc(db, "reservations", userReservation.id);
+
+      await runTransaction(db, async (transaction) => {
+        const resSnap = await transaction.get(reservationRef);
+        if (!resSnap.exists()) return;
+        const { collectionPointId } = resSnap.data();
+
+        const rewardSnap = await transaction.get(rewardRef);
+        if (!rewardSnap.exists()) throw new Error("Reward not found");
+
+        const currentStock = rewardSnap.data().collectionStocks?.[collectionPointId] || 0;
+
+        // increment stock back
+        transaction.update(rewardRef, {
+          [`collectionStocks.${collectionPointId}`]: currentStock + 1,
+        });
+
+        // mark reservation cancelled
+        transaction.update(reservationRef, {
+          status: "cancelled",
+          cancelledAt: serverTimestamp(),
+        });
+      });
+
+      // refresh reward data
+      const updatedRewardSnap = await getDoc(doc(db, "rewardItems", reward.id));
+      if (updatedRewardSnap.exists()) setReward({ id: updatedRewardSnap.id, ...updatedRewardSnap.data() });
+
+      setUserReservation(null);
+      setConfirmCancelReservationVisible(false);
+      showAnimatedToast("Reservation cancelled.");
+    } catch (err) {
+      console.error("Cancel reservation error:", err);
+      showAnimatedToast("Failed to cancel reservation.");
+    } finally {
+      setCancelingReservation(false);
+    }
+  };
 
   // Handle redeem (online request)
   const handleRedeemOnline = async () => {
@@ -581,6 +674,9 @@ const RewardDescription = () => {
     !isUnavailable &&
     (isCash ? userPoints > 0 : userPoints >= Number(reward.points || 0));
 
+  // User reservation state
+  const hasActiveReservation = !!userReservation;
+
   //Header title logic
   const getHeaderTitle = (category) => {
     switch (category) {
@@ -754,41 +850,68 @@ const RewardDescription = () => {
 
             {/* ACTION BUTTONS */}
             {reward?.modeAvailable?.toLowerCase() === "onsite" ? (
-              <View style={{ flexDirection: "row", gap: 10, marginTop: 24 }}>
-                {/* 🟢 RESERVE ITEM */}
-                <TouchableOpacity
-                  style={[
-                    styles.ctaButtonSolid,
-                    { flex: 1 },
-                    (!canRedeem || isUnavailable) && styles.disabledButton,
-                  ]}
-                  disabled={!canRedeem || isUnavailable}
-                  onPress={() => {
-                    if (!canRedeem || isUnavailable) return;
-                    setReserveModalVisible(true);
-                  }}
-                >
-                  <Text style={styles.ctaText}>Reserve Item</Text>
-                </TouchableOpacity>
+              // If user already has an active reservation for this reward, show reserved state + cancel button
+              !!userReservation ? (
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 24 }}>
+                  <TouchableOpacity
+                    disabled={true}
+                    style={[
+                      styles.ctaButtonSolid,
+                      { flex: 1 },
+                      styles.disabledButton,
+                    ]}
+                  >
+                    <Text style={styles.ctaText}>Reserved</Text>
+                  </TouchableOpacity>
 
-                {/* ⚪ FIND COLLECTION POINT */}
-                <TouchableOpacity
-                  style={[
-                    styles.ctaButtonSolid,
-                    {
-                      flex: 1,
-                      backgroundColor: "#FFFFFF",
-                      borderWidth: 2,
-                      borderColor: "#008243",
-                    },
-                  ]}
-                  onPress={() => router.push("Main/map")}
-                >
-                  <Text style={[styles.ctaText, { color: "#008243" }]}>
-                    Find Collection Point
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.ctaButtonSolid,
+                      {
+                        flex: 1,
+                        backgroundColor: "#B00020",
+                      },
+                    ]}
+                    onPress={() => setConfirmCancelReservationVisible(true)}
+                  >
+                    <Text style={styles.ctaText}>Cancel Reservation</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 24 }}>
+                  {/* 🟢 RESERVE ITEM */}
+                  <TouchableOpacity
+                    style={[
+                      styles.ctaButtonSolid,
+                      { flex: 1 },
+                      (!canRedeem || isUnavailable) && styles.disabledButton,
+                    ]}
+                    disabled={!canRedeem || isUnavailable}
+                    onPress={() => {
+                      if (!canRedeem || isUnavailable) return;
+                      setReserveModalVisible(true);
+                    }}
+                  >
+                    <Text style={styles.ctaText}>Reserve Item</Text>
+                  </TouchableOpacity>
+
+                  {/* ⚪ FIND COLLECTION POINT */}
+                  <TouchableOpacity
+                    style={[
+                      styles.ctaButtonSolid,
+                      {
+                        flex: 1,
+                        backgroundColor: "#FFFFFF",
+                        borderWidth: 2,
+                        borderColor: "#008243",
+                      },
+                    ]}
+                    onPress={() => router.push("Main/map")}
+                  >
+                    <Text style={[styles.ctaText, { color: "#008243" }]}>Find Collection Point</Text>
+                  </TouchableOpacity>
+                </View>
+              )
             ) : (
               /* fallback for online / cash / both */
               <TouchableOpacity
@@ -992,7 +1115,7 @@ const RewardDescription = () => {
                       !selectedCollectionPoint || isReserving ? 0.6 : 1,
                   },
                 ]}
-                onPress={handleReserveStock}
+                onPress={() => setConfirmReserveVisible(true)}
               >
                 {isReserving ? (
                   <ActivityIndicator color="#fff" />
@@ -1004,6 +1127,152 @@ const RewardDescription = () => {
           </View>
         </Modal>
 
+        {/* ✅ Confirm Reserve Modal */}
+        <Modal visible={confirmReserveVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalText}>Confirm reservation at this collection point?</Text>
+
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.choiceButton, { backgroundColor: "#B00020" }]}
+                  onPress={() => setConfirmReserveVisible(false)}
+                >
+                  <Text style={styles.okButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.choiceButton}
+                  disabled={isReserving}
+                  onPress={() => {
+                    setConfirmReserveVisible(false);
+                    handleReserveStock();
+                  }}
+                >
+                  <Text style={styles.okButtonText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+
+
+        {/** Resolve reserved collection point */}
+        {(() => {
+          const reservedPoint = collectionPoints.find(
+            (cp) => cp.id === userReservation?.collectionPointId
+          );
+          return (
+            <Modal
+              visible={confirmCancelReservationVisible}
+              transparent
+              animationType="fade"
+            >
+              <View style={styles.modalOverlay}>
+                <View style={[styles.modalContent, { width: "90%" }]}> 
+
+                  {/* ITEM INFO */}
+                  <View style={{ alignItems: "center", marginBottom: 14 }}>
+                    {reward?.image && (
+                      <Image
+                        source={{ uri: reward.image }}
+                        style={{
+                          width: 120,
+                          height: 80,
+                          borderRadius: 10,
+                          marginBottom: 8,
+                        }}
+                        resizeMode="cover"
+                      />
+                    )}
+
+                    <Text
+                      style={{
+                        fontFamily: "Poppins_700Bold",
+                        fontSize: 16,
+                        textAlign: "center",
+                        color: "#1B5E20",
+                      }}
+                    >
+                      {reward?.title}
+                    </Text>
+                  </View>
+
+                  {/* LOCATION INFO */}
+                  {reservedPoint && (
+                    <View
+                      style={{
+                        backgroundColor: "#F1F8E9",
+                        borderRadius: 10,
+                        padding: 12,
+                        marginBottom: 16,
+                        width: "100%",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontFamily: "Poppins_600SemiBold",
+                          color: "#2E7D32",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Reserved at
+                      </Text>
+
+                      <Text
+                        style={{
+                          fontFamily: "Poppins_700Bold",
+                          fontSize: 14,
+                          color: "#1B5E20",
+                        }}
+                      >
+                        {reservedPoint.name}
+                      </Text>
+
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "#555",
+                          marginTop: 5,
+                        }}
+                      >
+                        {reservedPoint.address}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* WARNING */}
+                  <Text style={styles.modalText}>
+                    Are you sure you want to cancel this reservation?{"\n\n"}
+                  </Text>
+
+                  {/* ACTIONS */}
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.choiceButton, { backgroundColor: "#B00020" }]}
+                      onPress={() => setConfirmCancelReservationVisible(false)}
+                    >
+                      <Text style={styles.okButtonText}>No</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.choiceButton}
+                      disabled={cancelingReservation}
+                      onPress={handleCancelReservation}
+                    >
+                      {cancelingReservation ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.okButtonText}>Yes, Cancel</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          );
+        })()}
 
         {/*CASH AMOUNT MODAL */}
         <Modal visible={cashModalVisible} transparent animationType="fade">
