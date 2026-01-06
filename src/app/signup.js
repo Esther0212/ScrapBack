@@ -771,30 +771,27 @@ const Signup = () => {
                         const { latitude, longitude } =
                           e.nativeEvent.coordinate;
 
-                        const isInside =
+                        if (
                           selectedBarangayFeature &&
-                          isInsideSelectedBarangay(
+                          !isInsideSelectedBarangay(
                             latitude,
                             longitude,
                             selectedBarangayFeature
-                          );
-
-                        if (!isInside) {
+                          )
+                        ) {
                           ToastAndroid.show(
-                            "Pin is outside the selected barangay. Please double-check your address.",
+                            "Location must be inside selected barangay.",
                             ToastAndroid.LONG
                           );
-
-                          // ✅ Always allow pin placement
-                          setMarker({ latitude, longitude });
-                          setMapRegion((prev) => ({
-                            ...(prev || {}),
-                            latitude,
-                            longitude,
-                            latitudeDelta: prev?.latitudeDelta,
-                            longitudeDelta: prev?.longitudeDelta,
-                          }));
-
+                          if (barangayCenter) {
+                            setMarker(null);
+                            setMapRegion({
+                              latitude: barangayCenter.latitude,
+                              longitude: barangayCenter.longitude,
+                              latitudeDelta: 0.0025,
+                              longitudeDelta: 0.0025,
+                            });
+                          }
                           return;
                         }
 
@@ -837,30 +834,28 @@ const Signup = () => {
                             const { latitude, longitude } =
                               e.nativeEvent.coordinate;
 
-                            const isInside =
+                            if (
                               selectedBarangayFeature &&
-                              isInsideSelectedBarangay(
+                              !isInsideSelectedBarangay(
                                 latitude,
                                 longitude,
                                 selectedBarangayFeature
-                              );
-
-                            if (!isInside) {
+                              )
+                            ) {
                               ToastAndroid.show(
-                                "Pin is outside the selected barangay. Make sure this is correct.",
+                                "Pin must stay inside the selected barangay.",
                                 ToastAndroid.LONG
                               );
-
-                              // ✅ Keep pin wherever the user dropped it
-                              setMarker({ latitude, longitude });
-                              setMapRegion((prev) => ({
-                                ...(prev || {}),
-                                latitude,
-                                longitude,
-                                latitudeDelta: prev?.latitudeDelta,
-                                longitudeDelta: prev?.longitudeDelta,
-                              }));
-
+                              if (barangayCenter) {
+                                setMarker(barangayCenter);
+                                setMapRegion((prev) => ({
+                                  ...(prev || {}),
+                                  latitude: barangayCenter.latitude,
+                                  longitude: barangayCenter.longitude,
+                                  latitudeDelta: prev?.latitudeDelta,
+                                  longitudeDelta: prev?.longitudeDelta,
+                                }));
+                              }
                               return;
                             }
 
@@ -1065,8 +1060,8 @@ const InputField = ({
       placeholderTextColor="#777"
       multiline={multiline}
       autoCapitalize={autoCapitalize}
-      blurOnSubmit={true} // ← KEEP DONE BUTTON
-      returnKeyType="done" // ← SHOW DONE BUTTON
+      blurOnSubmit={true}             // ← KEEP DONE BUTTON
+      returnKeyType="done"            // ← SHOW DONE BUTTON
       onSubmitEditing={() => Keyboard.dismiss()} // ← CLOSE KEYBOARD
       onContentSizeChange={(e) => {
         if (multiline && onHeightChange) {
@@ -1208,9 +1203,9 @@ const PasswordField = ({ label, value, setValue, visible, setVisible }) => (
         autoCorrect={false}
         autoCapitalize="none"
         importantForAutofill="no"
-        contextMenuHidden={true} // hides copy/paste menu
+        contextMenuHidden={true}       // hides copy/paste menu
         editable={true}
-        selectTextOnFocus={false} // prevents selecting/pasting
+        selectTextOnFocus={false}      // prevents selecting/pasting
       />
 
       <TouchableOpacity

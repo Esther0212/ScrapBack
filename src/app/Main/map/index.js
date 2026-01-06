@@ -20,7 +20,8 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import CustomBgColor from "../../../components/customBgColor";
-import { Ionicons, Entypo, FontAwesome } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { Entypo } from "@expo/vector-icons";
 import { db } from "../../../../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import collectionPointMarker from "../../../assets/map/collectionPointMarker.png";
@@ -114,8 +115,6 @@ export default function MapSelector() {
   const [points, setPoints] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [flattenedData, setFlattenedData] = useState([]);
-
-  const [isSatellite, setIsSatellite] = useState(false);
 
   /* ====================================
      FOCUS HANDLING (ENTER / LEAVE MAP)
@@ -543,21 +542,14 @@ export default function MapSelector() {
                 <Text
                   style={[
                     styles.toggleLabel,
-
-                    // 📍 MAP TAB
                     selectedView === "map" && {
-                      color: isSatellite
-                        ? "#FFFFFF" // 🛰 FORCE WHITE when satellite is ON
-                        : systemTheme === "dark"
-                          ? "#FFFFFF"
-                          : "#000000",
+                      color: systemTheme === "dark" ? "#FFFFFF" : "#000000",
+                      color: systemTheme === "light" ? "#000000" : "#FFFFFF",
                     },
-
-                    // 📋 LIST TAB (always black)
                     selectedView === "list" && { color: "#000000" },
                   ]}
                 >
-                  View Nearby Collection Points
+                  Manage Nearby Collection Points
                 </Text>
               </View>
             </View>
@@ -565,51 +557,36 @@ export default function MapSelector() {
 
           {/* Map or List */}
           {selectedView === "map" ? (
-            <>
-              <MapView
-                style={{ flex: 1 }}
-                region={region}
-                ref={mapRef}
-                provider={PROVIDER_GOOGLE}
-                mapType={isSatellite ? "hybrid" : "standard"}
-              >
-                {/* User location marker */}
-                {marker && (
-                  <Marker
-                    coordinate={marker}
-                    title={`${
-                      userData?.firstName ? userData.firstName : "Guest"
-                    }'s Location`}
-                    description="This is where you are."
-                  />
-                )}
-
-                {/* Searched location marker (state kept, but you said no search UI; this won't be set anymore) */}
-                {searchMarker && (
-                  <Marker
-                    coordinate={searchMarker}
-                    title="Searched Location"
-                    description="Selected place from search"
-                    pinColor="#0B57D0"
-                  />
-                )}
-
-                {/* Collection points with status-based icons from collectionSchedule */}
-                {renderMapMarkers()}
-              </MapView>
-              {/* 🛰 MAP TYPE TOGGLE (same as Signup) */}
-              <TouchableOpacity
-                style={styles.mapToggleButton}
-                onPress={() => setIsSatellite(!isSatellite)}
-                activeOpacity={0.8}
-              >
-                <FontAwesome
-                  name={isSatellite ? "map" : "map-o"}
-                  size={24}
-                  color="black"
+            <MapView
+              style={{ flex: 1 }}
+              region={region}
+              ref={mapRef}
+              provider={PROVIDER_GOOGLE}
+            >
+              {/* User location marker */}
+              {marker && (
+                <Marker
+                  coordinate={marker}
+                  title={`${
+                    userData?.firstName ? userData.firstName : "Guest"
+                  }'s Location`}
+                  description="This is where you are."
                 />
-              </TouchableOpacity>
-            </>
+              )}
+
+              {/* Searched location marker (state kept, but you said no search UI; this won't be set anymore) */}
+              {searchMarker && (
+                <Marker
+                  coordinate={searchMarker}
+                  title="Searched Location"
+                  description="Selected place from search"
+                  pinColor="#0B57D0"
+                />
+              )}
+
+              {/* Collection points with status-based icons from collectionSchedule */}
+              {renderMapMarkers()}
+            </MapView>
           ) : (
             <FlatList
               data={flattenedData}
@@ -702,10 +679,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins_700Bold",
     color: "#117D2E",
-    marginBottom: 4,
   },
   cardTitleWrapper: {
     flex: 1,
+    paddingRight: 10,
   },
   cardAddress: {
     fontSize: 14,
@@ -743,27 +720,12 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 4,
     borderRadius: 6,
-    marginBottom: 4,
   },
   statusBadgeText: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Poppins_400Regular",
     textAlign: "center",
-  },
-  mapToggleButton: {
-    position: "absolute",
-    top: 110, // below header
-    right: 16,
-    backgroundColor: "white",
-    padding: 8,
-    borderRadius: 8,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
-    zIndex: 20,
   },
 });

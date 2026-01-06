@@ -37,7 +37,6 @@ import {
   getDoc,
   updateDoc,
   addDoc,
-  setDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
@@ -105,24 +104,12 @@ export default function PickupRequestForm() {
 
   const [isLocked, setIsLocked] = useState(false);
 
-  const [addressChanged, setAddressChanged] = useState(false);
-
-  const [coordsChanged, setCoordsChanged] = useState(false);
-
   const [region, setRegion] = useState({
     latitude: 8.4542,
     longitude: 124.6319,
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
-
-  // 📅 Minimum selectable date = tomorrow
-  const tomorrow = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    d.setHours(0, 0, 0, 0); // start of tomorrow
-    return d;
-  })();
 
   // 📡 Fetch wasteConversionRates
   useEffect(() => {
@@ -432,7 +419,6 @@ export default function PickupRequestForm() {
 
   const confirmLocation = () => {
     setPickupAddress(addressName || "Unknown address");
-    // markerCoords is already correct — no need to reset it
     setModalVisible(false);
   };
 
@@ -600,31 +586,7 @@ export default function PickupRequestForm() {
           requestId: newDoc.id,
         });
 
-        // 🔔 Notify USER — pickup pending approval
-        await setDoc(
-          doc(
-            db,
-            "notifications",
-            user.uid,
-            "userNotifications",
-            newDoc.id // 👈 SAME AS pickupRequestId
-          ),
-          {
-            title: "Pickup Request Submitted",
-            body: "Your pickup request is now <b>pending</b> and is waiting for admin approval.",
-            type: "pickupStatus",
-            requestId: newDoc.id,
-            status: "pending",
-            read: false,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          }
-        );
-
-        showAnimatedToast(
-          "Pickup request submitted. Waiting for admin approval."
-        );
-
+        showAnimatedToast("Pickup request created!");
         setTimeout(() => router.push("/Main/requestPickup"), 1000);
       }
 
@@ -759,7 +721,6 @@ export default function PickupRequestForm() {
               setOriginalAddress(addressName);
               setOriginalCoords(markerCoords);
               setOriginalSearchHeight(searchHeight);
-              setAddressChanged(false); // 👈 reset change tracking
               setModalVisible(true);
             }}
           >
@@ -797,7 +758,6 @@ export default function PickupRequestForm() {
               value={date}
               mode="date"
               display={Platform.OS === "ios" ? "spinner" : "default"}
-              minimumDate={tomorrow} // ✅ DISABLE past + today
               onChange={onChangeDate}
             />
           )}
@@ -810,15 +770,324 @@ export default function PickupRequestForm() {
               onChange={onChangeDate}
             />
           )}
-        </ScrollView>
 
+          {/* Map Modal */}
+          <Modal visible={modalVisible} animationType="slide">
+            <View style={{ flex: 1 }}>
+              <View style={styles.topOverlay}>
+                <Text
+                  style={[
+                    styles.toggleLabel,
+                    systemTheme === "dark"
+                      ? { color: "#FFFFFF" }
+                      : { color: "#000000" },
+                  ]}
+                >
+                  Edit Address
+                </Text>
+                <View style={styles.searchBox}>
+                  <Animated.View
+                    style={{
+                      borderRadius: 10,
+                      padding: 2,
+                      borderWidth: 2, // thickness of glow
+                      paddingHorizontal: 10,
+                      borderColor: glowAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["transparent", "rgba(0,130,67,0.6)"],
+                      }),
+                    }}
+                  >
+                    <TextInput
+                      style={[
+                        styles.searchOverlay,
+                        {
+                          height: searchHeight,
+                        },
+                      ]}
+                      placeholder="Edit or Pinpoint Location"
+                      value={addressName}
+                      onChangeText={setAddressName}
+                      multiline={true}
+                      scrollEnabled={true} // 🔥 allows scrolling when max height reached
+                      onContentSizeChange={(e) => {
+                        const h = e.nativeEvent.contentSize.height;
+
+                        // Approx line height (React Native default ~20)
+                        const lineHeight = 20;
+
+                        // Maximum height for 4 lines
+                        const maxHeight = lineHeight * 4;
+
+                        const adjusted = Math.max(50, Math.min(h, maxHeight));
+
+                        if (adjusted !== searchHeight) {
+                          setSearchHeight(adjusted);
+                        }
+                      }}
+                    />
+                  </Animated.View>
+                </View>
+                <Text
+                  style={[
+                    styles.toggleLabel,
+                    systemTheme === "dark"
+                      ? { color: "#FFFFFF" }
+                      : { color: "#000000" },
+                  ]}
+                >
+                  Pinpoint Location
+                </Text>
+              </View>
+
+              {loadingLocation ? (
+                <ActivityIndicator style={{ marginTop: 20 }} size="large" />
+              ) : (
+                <MapView
+                  provider={PROVIDER_GOOGLE}
+                  style={{ flex: 1 }}
+                  // Use the initialRegion chosen earlier (edit coords or user/default). If initialRegion is null fallback to region state.
+                  initialRegion={initialRegion || region}
+                  mapType={isSatellite ? "hybrid" : "standard"}
+                  onPress={(e) => {
+                    if (isLocked) return;
+                    const coords = e.nativeEvent.coordinate;
+                    setMarkerCoords(coords);
+                    fetchAddressName(coords);
+                  }}
+                >
+                  {markerCoords && (
+                    <Marker
+                      coordinate={markerCoords}
+                      draggable={!isLocked}
+                      title="Pinpointed Pickup Location"
+                      description="This is your requested pickup location. Wait for confirmation from the admin."
+                      onDragEnd={(e) => {
+                        if (isLocked) return;
+                        const coords = e.nativeEvent.coordinate;
+                        setMarkerCoords(coords);
+                        fetchAddressName(coords);
+                      }}
+                    />
+                  )}
+                </MapView>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.accountInfoToggle,
+                  { top: searchHeight + 80 }, // 👈 dynamic offset based on search height
+                ]}
+                onPress={() => setIsSatellite(!isSatellite)}
+                activeOpacity={0.8}
+              >
+                <FontAwesome
+                  name={isSatellite ? "map" : "map-o"}
+                  size={24}
+                  color="black"
+                />
+              </TouchableOpacity>
+
+              <View style={styles.footerOverlay}>
+                <TouchableOpacity
+                  style={styles.cancelBtnOverlay}
+                  onPress={() => {
+                    setAddressName(originalAddress);
+                    setMarkerCoords(originalCoords);
+                    setSearchHeight(originalSearchHeight);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.footerText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.confirmBtnOverlay,
+                    isLocked && { backgroundColor: "#999" },
+                  ]}
+                  disabled={isLocked}
+                  onPress={() => setEditAddressModalVisible(true)}
+                >
+                  <Text style={styles.footerText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Waste Category Modal */}
+          <Modal visible={categoryModalVisible} animationType="slide">
+            <SafeAreaView style={{ flex: 1, backgroundColor: "#F0F1C5" }}>
+              <Text style={styles.modalHeader}>
+                {selectedCategory?.category}
+              </Text>
+              <ScrollView contentContainerStyle={styles.modalList}>
+                {selectedCategory?.items.map((item) => {
+                  const isSelected = selectedTypes.includes(item.type);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => toggleType(item.type)}
+                      style={[
+                        styles.wasteOption,
+                        isSelected && styles.wasteOptionSelected,
+                      ]}
+                      activeOpacity={0.9}
+                    >
+                      <View style={styles.wasteRow}>
+                        <View style={styles.wasteInfo}>
+                          <Text
+                            style={[
+                              styles.wasteText,
+                              isSelected && styles.wasteTextSelected,
+                            ]}
+                            numberOfLines={2}
+                            ellipsizeMode="tail"
+                          >
+                            {item.type}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.wastePoints,
+                              isSelected && {
+                                color: "#008243",
+                                fontFamily: "Poppins_400Regular",
+                              },
+                            ]}
+                          >
+                            {item.points} pts/kg
+                          </Text>
+                        </View>
+
+                        {isSelected && (
+                          <View style={styles.controls}>
+                            <TouchableOpacity
+                              style={styles.stepperBtn}
+                              onPress={() => {
+                                setWeights((prev) => {
+                                  const newValue =
+                                    (parseFloat(prev[item.type]) || 0) - 1;
+
+                                  // 👉 If weight goes to 0 → unselect the type
+                                  if (newValue <= 0) {
+                                    const updated = { ...prev };
+                                    delete updated[item.type];
+
+                                    // remove from selectedTypes
+                                    setSelectedTypes((types) =>
+                                      types.filter((t) => t !== item.type)
+                                    );
+
+                                    return updated;
+                                  }
+
+                                  // normal decrease
+                                  return {
+                                    ...prev,
+                                    [item.type]: newValue.toString(),
+                                  };
+                                });
+                              }}
+                            >
+                              <Text style={styles.stepperText}>-</Text>
+                            </TouchableOpacity>
+
+                            <TextInput
+                              style={styles.weightInput}
+                              placeholder="kg"
+                              keyboardType="numeric"
+                              value={weights[item.type] ?? ""}
+                              onChangeText={(val) => {
+                                // sanitize numbers
+                                const sanitized = val
+                                  .replace(/[^0-9.]/g, "")
+                                  .replace(/^([^.]*\.)|\./g, "$1")
+                                  .replace(/^(\d+\.?\d{0,2}).*$/, "$1");
+
+                                // ✅ Always keep type selected if user is typing
+                                setSelectedTypes((types) =>
+                                  types.includes(item.type)
+                                    ? types
+                                    : [...types, item.type]
+                                );
+
+                                // ✅ If user clears input, DO NOT unselect — just store empty
+                                if (sanitized === "") {
+                                  setWeights((prev) => ({
+                                    ...prev,
+                                    [item.type]: "",
+                                  }));
+                                  return;
+                                }
+
+                                // normal update
+                                setWeights((prev) => ({
+                                  ...prev,
+                                  [item.type]: sanitized,
+                                }));
+                              }}
+                            />
+
+                            <TouchableOpacity
+                              style={styles.stepperBtn}
+                              onPress={() => {
+                                setSelectedTypes((types) =>
+                                  types.includes(item.type)
+                                    ? types
+                                    : [...types, item.type]
+                                );
+
+                                setWeights((prev) => ({
+                                  ...prev,
+                                  [item.type]: (
+                                    (parseFloat(prev[item.type]) || 0) + 1
+                                  ).toString(),
+                                }));
+                              }}
+                            >
+                              <Text style={styles.stepperText}>+</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => {
+                    // ✅ Remove items with empty or zero weight on close
+                    setWeights((prev) => {
+                      const updated = { ...prev };
+
+                      Object.entries(updated).forEach(([key, value]) => {
+                        if (!value || parseFloat(value) <= 0) {
+                          delete updated[key];
+                        }
+                      });
+
+                      // also clean selectedTypes
+                      setSelectedTypes((prevTypes) =>
+                        prevTypes.filter((type) => updated[type] !== undefined)
+                      );
+
+                      return updated;
+                    });
+
+                    setCategoryModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalCloseText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </Modal>
+        </ScrollView>
         {/* ✅ Confirmation Modal before submitting */}
         <Modal
           visible={confirmModalVisible}
           transparent
           animationType="fade"
-          presentationStyle="overFullScreen"
-          statusBarTranslucent
           onRequestClose={() => setConfirmModalVisible(false)}
         >
           <View style={styles.overlayCenter}>
@@ -872,14 +1141,10 @@ export default function PickupRequestForm() {
             </View>
           </View>
         </Modal>
-
-        {/* Edit Address Modal */}
         <Modal
           visible={editAddressModalVisible}
           transparent
           animationType="fade"
-          presentationStyle="overFullScreen"
-          statusBarTranslucent
           onRequestClose={() => setEditAddressModalVisible(false)}
         >
           <View style={styles.overlayCenter}>
@@ -901,23 +1166,17 @@ export default function PickupRequestForm() {
                   style={styles.modalUseButton}
                   onPress={() => {
                     setEditAddressModalVisible(false);
-
-                    if (addressChanged || coordsChanged) {
-                      confirmLocation(); // ✅ saves address + coords
-                    } else {
-                      setModalVisible(false); // truly unchanged
-                    }
+                    confirmLocation();
                   }}
                 >
-                  <Text style={styles.modalUseText}>
-                    {addressChanged ? "Save address" : "Use as is"}
-                  </Text>
+                  <Text style={styles.modalUseText}>Use as is</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.modalEditButton}
                   onPress={() => {
                     setEditAddressModalVisible(false);
-                    // ✅ ONLY animate — do NOT close modal
+
+                    // trigger search field glow
                     Animated.sequence([
                       Animated.timing(glowAnim, {
                         toValue: 1,
@@ -949,7 +1208,6 @@ export default function PickupRequestForm() {
           </View>
         </Modal>
 
-        {/* Animated Toast */}
         {toastVisible && (
           <Animated.View
             style={[
@@ -971,337 +1229,6 @@ export default function PickupRequestForm() {
           </Animated.View>
         )}
       </SafeAreaView>
-
-      {/* Waste Category Modal */}
-      <Modal
-        visible={categoryModalVisible}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        statusBarTranslucent={true} // 🔥 Android
-      >
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#F0F1C5" }}>
-          <Text style={styles.modalHeader}>{selectedCategory?.category}</Text>
-          <ScrollView contentContainerStyle={styles.modalList}>
-            {selectedCategory?.items.map((item) => {
-              const isSelected = selectedTypes.includes(item.type);
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => toggleType(item.type)}
-                  style={[
-                    styles.wasteOption,
-                    isSelected && styles.wasteOptionSelected,
-                  ]}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.wasteRow}>
-                    <View style={styles.wasteInfo}>
-                      <Text
-                        style={[
-                          styles.wasteText,
-                          isSelected && styles.wasteTextSelected,
-                        ]}
-                        numberOfLines={2}
-                        ellipsizeMode="tail"
-                      >
-                        {item.type}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.wastePoints,
-                          isSelected && {
-                            color: "#008243",
-                            fontFamily: "Poppins_400Regular",
-                          },
-                        ]}
-                      >
-                        {item.points} pts/kg
-                      </Text>
-                    </View>
-
-                    {isSelected && (
-                      <View style={styles.controls}>
-                        <TouchableOpacity
-                          style={styles.stepperBtn}
-                          onPress={() => {
-                            setWeights((prev) => {
-                              const newValue =
-                                (parseFloat(prev[item.type]) || 0) - 1;
-
-                              // 👉 If weight goes to 0 → unselect the type
-                              if (newValue <= 0) {
-                                const updated = { ...prev };
-                                delete updated[item.type];
-
-                                // remove from selectedTypes
-                                setSelectedTypes((types) =>
-                                  types.filter((t) => t !== item.type)
-                                );
-
-                                return updated;
-                              }
-
-                              // normal decrease
-                              return {
-                                ...prev,
-                                [item.type]: newValue.toString(),
-                              };
-                            });
-                          }}
-                        >
-                          <Text style={styles.stepperText}>-</Text>
-                        </TouchableOpacity>
-
-                        <TextInput
-                          style={styles.weightInput}
-                          placeholder="kg"
-                          keyboardType="numeric"
-                          value={weights[item.type] ?? ""}
-                          onChangeText={(val) => {
-                            // sanitize numbers
-                            const sanitized = val
-                              .replace(/[^0-9.]/g, "")
-                              .replace(/^([^.]*\.)|\./g, "$1")
-                              .replace(/^(\d+\.?\d{0,2}).*$/, "$1");
-
-                            // ✅ Always keep type selected if user is typing
-                            setSelectedTypes((types) =>
-                              types.includes(item.type)
-                                ? types
-                                : [...types, item.type]
-                            );
-
-                            // ✅ If user clears input, DO NOT unselect — just store empty
-                            if (sanitized === "") {
-                              setWeights((prev) => ({
-                                ...prev,
-                                [item.type]: "",
-                              }));
-                              return;
-                            }
-
-                            // normal update
-                            setWeights((prev) => ({
-                              ...prev,
-                              [item.type]: sanitized,
-                            }));
-                          }}
-                        />
-
-                        <TouchableOpacity
-                          style={styles.stepperBtn}
-                          onPress={() => {
-                            setSelectedTypes((types) =>
-                              types.includes(item.type)
-                                ? types
-                                : [...types, item.type]
-                            );
-
-                            setWeights((prev) => ({
-                              ...prev,
-                              [item.type]: (
-                                (parseFloat(prev[item.type]) || 0) + 1
-                              ).toString(),
-                            }));
-                          }}
-                        >
-                          <Text style={styles.stepperText}>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => {
-                // ✅ Remove items with empty or zero weight on close
-                setWeights((prev) => {
-                  const updated = { ...prev };
-
-                  Object.entries(updated).forEach(([key, value]) => {
-                    if (!value || parseFloat(value) <= 0) {
-                      delete updated[key];
-                    }
-                  });
-
-                  // also clean selectedTypes
-                  setSelectedTypes((prevTypes) =>
-                    prevTypes.filter((type) => updated[type] !== undefined)
-                  );
-
-                  return updated;
-                });
-
-                setCategoryModalVisible(false);
-              }}
-            >
-              <Text style={styles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Map Modal */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        statusBarTranslucent={true} // 🔥 Android
-      >
-        <View style={{ flex: 1 }}>
-          <View style={styles.topOverlay}>
-            <Text
-              style={[
-                styles.toggleLabel,
-                systemTheme === "dark"
-                  ? { color: "#FFFFFF" }
-                  : { color: "#000000" },
-              ]}
-            >
-              Edit Address
-            </Text>
-            <View style={styles.searchBox}>
-              <Animated.View
-                style={{
-                  borderRadius: 10,
-                  padding: 2,
-                  borderWidth: 2, // thickness of glow
-                  paddingHorizontal: 10,
-                  borderColor: glowAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ["transparent", "rgba(0,130,67,0.6)"],
-                  }),
-                }}
-              >
-                <TextInput
-                  style={[
-                    styles.searchOverlay,
-                    {
-                      height: searchHeight,
-                    },
-                  ]}
-                  placeholder="Edit or Pinpoint Location"
-                  value={addressName}
-                  onChangeText={(text) => {
-                    setAddressName(text);
-
-                    // detect change vs original
-                    if (text.trim() !== (originalAddress || "").trim()) {
-                      setAddressChanged(true);
-                    } else {
-                      setAddressChanged(false);
-                    }
-                  }}
-                  multiline={true}
-                  scrollEnabled={true} // 🔥 allows scrolling when max height reached
-                  onContentSizeChange={(e) => {
-                    const h = e.nativeEvent.contentSize.height;
-
-                    // Approx line height (React Native default ~20)
-                    const lineHeight = 20;
-
-                    // Maximum height for 4 lines
-                    const maxHeight = lineHeight * 4;
-
-                    const adjusted = Math.max(50, Math.min(h, maxHeight));
-
-                    if (adjusted !== searchHeight) {
-                      setSearchHeight(adjusted);
-                    }
-                  }}
-                />
-              </Animated.View>
-            </View>
-            <Text
-              style={[
-                styles.toggleLabel,
-                systemTheme === "dark"
-                  ? { color: "#FFFFFF" }
-                  : { color: "#000000" },
-              ]}
-            >
-              Pinpoint Location
-            </Text>
-          </View>
-
-          {loadingLocation ? (
-            <ActivityIndicator style={{ marginTop: 20 }} size="large" />
-          ) : (
-            <MapView
-              provider={PROVIDER_GOOGLE}
-              style={{ flex: 1 }}
-              // Use the initialRegion chosen earlier (edit coords or user/default). If initialRegion is null fallback to region state.
-              initialRegion={initialRegion || region}
-              mapType={isSatellite ? "hybrid" : "standard"}
-              onPress={(e) => {
-                if (isLocked) return;
-                const coords = e.nativeEvent.coordinate;
-                setMarkerCoords(coords);
-                setCoordsChanged(true); // ✅ TRACK CHANGE
-                fetchAddressName(coords);
-              }}
-            >
-              {markerCoords && (
-                <Marker
-                  coordinate={markerCoords}
-                  draggable={!isLocked}
-                  title="Pinpointed Pickup Location"
-                  description="This is your requested pickup location. Wait for confirmation from the admin."
-                  onDragEnd={(e) => {
-                    if (isLocked) return;
-                    const coords = e.nativeEvent.coordinate;
-                    setMarkerCoords(coords);
-                    setCoordsChanged(true); // ✅ TRACK CHANGE
-                    fetchAddressName(coords);
-                  }}
-                />
-              )}
-            </MapView>
-          )}
-          <TouchableOpacity
-            style={[
-              styles.accountInfoToggle,
-              { top: searchHeight + 85 }, // 👈 dynamic offset based on search height
-            ]}
-            onPress={() => setIsSatellite(!isSatellite)}
-            activeOpacity={0.8}
-          >
-            <FontAwesome
-              name={isSatellite ? "map" : "map-o"}
-              size={24}
-              color="black"
-            />
-          </TouchableOpacity>
-
-          <View style={styles.footerOverlay}>
-            <TouchableOpacity
-              style={styles.cancelBtnOverlay}
-              onPress={() => {
-                setAddressName(originalAddress);
-                setMarkerCoords(originalCoords);
-                setSearchHeight(originalSearchHeight);
-                setModalVisible(false);
-              }}
-            >
-              <Text style={styles.footerText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.confirmBtnOverlay,
-                isLocked && { backgroundColor: "#999" },
-              ]}
-              disabled={isLocked}
-              onPress={() => setEditAddressModalVisible(true)}
-            >
-              <Text style={styles.footerText}>Confirm</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </CustomBgColor>
   );
 }
@@ -1394,7 +1321,7 @@ const styles = StyleSheet.create({
   },
   topOverlay: {
     position: "absolute",
-    top: 40,
+    top: 30,
     left: 20,
     right: 20,
     zIndex: 10,
@@ -1455,7 +1382,6 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     fontSize: 18,
     padding: 16,
-    paddingTop: 40,
     textAlign: "center",
     backgroundColor: "#F0F1C5",
     shadowColor: "#000",
